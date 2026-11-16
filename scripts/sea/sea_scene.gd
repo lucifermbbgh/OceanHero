@@ -163,6 +163,16 @@ func _draw() -> void:
 		draw_circle(isl[0], isl[1], Color(0.30, 0.34, 0.20))
 		draw_circle(isl[0], isl[1] * 0.72, Color(0.36, 0.40, 0.24))
 		draw_arc(isl[0], isl[1], 0, TAU, 40, Color(0.50, 0.55, 0.33), 5.0)
+	# 任务目标标记（运输/护航 → 哨站）
+	for q in GameState.quests_active:
+		var qt := String(q.get("type", ""))
+		if qt != "transport" and qt != "escort":
+			continue
+		var pulse := 118.0
+		draw_arc(outpost_pos, pulse, 0, TAU, 32, Color(0.95, 0.85, 0.35), 3.0)
+		draw_string(ThemeDB.fallback_font, outpost_pos + Vector2(-40, -150), "任务",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0.95, 0.85, 0.35))
+
 	# 打捞点
 	for sv in salvages:
 		draw_arc(sv, 44.0, 0, TAU, 20, Color(0.75, 0.62, 0.35), 3.0)
@@ -215,6 +225,7 @@ func _build_hud() -> void:
 	hud = SeaHud.new()
 	add_child(hud)
 	hud.ammo_selected.connect(_on_ammo_selected)
+	hud.quest_nav_pressed.connect(_on_quest_nav)
 	hud.fire_pressed.connect(_on_fire_pressed)
 	hud.boarding_pressed.connect(_on_boarding_pressed)
 	hud.retreat_pressed.connect(_on_retreat_pressed)
@@ -655,6 +666,7 @@ func _process(delta: float) -> void:
 	_update_boarding(delta)
 	_update_bounty_hunters(delta)
 	_update_escort()
+	_refresh_quest_hud()
 	if camera != null and player != null and is_instance_valid(player):
 		camera.position = player.position
 	if hud != null and player != null:
@@ -803,6 +815,61 @@ func _on_enemy_disengaged(ship) -> void:
 		player.target = null
 		player.engaged = false
 	hud.ticker("已脱离 %s 的追击" % String(ship.get("display_name")))
+
+# ---------------- 任务导航 ----------------
+
+## 任务的导航目标位置；没有可去的地方时返回 null
+func _quest_nav_target(q: Dictionary) -> Variant:
+	match String(q.get("type", "")):
+		"transport", "escort":
+			return outpost_pos
+		"gather":
+			var best = null
+			var best_d := INF
+			for sv in salvages:
+				var d: float = player.global_position.distance_to(sv)
+				if d < best_d:
+					best_d = d
+					best = sv
+			return best
+		"hunt":
+			var kind := String(q.get("target_kind", "pirate"))
+			var best_e = null
+			var best_ed := INF
+			for e in enemies:
+				if not is_instance_valid(e) or not e.get("alive"):
+					continue
+				var is_mon: bool = e.has_method("alive_limbs")
+				if kind == "monster" and not is_mon:
+					continue
+				if kind == "pirate" and is_mon:
+					continue
+				var d2: float = player.global_position.distance_to(e.global_position)
+				if d2 < best_ed:
+					best_ed = d2
+					best_e = e.global_position
+			return best_e
+	return null
+
+func _on_quest_nav(index: int) -> void:
+	if index < 0 or index >= GameState.quests_active.size():
+		return
+	var q: Dictionary = GameState.quests_active[index]
+	var t = _quest_nav_target(q)
+	if t == null:
+		hud.ticker("该任务暂时没有可导航的目标")
+		return
+	player.nav_queue = _route_to(t)
+	player.nav_target = null
+	player.target = null
+	player.engaged = false
+	hud.ticker("已设定航线：%s" % String(q.get("title", "")))
+
+func _refresh_quest_hud() -> void:
+	var can_nav: Array = []
+	for q in GameState.quests_active:
+		can_nav.append(_quest_nav_target(q) != null)
+	hud.update_quests(GameState.quests_active, can_nav)
 
 func _lock_target(enemy) -> void:
 	player.target = enemy

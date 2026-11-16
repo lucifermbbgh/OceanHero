@@ -2,6 +2,7 @@ extends CanvasLayer
 ## 海域 HUD。全部用代码构建，避免手写 .tscn 的锚点错误。
 
 signal ammo_selected(id: StringName)
+signal quest_nav_pressed(index: int)
 signal fire_pressed
 signal boarding_pressed
 signal retreat_pressed
@@ -20,6 +21,7 @@ var _clock: Label
 var _ammo_buttons := {}
 var _fire_btn: Button
 var _board_btn: Button
+var _quest_rows: Array = []
 var _retreat_btn: Button
 var _ticker_timer := 0.0
 
@@ -31,6 +33,7 @@ func _ready() -> void:
 	add_child(root)
 
 	_build_player_panel(root)
+	_build_quest_panel(root)
 	_build_target_panel(root)
 	_build_command_bar(root)
 
@@ -110,6 +113,30 @@ func _build_player_panel(root: Control) -> void:
 	_bar_row(vb, "sail", "风帆", Color(0.85, 0.82, 0.7))
 	_bar_row(vb, "rudder", "舵机", Color(0.55, 0.7, 0.85))
 	_bar_row(vb, "crew", "船员", Color(0.45, 0.72, 0.45))
+
+func _build_quest_panel(root: Control) -> void:
+	var vb := _make_panel(root, Vector2(20, 182), Vector2(380, 150))
+	var title := Label.new()
+	title.text = "任务追踪"
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color(0.88, 0.76, 0.42))
+	vb.add_child(title)
+	for i in range(3):
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 6)
+		vb.add_child(hb)
+		var l := Label.new()
+		l.add_theme_font_size_override("font_size", 13)
+		l.custom_minimum_size = Vector2(268, 0)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hb.add_child(l)
+		var b := Button.new()
+		b.text = "导航"
+		b.custom_minimum_size = Vector2(64, 24)
+		var idx := i
+		b.pressed.connect(func(): quest_nav_pressed.emit(idx))
+		hb.add_child(b)
+		_quest_rows.append({"label": l, "button": b, "row": hb})
 
 func _build_target_panel(root: Control) -> void:
 	_target_panel = PanelContainer.new()
@@ -198,6 +225,24 @@ func _build_command_bar(root: Control) -> void:
 	ret.custom_minimum_size = Vector2(110, 38)
 	ret.pressed.connect(func(): return_pressed.emit())
 	hb.add_child(ret)
+
+## 刷新任务追踪面板；targets[i] 为「导航是否可用」
+func update_quests(active: Array, can_nav: Array) -> void:
+	for i in range(_quest_rows.size()):
+		var row: Dictionary = _quest_rows[i]
+		var hb: HBoxContainer = row.row
+		if i < active.size():
+			var q: Dictionary = active[i]
+			var prog := "%d/%d" % [int(q.get("progress", 0)), int(q.get("amount", 1))]
+			var fac := String(q.get("faction", ""))
+			var fac_txt := ""
+			if fac != "":
+				fac_txt = "　[%s]" % String(GameState.FACTION_NAMES.get(fac, ""))
+			row.label.text = "%s　%s%s" % [String(q.get("title", "任务")), prog, fac_txt]
+			hb.visible = true
+			row.button.disabled = not bool(can_nav[i]) if i < can_nav.size() else true
+		else:
+			hb.visible = false
 
 func update_all(player, target) -> void:
 	if player != null and is_instance_valid(player):

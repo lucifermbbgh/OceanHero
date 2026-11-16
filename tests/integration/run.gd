@@ -15,6 +15,7 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_quest_nav()
 	await _test_engage_rules()
 	await _test_maps()
 	await _test_bosses()
@@ -480,6 +481,58 @@ func _test_cross_port() -> void:
 	sea.queue_free()
 	s.queue_free()
 	await _frames(2)
+
+# ---------------- 任务导航 ----------------
+func _test_quest_nav() -> void:
+	print("\n[任务导航]")
+	GameState.reset_new_game()
+	GameState.quests_active.clear()
+	GameState.quests_active.append({"id": "n1", "type": "transport", "commodity": "grain",
+		"amount": 10, "progress": 0, "title": "运输测试", "reward_gold": 100,
+		"reward_xp": 0, "reward_comm": 0, "faction": "merchant"})
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+
+	var q: Dictionary = GameState.quests_active[0]
+	var target = s._quest_nav_target(q)
+	_ok(target != null, "运输任务有导航目标")
+	_ok(target == s.outpost_pos, "运输任务导航到哨站")
+
+	s._on_quest_nav(0)
+	_ok(s.player.nav_queue.size() >= 1 or s.player.nav_target != null, "点导航后生成航线")
+
+	# 采集任务 → 最近打捞点
+	GameState.quests_active.clear()
+	GameState.quests_active.append({"id": "n2", "type": "gather", "amount": 2, "progress": 0,
+		"title": "采集测试", "reward_gold": 100, "reward_xp": 0, "reward_comm": 0})
+	var s2 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s2)
+	await _frames(3)
+	_ok(s2.salvages.size() > 0, "采集任务生成打捞点")
+	var g_target = s2._quest_nav_target(GameState.quests_active[0])
+	_ok(g_target != null, "采集任务有导航目标")
+	s2.queue_free()
+	await _frames(2)
+
+	# 讨伐任务 → 最近的对应敌人
+	GameState.quests_active.clear()
+	GameState.quests_active.append({"id": "n3", "type": "hunt", "target_kind": "pirate",
+		"amount": 3, "progress": 0, "title": "讨伐测试", "reward_gold": 100,
+		"reward_xp": 0, "reward_comm": 0})
+	var s3 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s3)
+	await _frames(3)
+	var h_target = s3._quest_nav_target(GameState.quests_active[0])
+	_ok(h_target != null, "讨伐任务导航到最近的海盗")
+
+	# 贸易任务没有具体地点
+	var trade := {"type": "trade", "amount": 100, "progress": 0}
+	_ok(s3._quest_nav_target(trade) == null, "贸易任务没有导航点")
+	s3.queue_free()
+	await _frames(2)
+	GameState.quests_active.clear()
 
 # ---------------- 交战规则 ----------------
 func _test_engage_rules() -> void:
