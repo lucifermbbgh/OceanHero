@@ -552,6 +552,30 @@ func _test_ecology() -> void:
 			overflow += 1
 	_ok(overflow == 0, "网格内单位数受控", "溢出=%d" % overflow)
 
+	# 均匀度：任意两艘的间距不应过近
+	var list: Array = []
+	for e in s3.enemies:
+		if is_instance_valid(e):
+			list.append(e)
+	var min_pair := 1.0e9
+	for i in range(list.size()):
+		for j in range(i + 1, list.size()):
+			min_pair = minf(min_pair, list[i].global_position.distance_to(list[j].global_position))
+	_ok(min_pair >= 200.0, "单位之间保持最小间距（不会挤成一堆）", "最小间距=%.0f" % min_pair)
+
+	# 迎接单位的采样必须在圆周上等角距分散（直接验证采样函数）
+	s3._near_sector = 0
+	var angles: Array = []
+	for k in range(3):
+		var p: Vector2 = s3._sample_candidate(true)
+		angles.append((p - s3.player.global_position).angle())
+	var min_gap := 1.0e9
+	for i in range(angles.size()):
+		for j in range(i + 1, angles.size()):
+			min_gap = minf(min_gap, absf(wrapf(angles[i] - angles[j], -PI, PI)))
+	_ok(min_gap > deg_to_rad(60.0), "迎接单位绕玩家等角距分散",
+		"最小角度差=%.1f°" % rad_to_deg(min_gap))
+
 	# 围攻上限：跑一段时间后追打玩家的单位不超过 3
 	for i in range(240):
 		await get_tree().physics_frame

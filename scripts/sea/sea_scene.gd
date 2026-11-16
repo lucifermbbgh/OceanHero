@@ -53,9 +53,13 @@ const NEAR_UNITS := 3                # 出生点附近保留几个单位，避�
 const DENSITY_CELL := 2000.0         # 密度网格边长
 const MAX_PER_CELL := 3              # 单个网格内的单位上限
 const MAX_ATTACKERS_ON_PLAYER := 3   # 同时追打玩家的单位上限
+## 采样：最小间距 + 迎接单位的扇区分层
+const MIN_SEPARATION := 420.0
+const NEAR_SECTORS := 6              # 环带按 6 个扇区分层，每个迎接单位占不同扇区
 
 var hunter_timer := 45.0
 var ai_timer := 0.0
+var _near_sector := 0
 var salvages: Array = []
 var escort_ship = null
 var boarded := false
@@ -658,28 +662,68 @@ func _count_kind(kind: String) -> int:
 	return n
 
 ## 在整张图里找一个"不挤、不贴着玩家"的落点
-## near=true 时在玩家视野边缘的环带里取点（只给少量"迎接"单位用）
+## 落点采样：先严格，再逐步放宽，最后才兜底
 func _random_spawn_pos(near: bool = false) -> Vector2:
+	# 1) 严格：最小间距 + 网格密度
+	for attempt in range(60):
+		var p := _sample_candidate(near)
+		if _is_spot_free(p, MIN_SEPARATION):
+			return p
+	# 2) 放宽间距到一半再试
+	for attempt in range(60):
+		var p := _sample_candidate(near)
+		if _is_spot_free(p, MIN_SEPARATION * 0.5):
+			return p
+	# 3) 兜底：找全图最空、离玩家最远的格子中心
+	return _fallback_spot()
+
+## 候选点：迎接单位按扇区分层（保证绕玩家一圈分散），其余全图均匀采样
+func _sample_candidate(near: bool) -> Vector2:
 	if near and player != null and is_instance_valid(player):
-		var ang := RngService.randf() * TAU
+		# 按 NEAR_UNITS 等分圆周，再叠 ±20° 抖动：
+		# 保证几个"迎接"单位绕玩家分散，不会全挤在一侧
+		var idx := _near_sector % maxi(1, NEAR_UNITS)
+		_near_sector += 1
+		var ang := float(idx) * TAU / float(maxi(1, NEAR_UNITS)) + RngService.randf_range(-0.35, 0.35)
 		var dist := RngService.randf_range(NEAR_RING_MIN, NEAR_RING_MAX)
 		return (player.global_position + Vector2.RIGHT.rotated(ang) * dist).clamp(
 			Vector2(SPAWN_MARGIN, SPAWN_MARGIN), Vector2(SEA_SIZE - SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
-	for attempt in range(40):
-		var p := Vector2(
-			RngService.randf_range(SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN),
-			RngService.randf_range(SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
-		if player != null and is_instance_valid(player):
-			if p.distance_to(player.global_position) < PLAYER_SAFE_RADIUS:
-				continue
-		if _units_in_cell(p) >= MAX_PER_CELL:
-			continue
-		return p
-	# 实在找不到就丢到远离玩家的一角
-	var fallback := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5)
+	return Vector2(
+		RngService.randf_range(SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN),
+		RngService.randf_range(SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
+
+## 这个点是否满足：不贴玩家、网格不超限、与已有单位保持 min_sep
+func _is_spot_free(p: Vector2, min_sep: float) -> bool:
 	if player != null and is_instance_valid(player):
-		fallback = player.global_position + Vector2(2200, 2200)
-	return fallback.clamp(Vector2(SPAWN_MARGIN, SPAWN_MARGIN), Vector2(SEA_SIZE - SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
+		if p.distance_to(player.global_position) < PLAYER_SAFE_RADIUS - 1.0:
+			return false
+	if _units_in_cell(p) >= MAX_PER_CELL:
+		return false
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		if e.global_position.distance_to(p) < min_sep:
+			return false
+	return true
+
+## 兜底：挑一个离其他单位最远、且格子里没人的位置
+func _fallback_spot() -> Vector2:
+	var best := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5)
+	var best_score := -1.0
+	for gx in range(1, 8):
+		for gy in range(1, 8):
+			var p := Vector2(float(gx) * SEA_SIZE / 8.0, float(gy) * SEA_SIZE / 8.0)
+			if player != null and is_instance_valid(player):
+				if p.distance_to(player.global_position) < PLAYER_SAFE_RADIUS:
+					continue
+			var score := 1.0e9
+			for e in enemies:
+				if is_instance_valid(e):
+					score = minf(score, e.global_position.distance_to(p))
+			if score > best_score:
+				best_score = score
+				best = p
+	return best
 
 func _units_in_cell(p: Vector2) -> int:
 	var cell := Vector2(floor(p.x / DENSITY_CELL), floor(p.y / DENSITY_CELL))
@@ -1062,10 +1106,20 @@ func debug_stats() -> Dictionary:
 		var ep: Vector2 = e.global_position
 		var k := "%d_%d" % [int(floor(ep.x / DENSITY_CELL)), int(floor(ep.y / DENSITY_CELL))]
 		cells[k] = int(cells.get(k, 0)) + 1
+	# 两两最近距离：衡量是否"挤成一堆"
+	var min_pair := 1.0e9
+	var units_list: Array = []
+	for e in enemies:
+		if is_instance_valid(e):
+			units_list.append(e)
+	for i in range(units_list.size()):
+		for j in range(i + 1, units_list.size()):
+			min_pair = minf(min_pair, units_list[i].global_position.distance_to(units_list[j].global_position))
 	return {
 		"units": enemies.size(),
 		"within_1200": near,
 		"nearest": min_d,
+		"min_pair": min_pair,
 		"targeting_player": _count_targeting_player(),
 		"max_cell": cells.values().max() if not cells.is_empty() else 0,
 		"fps": Engine.get_frames_per_second(),
