@@ -15,6 +15,7 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_pathfinding()
 	await _test_ecology()
 	await _test_quest_nav()
 	await _test_engage_rules()
@@ -480,6 +481,64 @@ func _test_cross_port() -> void:
 			at_home += 1
 	_ok(at_home == 0, "母港船位里没有哨站那艘船")
 	sea.queue_free()
+	s.queue_free()
+	await _frames(2)
+
+# ---------------- 航线规划 ----------------
+func _path_hits_island(s, path: Array, from: Vector2) -> bool:
+	var prev := from
+	for p in path:
+		for isl in s.islands:
+			if s._segment_hits_circle(prev, p, isl[0], isl[1] + 40.0):
+				return true
+		prev = p
+	return false
+
+func _test_pathfinding() -> void:
+	print("\n[航线规划]")
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	_ok(s.islands.size() > 0, "有岛屿可用于测试")
+
+	var isl: Array = s.islands[0]
+	var c: Vector2 = isl[0]
+	var r: float = isl[1]
+	s.player.global_position = (c + Vector2(r + 300.0, 0)).clamp(Vector2(100, 100), Vector2(7900, 7900))
+	var target: Vector2 = (c - Vector2(r + 300.0, 0)).clamp(Vector2(100, 100), Vector2(7900, 7900))
+	var route: Array = s._route_to(target)
+	_ok(route.size() >= 2, "跨岛航线会插入绕航点", "waypoints=%d" % route.size())
+	_ok(not _path_hits_island(s, route, s.player.global_position),
+		"规划出的航线全程不穿岛", "waypoints=%d" % route.size())
+
+	# 直线可达时不应绕路
+	var clear_target: Vector2 = (s.player.global_position + Vector2(0, 500)).clamp(Vector2(100, 100), Vector2(7900, 7900))
+	var direct: Array = s._route_to(clear_target)
+	var blocked := false
+	for i in s.islands:
+		if s._segment_hits_circle(s.player.global_position, clear_target, i[0], i[1] + 40.0):
+			blocked = true
+	if not blocked:
+		_ok(direct.size() == 1, "无障碍时只有目标点", "waypoints=%d" % direct.size())
+
+	# 多岛串联：随便挑几个远点，航线都必须不穿岛
+	var ok_all := true
+	for k in range(6):
+		var dest := Vector2(600.0 + k * 1100.0, 700.0 + k * 900.0).clamp(Vector2(100, 100), Vector2(7900, 7900))
+		var rt: Array = s._route_to(dest)
+		if _path_hits_island(s, rt, s.player.global_position):
+			ok_all = false
+	_ok(ok_all, "随机 6 个目标点的航线都不穿岛")
+
+	# 撤离也走规划而不是直线
+	s.player.heading = 0.0
+	s.player.engaged = true
+	s.player.target = null
+	s._on_retreat_pressed()
+	_ok(s.player.nav_queue.size() >= 1, "撤离会生成规划航线", "queue=%d" % s.player.nav_queue.size())
+
 	s.queue_free()
 	await _frames(2)
 
@@ -1152,9 +1211,11 @@ func _test_avoidance() -> void:
 	# 点击绕行：目标在岛的另一侧
 	s.player.global_position = c + Vector2(r + 300.0, 0)
 	var route: Array = s._route_to(c + Vector2(-(r + 300.0), 0))
-	_ok(route.size() == 2, "跨岛航线插入绕航点", "size=%d" % route.size())
+	_ok(route.size() >= 2, "跨岛航线插入绕航点", "size=%d" % route.size())
+	_ok(not _path_hits_island(s, route, s.player.global_position), "跨岛航线不穿岛",
+		"size=%d" % route.size())
 	var direct: Array = s._route_to(c + Vector2(r + 900.0, 0))
-	_ok(direct.size() == 1, "不跨岛的航线不加绕航点")
+	_ok(direct.size() == 1, "不跨岛的航线不加绕航点", "size=%d" % direct.size())
 
 	# 没有船体碰撞
 	_ok(s.player.collision_mask == 0, "船不与任何实体碰撞")

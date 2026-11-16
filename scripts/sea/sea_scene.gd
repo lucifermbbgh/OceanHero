@@ -906,24 +906,48 @@ func _unhandled_input(event: InputEvent) -> void:
 			player.target = null
 			player.engaged = false
 
-## 线段–圆相交时插入一个绕航点（只做一次，不做多岛串联寻路）
+## 求绕开圆的一个切点：从 from 出发绕 open 圈走、且尽量靠近 toward
+func _tangent_point(from: Vector2, c: Vector2, r: float, toward: Vector2) -> Vector2:
+	var d := from.distance_to(c)
+	if d <= r + 1.0:
+		# 已经压在圈里：沿远离圆心的方向先走出去
+		var out_dir := (from - c)
+		if out_dir.length() < 0.01:
+			out_dir = Vector2.RIGHT
+		return c + out_dir.normalized() * (r + 80.0)
+	var alpha := acos(clampf(r / d, -1.0, 1.0))
+	var theta := (from - c).angle()
+	var cand_a := c + Vector2.RIGHT.rotated(theta + alpha) * (r + 60.0)
+	var cand_b := c + Vector2.RIGHT.rotated(theta - alpha) * (r + 60.0)
+	return cand_a if cand_a.distance_to(toward) < cand_b.distance_to(toward) else cand_b
+
+## 规划航线：逐段检查，遇到岛屿就插入切点，直到整条路线都不穿岛（最多 8 次修正）
 func _route_to(target: Vector2) -> Array:
 	if player == null:
 		return [target]
 	var start: Vector2 = player.global_position
-	for isl in islands:
-		var c: Vector2 = isl[0]
-		var r: float = isl[1] + 40.0
-		if not _segment_hits_circle(start, target, c, r):
-			continue
-		var dir: Vector2 = (target - start).normalized()
-		var perp := Vector2(-dir.y, dir.x)
-		var side := signf(perp.dot(start - c))
-		if absf(side) < 0.01:
-			side = 1.0
-		var wp: Vector2 = c + perp * side * (isl[1] + 140.0)
-		return [wp, target]
-	return [target]
+	var pts: Array = [start, target]
+	for iteration in range(8):
+		var inserted := false
+		for i in range(pts.size() - 1):
+			var a: Vector2 = pts[i]
+			var b: Vector2 = pts[i + 1]
+			for isl in islands:
+				var c: Vector2 = isl[0]
+				var r: float = isl[1] + AVOID_MARGIN * 0.75
+				if not _segment_hits_circle(a, b, c, r):
+					continue
+				var wp := _tangent_point(a, c, r, b)
+				# 防止原地插入同一个点导致死循环
+				if wp.distance_to(a) > 30.0:
+					pts.insert(i + 1, wp)
+					inserted = true
+					break
+			if inserted:
+				break
+		if not inserted:
+			break
+	return pts.slice(1)
 
 func _segment_hits_circle(a: Vector2, b: Vector2, c: Vector2, r: float) -> bool:
 	var ab := b - a
@@ -1091,6 +1115,13 @@ func _faction_ai(delta: float) -> void:
 			e.set("target", best)
 			e.set("engaged", true)
 
+## 调试用：把规划出的航线转成可打印的坐标数组
+func debug_route(dest: Vector2) -> Array:
+	var out: Array = []
+	for p in _route_to(dest):
+		out.append([int(p.x), int(p.y)])
+	return out
+
 ## 调试/记录用：当前海域的密度快照
 func debug_stats() -> Dictionary:
 	var near := 0
@@ -1164,7 +1195,10 @@ func _on_retreat_pressed() -> void:
 	var t = player.target
 	player.target = null
 	player.engaged = false
-	player.nav_target = player.position + Vector2.RIGHT.rotated(player.heading) * 1200.0
+	var flee: Vector2 = (player.position + Vector2.RIGHT.rotated(player.heading) * 1400.0).clamp(
+		Vector2(100, 100), Vector2(SEA_SIZE - 100, SEA_SIZE - 100))
+	player.nav_queue = _route_to(flee)
+	player.nav_target = null
 	if t != null and is_instance_valid(t):
 		t.target = null
 		t.engaged = false
