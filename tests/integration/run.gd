@@ -26,6 +26,8 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_steering_stability()
+	await _test_auto_fire()
 	await _test_pathfinding()
 	await _test_ecology()
 	_mark("到任务导航前")
@@ -495,6 +497,81 @@ func _test_cross_port() -> void:
 			at_home += 1
 	_ok(at_home == 0, "母港船位里没有哨站那艘船")
 	sea.queue_free()
+	s.queue_free()
+	await _frames(2)
+
+# ---------------- 转向稳定性 ----------------
+func _test_steering_stability() -> void:
+	print("\n[转向稳定性]")
+	GameState.reset_new_game()
+	var ship = load("res://scenes/ship/sea_ship.tscn").instantiate()
+	ship.setup_enemy(DataRegistry.get_enemy(&"pirate_scout"), 1.0)
+	var center := Vector2(4000, 4000)
+	var r := 300.0
+	ship.obstacles = [[center, r]]
+	ship.global_position = center + Vector2(r + 500.0, 0)
+	ship.heading = PI            # 正对岛心
+	ship.rotation = PI
+	ship.home_pos = ship.global_position
+	ship.wander_heading = ship.heading
+	ship.wander_timer = 100.0
+	ship.target = null
+	add_child(ship)
+	await _frames(2)
+
+	var prev_delta := 0.0
+	var flips := 0
+	var prev_h: float = ship.heading
+	for i in range(150):
+		await get_tree().physics_frame
+		var d := wrapf(ship.heading - prev_h, -PI, PI)
+		prev_h = ship.heading
+		if absf(d) > 0.0005:
+			if prev_delta != 0.0 and signf(d) != signf(prev_delta):
+				flips += 1
+			prev_delta = d
+	_ok(flips <= 8, "绕障时转向不会高频左右抽搐", "150 帧内反向次数=%d" % flips)
+	ship.queue_free()
+	await _frames(2)
+
+# ---------------- 自动开火 ----------------
+func _test_auto_fire() -> void:
+	print("\n[自动开火]")
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	var e = s.enemies[0]
+	e.global_position = s.player.global_position + Vector2(400, 0)
+	s._lock_target(e)
+	e.target = s.player
+	_ok(not s.player.auto_fire, "锁定后默认不自动开火")
+
+	# 关闭状态：等一个装填周期也不应开火
+	for i in range(140):
+		await get_tree().physics_frame
+	_ok(s.player.volleys_fired == 0, "未开启时不会自动开火", "volleys=%d" % s.player.volleys_fired)
+
+	# 开启：持续齐射
+	s._on_fire_pressed()
+	_ok(s.player.auto_fire, "点「开火」进入自动开火")
+	for i in range(300):
+		await get_tree().physics_frame
+	_ok(s.player.volleys_fired >= 2, "自动开火会连续齐射", "volleys=%d" % s.player.volleys_fired)
+
+	# 关闭：停止开火
+	s._on_fire_pressed()
+	_ok(not s.player.auto_fire, "再点一次「停火」关闭")
+	var n_after: int = s.player.volleys_fired
+	for i in range(200):
+		await get_tree().physics_frame
+	_ok(s.player.volleys_fired == n_after, "停火后不再射击", "volleys=%d" % s.player.volleys_fired)
+
+	# 无目标时按钮不生效
+	s.player.target = null
+	s._on_fire_pressed()
+	_ok(not s.player.auto_fire, "没有目标时不会进入自动开火")
 	s.queue_free()
 	await _frames(2)
 

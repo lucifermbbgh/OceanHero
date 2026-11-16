@@ -51,6 +51,9 @@ var wander_heading := 0.0
 var wander_timer := 0.0
 var home_pos := Vector2.ZERO
 var obstacles: Array = []      # 场景注入的岛屿列表 [[中心, 半径], ...]
+var auto_fire := false         # 玩家：锁定后是否持续自动开火（按「开火」切换）
+var _avoiding := false         # 是否正在绕障（带滞回）
+var _avoid_side := 1.0         # 锁定的绕行侧，进入时决定，离开前不变
 var last_attacker = null
 var heading := 0.0
 var nav_target = null
@@ -253,7 +256,8 @@ func _update_steering(delta: float) -> void:
 	else:
 		desired_turn = _ai_steer(delta)
 
-	heading += clampf(desired_turn, -1.0, 1.0) * turn_rate * turn_mult * delta
+	# turn_rate 数据里是「度/秒」，这里必须转成弧度，否则转向快 57 倍（船头会疯狂抽搐）
+	heading += clampf(desired_turn, -1.0, 1.0) * deg_to_rad(turn_rate) * turn_mult * delta
 	rotation = heading
 	var target_speed := base_speed_px * speed_mult * clampf(desired_throttle, 0.0, 1.0)
 	# 岛屿软约束：斥力来自 sea_scene 每帧写入的 external_push
@@ -265,29 +269,48 @@ func _turn_toward(want: float) -> float:
 	var diff := wrapf(want - heading, -PI, PI)
 	return clampf(diff * 2.0, -1.0, 1.0)
 
-## 前视避障：正前方 320px 若压进岛屿减速带，就沿切线滑开
+## 前视避障：正前方 320px 若压进岛屿减速带，就沿切线滑开。
+## 关键：**进入时锁定绕行侧**并加滞回半径，否则会在左右切线之间逐帧翻转（船头抽搐）。
 func _avoidance_turn() -> float:
 	if obstacles.is_empty():
 		return 0.0
 	var look: Vector2 = global_position + Vector2.RIGHT.rotated(heading) * 320.0
+	var hit_c := Vector2.ZERO
+	var found := false
 	for o in obstacles:
 		var c: Vector2 = o[0]
-		var r: float = o[1] + 150.0 + 90.0
-		if look.distance_to(c) >= r:
-			continue
-		var away: Vector2 = global_position - c
-		if away.length() < 1.0:
-			away = Vector2.RIGHT
-		var tangent := Vector2(-away.y, away.x).normalized()
+		var r_in: float = o[1] + 150.0 + 90.0
+		# 已在避障中时用更大的退出半径，避免刚脱离又立刻触发
+		var r := (r_in + 110.0) if _avoiding else r_in
+		if look.distance_to(c) < r:
+			hit_c = c
+			found = true
+			break
+	if not found:
+		_avoiding = false
+		return 0.0
+	var away: Vector2 = global_position - hit_c
+	if away.length() < 1.0:
+		away = Vector2.RIGHT
+	var tangent := Vector2(-away.y, away.x).normalized()
+	if not _avoiding:
+		# 首次进入：按当前朝向选一侧，之后一直沿这一侧绕，不再重算
+		_avoiding = true
 		var d1 := absf(wrapf(tangent.angle() - heading, -PI, PI))
 		var d2 := absf(wrapf((-tangent).angle() - heading, -PI, PI))
-		var dir := tangent if d1 <= d2 else -tangent
-		return _turn_toward(dir.angle())
-	return 0.0
+		_avoid_side = 1.0 if d1 <= d2 else -1.0
+	var dir := tangent * _avoid_side
+	# 死区 + 限幅：否则会在"对准切线"附近来回过冲，导致船头高频抽搐
+	var diff := wrapf(dir.angle() - heading, -PI, PI)
+	if absf(diff) < 0.05:
+		return 0.0
+	return clampf(diff * 1.2, -0.6, 0.6)
 
 func _ai_steer(delta: float) -> float:
 	var avoid := _avoidance_turn()
-	if avoid != 0.0:
+	# 只要还在绕障中（_avoiding），就独占转向权：
+	# 否则"返航/巡游"会插进来把船头往回掰，与避障逐帧互相覆盖 → 抽搐
+	if _avoiding or avoid != 0.0:
 		throttle = maxf(throttle, 0.4)
 		return avoid
 	if faction == "merchant" and target != null and is_instance_valid(target):
@@ -342,8 +365,10 @@ func _update_firing(delta: float) -> void:
 	# 锁定即开始装填；是否开火由玩家决定
 	if reload_timer > 0.0:
 		reload_timer -= delta
-	# 玩家不自动开火，必须由 UI 触发 try_fire()
+	# 玩家：只有打开"自动开火"才持续射击，否则必须手动触发 try_fire()
 	if is_player:
+		if auto_fire and reload_timer <= 0.0 and can_target(target):
+			_fire_at(target)
 		return
 	# 商船只逃不打
 	if faction == "merchant":

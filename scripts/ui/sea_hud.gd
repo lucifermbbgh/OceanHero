@@ -289,15 +289,23 @@ func update_all(player, target) -> void:
 		if t == null or not is_instance_valid(t) or not t.alive:
 			_fire_btn.text = "开火"
 			_fire_btn.disabled = true
+			_fire_btn.modulate = Color(1, 1, 1)
+		elif player.auto_fire:
+			_fire_btn.text = "停火"
+			_fire_btn.disabled = false
+			_fire_btn.modulate = Color(1.0, 0.75, 0.55)
 		elif player.reload_timer > 0.0:
 			_fire_btn.text = "装填 %.1fs" % player.reload_timer
-			_fire_btn.disabled = true
+			_fire_btn.disabled = false
+			_fire_btn.modulate = Color(1, 1, 1)
 		elif not player.can_target(t):
 			_fire_btn.text = "超出射程"
-			_fire_btn.disabled = true
+			_fire_btn.disabled = false
+			_fire_btn.modulate = Color(1, 1, 1)
 		else:
 			_fire_btn.text = "开火！"
 			_fire_btn.disabled = false
+			_fire_btn.modulate = Color(1, 1, 1)
 	if player != null and is_instance_valid(player) and target != null and is_instance_valid(target):
 		var near: bool = player.global_position.distance_to(target.global_position) <= 140.0
 		var weak: bool = _pct_of(target, "hull") <= 0.10
