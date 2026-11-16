@@ -554,6 +554,42 @@ func _test_interaction() -> void:
 		"progress=%d" % int(GameState.quests_active[0].get("progress", 0)))
 	_ok(s2.salvages.size() == 2, "打捞点被消耗", "left=%d" % s2.salvages.size())
 
+	# 打捞点不能刷在岛上
+	var min_island_gap := 1.0e9
+	for sv2 in s2.salvages:
+		min_island_gap = minf(min_island_gap, s2._dist_to_nearest_island(sv2))
+	_ok(min_island_gap > 200.0, "打捞点不会刷在岛屿范围内", "最近离岛边 %.0f px" % min_island_gap)
+
+	# 撤离不会瞬间解除敌方追击
+	GameState.reset_new_game()
+	GameState.current_map = 3
+	var s3 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s3)
+	await _frames(3)
+	var pursuer = s3.enemies[0]
+	pursuer.global_position = s3.player.global_position + Vector2(500, 0)
+	pursuer.target = s3.player
+	s3._on_retreat_pressed()
+	_ok(pursuer.target == s3.player, "撤离后敌人仍会继续追（不能一键脱战）")
+	_ok(s3.player.nav_queue.size() >= 1, "撤离会规划远离航线")
+	s3.queue_free()
+	await _frames(2)
+
+	# 货舱 HUD 文本
+	GameState.reset_new_game()
+	GameState.add_cargo(&"grain", 12)
+	var s4 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s4)
+	await _frames(3)
+	s4._refresh_cargo_hud()
+	var cargo_txt: String = s4.hud._cargo_label.text
+	_ok(cargo_txt.contains("谷物"), "货舱清单显示商品名", cargo_txt.replace("\n", " / "))
+	_ok(cargo_txt.contains("12"), "货舱清单显示数量")
+	_ok(cargo_txt.contains("容量"), "货舱清单显示容量")
+	s4.queue_free()
+	await _frames(2)
+	GameState.cargo.clear()
+
 	s2.player.global_position = s2.outpost_pos + Vector2(120, 0)
 	_ok(s2.interact_prompt().contains("哨站"), "靠近哨站提示进入", s2.interact_prompt())
 	s2.player.global_position = s2.BACK_GATE + Vector2(100, 0)
@@ -772,7 +808,8 @@ func _test_ecology() -> void:
 	for e in s3.enemies:
 		if e.get("is_boss"):
 			continue
-		if e.global_position.distance_to(s3.player.global_position) < s3.PLAYER_SAFE_RADIUS - 1.0:
+		# 用 home_pos（出生点快照）判定，避免单位已经开动后距离变小造成误判
+		if e.home_pos.distance_to(s3.player.global_position) < s3.PLAYER_SAFE_RADIUS - 1.0:
 			too_close += 1
 	_ok(too_close == 0, "没有单位刷在玩家安全区内", "越界=%d" % too_close)
 

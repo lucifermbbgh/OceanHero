@@ -25,6 +25,10 @@ var _board_btn: Button
 var _quest_rows: Array = []
 var _quest_panel: PanelContainer = null
 var _prompt_lbl: Label
+var _hint_lbl: Label
+var _cargo_panel: PanelContainer = null
+var _cargo_label: Label
+var _cargo_btn: Button
 var _retreat_btn: Button
 var _ticker_timer := 0.0
 
@@ -36,6 +40,7 @@ func _ready() -> void:
 	add_child(root)
 
 	_build_prompt(root)
+	_build_cargo_panel(root)
 	_build_player_panel(root)
 	_build_quest_panel(root)
 	_build_target_panel(root)
@@ -128,6 +133,46 @@ func _build_prompt(root: Control) -> void:
 	_prompt_lbl.position = Vector2(400, 806)
 	_prompt_lbl.custom_minimum_size = Vector2(800, 30)
 	root.add_child(_prompt_lbl)
+
+	_hint_lbl = Label.new()
+	_hint_lbl.text = ""
+	_hint_lbl.visible = false
+	_hint_lbl.add_theme_font_size_override("font_size", 15)
+	_hint_lbl.add_theme_color_override("font_color", Color(0.9, 0.6, 0.55))
+	_hint_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_lbl.position = Vector2(400, 782)
+	_hint_lbl.custom_minimum_size = Vector2(800, 26)
+	root.add_child(_hint_lbl)
+
+func _build_cargo_panel(root: Control) -> void:
+	var vb := _make_panel(root, Vector2(510, 182), Vector2(400, 190))
+	_cargo_panel = vb.get_parent() as PanelContainer
+	_cargo_panel.visible = false
+	var head := Label.new()
+	head.text = "货舱清单"
+	head.add_theme_font_size_override("font_size", 15)
+	head.add_theme_color_override("font_color", Color(0.88, 0.76, 0.42))
+	vb.add_child(head)
+	_cargo_label = Label.new()
+	_cargo_label.add_theme_font_size_override("font_size", 13)
+	_cargo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_cargo_label.custom_minimum_size = Vector2(370, 0)
+	vb.add_child(_cargo_label)
+
+func toggle_cargo() -> void:
+	if _cargo_panel != null:
+		_cargo_panel.visible = not _cargo_panel.visible
+
+func update_cargo(text: String) -> void:
+	if _cargo_label != null:
+		_cargo_label.text = text
+
+## 交战状态提示（被追击 / 脱离进度）
+func set_combat_hint(text: String) -> void:
+	if _hint_lbl == null:
+		return
+	_hint_lbl.text = text
+	_hint_lbl.visible = text != ""
 
 ## 场景每帧告诉 HUD 当前可以按 E 做什么
 func set_prompt(text: String) -> void:
@@ -226,6 +271,12 @@ func _build_command_bar(root: Control) -> void:
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(20, 0)
 	hb.add_child(sep)
+
+	_cargo_btn = Button.new()
+	_cargo_btn.text = "货舱"
+	_cargo_btn.custom_minimum_size = Vector2(84, 38)
+	_cargo_btn.pressed.connect(func(): toggle_cargo())
+	hb.add_child(_cargo_btn)
 
 	_fire_btn = Button.new()
 	_fire_btn.text = "开火"

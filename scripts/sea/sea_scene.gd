@@ -544,7 +544,32 @@ func _spawn_salvages() -> void:
 	if not _has_quest("gather"):
 		return
 	for i in range(3):
-		salvages.append(_random_spawn_pos())
+		salvages.append(_clear_water_pos())
+
+## 找一个"既不在岛上、也不贴着岛"的海面位置（打捞点专用）
+func _clear_water_pos() -> Vector2:
+	for attempt in range(60):
+		var p: Vector2 = _random_spawn_pos()
+		if _dist_to_nearest_island(p) > 260.0:
+			return p
+	# 兜底：全图找最远离岛的格子中心
+	var best: Vector2 = Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5)
+	var best_d := -1.0
+	for gx in range(1, 8):
+		for gy in range(1, 8):
+			var q := Vector2(float(gx) * SEA_SIZE / 8.0, float(gy) * SEA_SIZE / 8.0)
+			var d: float = _dist_to_nearest_island(q)
+			if d > best_d:
+				best_d = d
+				best = q
+	return best
+
+## 到最近岛屿边缘的距离（正数表示在岛外）
+func _dist_to_nearest_island(p: Vector2) -> float:
+	var best := 1.0e9
+	for isl in islands:
+		best = minf(best, p.distance_to(isl[0]) - float(isl[1]))
+	return best
 
 func _has_quest(type_name: String) -> bool:
 	for q in GameState.quests_active:
@@ -814,25 +839,11 @@ func _process(delta: float) -> void:
 	_faction_ai(delta)
 	_refresh_quest_hud()
 	hud.set_prompt(interact_prompt())
+	_refresh_cargo_hud()
+	_refresh_hint()
 	if camera != null and player != null and is_instance_valid(player):
 		camera.position = player.position
-	if hud != null and player != null:
-		var near_back: bool = player.position.distance_to(BACK_GATE) < 240.0
-		var near_fwd: bool = player.position.distance_to(FORWARD_GATE) < 240.0
-		var near_out: bool = player.position.distance_to(outpost_pos) < 240.0
-		if near_out:
-			hud.set_hint("按 E 进入浅湾哨站  ·  市场 / 换船 / 交付订单")
-		elif near_back:
-			hud.set_hint("按 E %s" % ("返回母港" if map_index <= 1 else "返回 %s" % _map_name(map_index - 1)))
-		elif near_fwd:
-			if map_index >= 9:
-				hud.set_hint("航道尽头 · 王冠之海")
-			elif GameState.is_map_cleared(map_index):
-				hud.set_hint("按 E 前往 %s" % _map_name(map_index + 1))
-			else:
-				hud.set_hint("航门锁闭 · 击败本图 Boss 才能开启")
-		else:
-			hud.set_hint("")
+	# 互动提示统一由 interact_prompt() 提供，这里不再重复一套
 
 func _update_bounty_hunters(delta: float) -> void:
 	hunter_timer -= delta
@@ -1203,6 +1214,47 @@ func _nearest_salvage_dist() -> float:
 		best = minf(best, player.global_position.distance_to(sv))
 	return best
 
+## 把货舱内容推给 HUD
+func _refresh_cargo_hud() -> void:
+	var lines: Array = []
+	for cid in GameState.cargo:
+		var amount := int(GameState.cargo[cid])
+		if amount <= 0:
+			continue
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c == null:
+			continue
+		lines.append("%s × %d（占 %.0f 单位）" % [String(c.display_name), amount,
+			float(amount) * float(c.volume)])
+	var body := "空载" if lines.is_empty() else "\n".join(lines)
+	hud.update_cargo("容量 %.0f / %.0f\n%s" % [GameState.cargo_used(),
+		float(GameState.cargo_capacity()), body])
+
+## 交战状态提示：被追击距离 / 脱离进度
+func _refresh_hint() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var chaser = null
+	var min_d := 1.0e9
+	for e in enemies:
+		if not is_instance_valid(e) or not e.get("alive"):
+			continue
+		if e.get("target") != player:
+			continue
+		var d: float = e.global_position.distance_to(player.global_position)
+		if d < min_d:
+			min_d = d
+			chaser = e
+	if chaser == null:
+		hud.set_combat_hint("")
+		return
+	var need: float = player.DISENGAGE_DIST
+	if min_d >= need:
+		var left: float = maxf(0.0, float(player.DISENGAGE_TIME) - float(chaser.get("disengage_timer")))
+		hud.set_combat_hint("脱离中 · 保持距离 %.0f 秒" % left)
+	else:
+		hud.set_combat_hint("被追击 · 距离 %d / 需拉开 %d" % [int(min_d), int(need)])
+
 func _lock_target(enemy) -> void:
 	player.auto_fire = false
 	player.target = enemy
@@ -1238,15 +1290,20 @@ func _on_retreat_pressed() -> void:
 		hud.ticker("风帆或舵机已毁，无法撤离")
 		return
 	var t = player.target
+	# 撤离 = 自动驶离当前目标，但不免除"必须真的拉开距离"这条规则：
+	# 敌人仍会追，直到满足 1600px / 5 秒的脱战条件
+	var away_dir: Vector2 = Vector2.RIGHT.rotated(player.heading)
+	if t != null and is_instance_valid(t):
+		away_dir = (player.global_position - t.global_position).normalized()
 	player.target = null
 	player.engaged = false
-	var flee: Vector2 = (player.position + Vector2.RIGHT.rotated(player.heading) * 1400.0).clamp(
+	var flee: Vector2 = (player.position + away_dir * 1800.0).clamp(
 		Vector2(100, 100), Vector2(SEA_SIZE - 100, SEA_SIZE - 100))
 	player.nav_queue = _route_to(flee)
 	player.nav_target = null
-	if t != null and is_instance_valid(t):
-		t.target = null
-		t.engaged = false
+	player.dodging = true
+	player.dodge_timer = 8.0
+	hud.ticker("撤离中：甩开追击 5 秒即可脱战")
 	hud.ticker("已脱离战斗")
 
 func _on_boarding_pressed() -> void:

@@ -369,7 +369,8 @@ func _rebuild_market() -> void:
 		name_l.custom_minimum_size = Vector2(90, 0)
 		row.add_child(name_l)
 		var price_l := Label.new()
-		price_l.text = "买 %d / 卖 %d  (库存 %d)" % [bp, sp, stock]
+		var have := int(GameState.cargo.get(id, 0))
+		price_l.text = "买 %d / 卖 %d   港口库存 %d｜船上 %d" % [bp, sp, stock, have]
 		price_l.custom_minimum_size = Vector2(240, 0)
 		row.add_child(price_l)
 		var b_buy := Button.new()
@@ -383,6 +384,36 @@ func _rebuild_market() -> void:
 		b_sell.custom_minimum_size = Vector2(72, 32)
 		b_sell.pressed.connect(func(): _sell(cid, 10, sp))
 		row.add_child(b_sell)
+	# 船上货舱汇总：买的东西到底装在哪儿
+	var sep := HSeparator.new()
+	market_list.add_child(sep)
+	var hold_head := Label.new()
+	hold_head.text = "我船货舱  %.0f / %.0f" % [GameState.cargo_used(), float(GameState.cargo_capacity())]
+	hold_head.add_theme_font_size_override("font_size", 17)
+	hold_head.add_theme_color_override("font_color", Color(0.85, 0.78, 0.5))
+	market_list.add_child(hold_head)
+	var any := false
+	for id in [&"grain", &"timber", &"rum", &"spice"]:
+		var have := int(GameState.cargo.get(id, 0))
+		if have <= 0:
+			continue
+		any = true
+		var cc: Resource = DataRegistry.get_commodity(id)
+		var line := Label.new()
+		line.text = "　%s × %d" % [String(cc.display_name), have]
+		line.add_theme_font_size_override("font_size", 15)
+		market_list.add_child(line)
+	if not any:
+		var empty := Label.new()
+		empty.text = "　（空载）"
+		empty.add_theme_font_size_override("font_size", 15)
+		market_list.add_child(empty)
+	var tip := Label.new()
+	tip.text = "买到的货物直接装船，随船航行；卖货请到目标港口。"
+	tip.add_theme_font_size_override("font_size", 13)
+	tip.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
+	market_list.add_child(tip)
+
 	var close := Button.new()
 	close.text = "关闭"
 	close.custom_minimum_size = Vector2(120, 34)

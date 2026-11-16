@@ -55,6 +55,8 @@ var auto_fire := false         # 玩家：锁定后是否持续自动开火（�
 var _avoiding := false         # 是否正在绕障（带滞回）
 var _avoid_side := 1.0         # 锁定的绕行侧，进入时决定，离开前不变
 var last_attacker = null
+var dodging := false           # 玩家按下撤离后的一段时间内处于"主动脱离"
+var dodge_timer := 0.0
 var heading := 0.0
 var nav_target = null
 var nav_queue: Array = []
@@ -350,6 +352,10 @@ func _ai_steer(delta: float) -> float:
 
 func _update_firing(delta: float) -> void:
 	_update_disengage(delta)
+	if dodging:
+		dodge_timer -= delta
+		if dodge_timer <= 0.0:
+			dodging = false
 	# 换目标（含首次锁定）时重新开始一轮装填，避免"刚锁定就立刻开火"
 	if target != _last_target:
 		_last_target = target
