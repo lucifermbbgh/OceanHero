@@ -565,6 +565,45 @@ func _test_quest_nav() -> void:
 	await _frames(2)
 	GameState.reputation["black_sail"] = 0
 
+	# 闲置单位不应原地打转
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s6 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s6)
+	await _frames(3)
+	var idle = null
+	for e in s6.enemies:
+		if String(e.get("faction")) == "pirate":
+			idle = e
+			break
+	if idle != null:
+		idle.target = null
+		idle.wander_heading = idle.heading
+		idle.wander_timer = 100.0
+		var steer: float = idle._ai_steer(0.016)
+		_ok(absf(steer) < 0.05, "闲置单位航向已对齐时不再转向", "steer=%.3f" % steer)
+		idle.wander_heading = idle.heading + 0.5
+		var steer2: float = idle._ai_steer(0.016)
+		_ok(absf(steer2) > 0.05, "偏离巡游航向时会修正", "steer=%.3f" % steer2)
+		_ok(absf(steer2) <= 0.6, "修正幅度受限，不会猛打舵", "steer=%.3f" % steer2)
+
+		# 真正跑物理帧：航向应当收敛，而不是持续旋转
+		idle.target = null
+		idle.wander_heading = idle.heading
+		idle.wander_timer = 100.0
+		for i in range(150):
+			await get_tree().physics_frame
+		var h_start: float = idle.heading
+		for i in range(30):
+			await get_tree().physics_frame
+		var drift: float = absf(wrapf(idle.heading - h_start, -PI, PI))
+		_ok(drift < 0.02, "闲置单位不会持续旋转", "0.5 秒内转了 %.4f rad" % drift)
+	else:
+		_fail += 1
+		print("  FAIL  没有找到海盗单位")
+	s6.queue_free()
+	await _frames(2)
+
 	# 贸易任务没有具体地点
 	var trade := {"type": "trade", "amount": 100, "progress": 0}
 	_ok(s3._quest_nav_target(trade) == null, "贸易任务没有导航点")

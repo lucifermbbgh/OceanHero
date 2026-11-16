@@ -47,6 +47,8 @@ var target = null
 var reload_timer := 0.0
 var disengage_timer := 0.0
 var _last_target = null
+var wander_heading := 0.0
+var wander_timer := 0.0
 var heading := 0.0
 var nav_target = null
 var nav_queue: Array = []
@@ -161,6 +163,8 @@ func setup_enemy(edef: Resource, level_scale: float = 1.0) -> void:
 	unique_crew_stat = int(edef.unique_crew_stat)
 	base_damage_ref = cannon_damage
 	base_reload_ref = cannon_reload
+	wander_heading = heading
+	wander_timer = RngService.randf_range(2.0, 6.0)
 	queue_redraw()
 
 # ---------------- 状态查询 ----------------
@@ -238,7 +242,7 @@ func _update_steering(delta: float) -> void:
 			else:
 				desired_throttle = 0.12
 	else:
-		desired_turn = _ai_steer()
+		desired_turn = _ai_steer(delta)
 
 	heading += clampf(desired_turn, -1.0, 1.0) * turn_rate * turn_mult * delta
 	rotation = heading
@@ -252,7 +256,7 @@ func _turn_toward(want: float) -> float:
 	var diff := wrapf(want - heading, -PI, PI)
 	return clampf(diff * 2.0, -1.0, 1.0)
 
-func _ai_steer() -> float:
+func _ai_steer(delta: float) -> float:
 	if target != null and is_instance_valid(target):
 		var dist: float = global_position.distance_to(target.global_position)
 		if dist > cannon_range * 0.75:
@@ -268,8 +272,16 @@ func _ai_steer() -> float:
 			return 0.0
 		throttle = 0.6
 		return _turn_toward(to_target.angle())
-	throttle = 0.15
-	return 0.2
+	# 无目标：缓慢巡游。每隔几秒换一次航向，而不是恒定舵角原地打转
+	wander_timer -= delta
+	if wander_timer <= 0.0:
+		wander_timer = RngService.randf_range(4.0, 9.0)
+		wander_heading = heading + RngService.randf_range(-PI * 0.7, PI * 0.7)
+	throttle = 0.25
+	var wdiff := wrapf(wander_heading - heading, -PI, PI)
+	if absf(wdiff) < 0.08:
+		return 0.0
+	return clampf(wdiff * 1.5, -0.6, 0.6)
 
 func _update_firing(delta: float) -> void:
 	_update_disengage(delta)
