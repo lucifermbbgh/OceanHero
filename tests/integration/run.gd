@@ -15,6 +15,7 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_ecology()
 	await _test_quest_nav()
 	await _test_engage_rules()
 	await _test_maps()
@@ -480,6 +481,70 @@ func _test_cross_port() -> void:
 	_ok(at_home == 0, "母港船位里没有哨站那艘船")
 	sea.queue_free()
 	s.queue_free()
+	await _frames(2)
+
+# ---------------- 阵营生态 ----------------
+func _test_ecology() -> void:
+	print("\n[阵营生态]")
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+
+	# 敌对关系
+	_ok(s._is_hostile("pirate", "merchant"), "海盗敌视商船")
+	_ok(s._is_hostile("pirate", "navy"), "海盗敌视海军")
+	_ok(s._is_hostile("navy", "pirate"), "海军敌视海盗")
+	_ok(not s._is_hostile("navy", "merchant"), "海军不敌视商船")
+	_ok(not s._is_hostile("merchant", "merchant"), "商船之间不敌对")
+	_ok(s._is_hostile("pirate", "player"), "海盗敌视玩家")
+
+	# 1~2 图：没有任何单位主动锁定玩家
+	_ok(not bool(s.map_def.hostile), "图 1 非敌对海域")
+	var aggro_count := 0
+	for e in s.enemies:
+		if e.get("target") == s.player:
+			aggro_count += 1
+	_ok(aggro_count == 0, "低级图没有单位主动锁定玩家", "count=%d" % aggro_count)
+
+	# 战力判断：弱海盗不会主动打强海军
+	var weak = load("res://scenes/ship/sea_ship.tscn").instantiate()
+	weak.setup_enemy(DataRegistry.get_enemy(&"pirate_scout"), 0.5)
+	s.add_child(weak)
+	var strong = load("res://scenes/ship/sea_ship.tscn").instantiate()
+	strong.setup_enemy(DataRegistry.get_enemy(&"navy_patrol"), 4.0)
+	s.add_child(strong)
+	_ok(float(strong.combat_power()) > float(weak.combat_power()), "海军战力高于海盗")
+	_ok(not s._will_attack(weak, strong), "弱方不会主动追击强方")
+	_ok(s._will_attack(strong, weak), "强方会主动追击弱方")
+	s.queue_free()
+	await _frames(2)
+
+	# 3 图：生态单位齐备，海怪无差别主动
+	GameState.current_map = 3
+	var s3 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s3)
+	await _frames(6)
+	_ok(bool(s3.map_def.hostile), "图 3 为敌对海域")
+	_ok(s3._count_faction("navy") >= 1, "图 3 有海军巡逻", "count=%d" % s3._count_faction("navy"))
+	_ok(s3._count_faction("merchant") >= 1, "图 3 有中立商船", "count=%d" % s3._count_faction("merchant"))
+	_ok(s3.enemies.size() <= s3.MAX_UNITS, "同屏单位不超过上限", "count=%d" % s3.enemies.size())
+
+	# NPC 互殴不给玩家战利品
+	GameState.add_gold(0)
+	var merchant = null
+	for e in s3.enemies:
+		if String(e.get("faction")) == "merchant":
+			merchant = e
+			break
+	if merchant != null:
+		var gold_before := GameState.gold
+		merchant.last_attacker = null
+		merchant.take_damage({"hull": 999999.0, "sail": 0.0, "rudder": 0.0, "crew": 0.0})
+		await _frames(4)
+		_ok(GameState.gold == gold_before, "NPC 击杀不给玩家金币", "gold=%d" % GameState.gold)
+	s3.queue_free()
 	await _frames(2)
 
 # ---------------- 任务导航 ----------------
@@ -1096,6 +1161,7 @@ func _test_currency() -> void:
 		s.queue_free()
 		return
 	e.commendation_reward = 5
+	e.last_attacker = s.player
 	e.take_damage({"hull": 999999.0, "sail": 0.0, "rudder": 0.0, "crew": 0.0})
 	await _frames(3)
 	_ok(GameState.commendation == 5, "击沉带战功奖励的敌人后战功 +5", "comm=%d" % GameState.commendation)

@@ -31,6 +31,7 @@ var enemy_id: StringName = &""
 var is_boss := false
 var boss_phase := 1
 var base_attack_ref := 0.0
+var last_attacker = null
 
 var _sway := 0.0
 var external_push := Vector2.ZERO
@@ -65,6 +66,10 @@ func setup(edef: Resource, level_scale: float = 1.0) -> void:
 	loot_amount = int(edef.loot_amount)
 	gear_drop_chance = float(edef.gear_drop_chance)
 	queue_redraw()
+
+## 海怪战力：躯体 × 单位时间输出
+func combat_power() -> float:
+	return body_hp * 0.6 + attack_damage / maxf(0.2, attack_interval) * 26.0
 
 func body_pct() -> float:
 	return clampf(body_hp / maxf(1.0, body_max), 0.0, 1.0)
@@ -109,6 +114,7 @@ func _attack() -> void:
 		"hit": 1.0, "raw": dmg,
 		"hull": dmg, "sail": dmg * 0.15, "rudder": dmg * 0.1, "crew": dmg * 0.25 * float(alive_limbs()) * 0.5,
 	}
+	target.last_attacker = self
 	target.take_damage(res)
 
 func take_damage(res: Dictionary) -> void:
@@ -146,7 +152,8 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, 44.0, 0, TAU, 24, Color(0.9, 0.85, 0.6), 2.0)
 	# 肢体
 	for i in range(limb_hp.size()):
-		var ang := TAU * float(i) / float(maxi(1, limb_hp.size())) + _sway * 0.7
+		# 来回摆动（sin），不是线性旋转——否则看起来整只怪在打转
+		var ang := TAU * float(i) / float(maxi(1, limb_hp.size())) + sin(_sway * 1.6 + float(i)) * 0.45
 		var dir := Vector2.RIGHT.rotated(ang)
 		var alive_l: bool = float(limb_hp[i]) > 0.0
 		var c: Color = Color(0.42, 0.34, 0.24) if alive_l else Color(0.2, 0.18, 0.15)

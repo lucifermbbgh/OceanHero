@@ -49,6 +49,7 @@ var disengage_timer := 0.0
 var _last_target = null
 var wander_heading := 0.0
 var wander_timer := 0.0
+var last_attacker = null
 var heading := 0.0
 var nav_target = null
 var nav_queue: Array = []
@@ -169,6 +170,11 @@ func setup_enemy(edef: Resource, level_scale: float = 1.0) -> void:
 
 # ---------------- 状态查询 ----------------
 
+## 粗略战力：船体 × 单位时间输出。只用于 NPC 的"打不打得过"判断
+func combat_power() -> float:
+	var dps := float(maxi(1, guns_per_side)) * cannon_damage / maxf(0.2, cannon_reload)
+	return hull_hp * 0.6 + dps * 26.0
+
 func sail_pct() -> float:
 	return clampf(sail_hp / maxf(1.0, sail_max), 0.0, 1.0)
 
@@ -257,6 +263,11 @@ func _turn_toward(want: float) -> float:
 	return clampf(diff * 2.0, -1.0, 1.0)
 
 func _ai_steer(delta: float) -> float:
+	if faction == "merchant" and target != null and is_instance_valid(target):
+		# 商船逃向远离威胁的方向
+		var away: Vector2 = global_position - target.global_position
+		throttle = 1.0
+		return _turn_toward(away.angle())
 	if target != null and is_instance_valid(target):
 		var dist: float = global_position.distance_to(target.global_position)
 		if dist > cannon_range * 0.75:
@@ -302,6 +313,9 @@ func _update_firing(delta: float) -> void:
 		reload_timer -= delta
 	# 玩家不自动开火，必须由 UI 触发 try_fire()
 	if is_player:
+		return
+	# 商船只逃不打
+	if faction == "merchant":
 		return
 	if reload_timer > 0.0:
 		return
@@ -363,6 +377,7 @@ func _fire_at(enemy) -> void:
 	# 链弹打的是帆索，海怪没有帆 → 完全无效
 	var is_monster: bool = enemy.has_method("alive_limbs")
 	if not (is_monster and ammo_id == &"chain"):
+		enemy.last_attacker = self
 		enemy.take_damage(res)
 	reload_timer = CombatResolver.reload_time(cannon_reload, crew_pct(), crew_reload_bonus)
 

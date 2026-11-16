@@ -14,6 +14,9 @@ func set_seed(s: int) -> void:
 func randf() -> float:
 	return _rng.randf()
 
+func randf_range(from: float, to: float) -> float:
+	return _rng.randf_range(from, to)
+
 func randi_range(a: int, b: int) -> int:
 	return _rng.randi_range(a, b)
 

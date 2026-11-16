@@ -35,7 +35,18 @@ var outpost_pos := Vector2(3400, 5050)
 var port_ui: CanvasLayer
 var port_panel: PanelContainer
 var port_list: VBoxContainer
+## 同屏单位上限（超过就不再刷新，避免越打越多）
+const MAX_UNITS := 28
+## 阵营敌对关系
+const FACTION_ENEMIES := {
+	"navy": ["pirate"],
+	"pirate": ["navy", "merchant", "player"],
+	"merchant": [],
+}
+const AI_TICK := 0.6
+
 var hunter_timer := 45.0
+var ai_timer := 0.0
 var salvages: Array = []
 var escort_ship = null
 var boarded := false
@@ -85,6 +96,12 @@ func _spawn_map_contents() -> void:
 	for i in range(monsters):
 		_spawn_monster()
 	# Boss：同图各一只，已击败则不再刷新
+	# 3 图以上加入生态：海军巡逻 + 中立商船
+	if map_def != null and bool(map_def.hostile):
+		_spawn_navy_patrol()
+		_spawn_navy_patrol()
+		_spawn_merchant()
+		_spawn_merchant()
 	if map_def != null:
 		var pb: StringName = map_def.pirate_boss
 		if String(pb) != "" and not GameState.is_boss_defeated(pb):
@@ -561,6 +578,8 @@ func _loot_mult() -> float:
 	return pow(2.4, float(map_index - 1))
 
 func _spawn_pirate() -> void:
+	if enemies.size() >= MAX_UNITS:
+		return
 	var cap := int(map_def.pirates) if map_def != null else 4
 	if _count_kind("pirate") >= cap:
 		return
@@ -574,6 +593,8 @@ func _spawn_pirate() -> void:
 	enemies.append(e)
 
 func _spawn_monster() -> void:
+	if enemies.size() >= MAX_UNITS:
+		return
 	var cap := int(map_def.monsters) if map_def != null else 2
 	if _count_kind("monster") >= cap:
 		return
@@ -584,6 +605,34 @@ func _spawn_monster() -> void:
 	m.died.connect(_on_enemy_died)
 	add_child(m)
 	enemies.append(m)
+
+## 海军巡逻队：不主动找玩家，只打海盗
+func _spawn_navy_patrol() -> void:
+	if enemies.size() >= MAX_UNITS or _count_faction("navy") >= 2:
+		return
+	var e = ShipScene.instantiate()
+	e.setup_enemy(DataRegistry.get_enemy(&"navy_patrol"), _map_scale())
+	e.loot_mult = _loot_mult()
+	e.position = _random_spawn_pos()
+	e.died.connect(_on_enemy_died)
+	e.disengaged.connect(_on_enemy_disengaged)
+	add_child(e)
+	enemies.append(e)
+
+## 中立商船：被海盗追，不还手
+func _spawn_merchant() -> void:
+	if enemies.size() >= MAX_UNITS or _count_faction("merchant") >= 2:
+		return
+	var e = ShipScene.instantiate()
+	e.setup_enemy(DataRegistry.get_enemy(&"pirate_scout"), _map_scale() * 0.8)
+	e.faction = "merchant"
+	e.display_name = "中立商船"
+	e.loot_mult = _loot_mult()
+	e.position = _random_spawn_pos()
+	e.died.connect(_on_enemy_died)
+	e.disengaged.connect(_on_enemy_disengaged)
+	add_child(e)
+	enemies.append(e)
 
 func _count_kind(kind: String) -> int:
 	var n := 0
@@ -666,6 +715,7 @@ func _process(delta: float) -> void:
 	_update_boarding(delta)
 	_update_bounty_hunters(delta)
 	_update_escort()
+	_faction_ai(delta)
 	_refresh_quest_hud()
 	if camera != null and player != null and is_instance_valid(player):
 		camera.position = player.position
@@ -885,6 +935,73 @@ func _quest_note(q: Dictionary) -> String:
 	var dist := int(player.global_position.distance_to(escort_ship.global_position))
 	return "　⚑ %d%% · %dm" % [pct, dist]
 
+# ---------------- 阵营生态 ----------------
+
+func _is_hostile(a: String, b: String) -> bool:
+	if a == b:
+		return false
+	return (FACTION_ENEMIES.get(a, []) as Array).has(b)
+
+## 战力判断：打得过才主动追击，打不过只被动还击
+func _will_attack(attacker, victim) -> bool:
+	if not attacker.has_method("combat_power") or not victim.has_method("combat_power"):
+		return true
+	return float(attacker.combat_power()) > float(victim.combat_power()) * 1.25
+
+func _all_units() -> Array:
+	var out: Array = []
+	if player != null and is_instance_valid(player) and player.alive:
+		out.append(player)
+	for e in enemies:
+		if is_instance_valid(e) and e.get("alive"):
+			out.append(e)
+	return out
+
+func _faction_ai(delta: float) -> void:
+	ai_timer -= delta
+	if ai_timer > 0.0:
+		return
+	ai_timer = AI_TICK
+	var hostile_map: bool = map_def != null and bool(map_def.hostile)
+	var units := _all_units()
+
+	for e in units:
+		if e == player:
+			continue
+		var is_mon: bool = e.has_method("alive_limbs")
+		# 1~2 图：谁都不主动
+		if not hostile_map:
+			continue
+		# 海怪：3 图以上无差别攻击（不看战力）
+		if is_mon:
+			if e.get("target") == null and player != null and is_instance_valid(player):
+				e.set("target", player)
+			continue
+		# 已有有效目标就跳过
+		var cur = e.get("target")
+		if cur != null and is_instance_valid(cur) and cur.get("alive"):
+			continue
+		var fac := String(e.get("faction"))
+		# 商船只逃不打
+		if fac == "merchant":
+			continue
+		var best = null
+		var best_d := 1500.0
+		for o in units:
+			if o == e:
+				continue
+			if not _is_hostile(fac, String(o.get("faction"))):
+				continue
+			var d: float = e.global_position.distance_to(o.global_position)
+			if d < best_d:
+				best_d = d
+				best = o
+		if best == null:
+			continue
+		if _will_attack(e, best):
+			e.set("target", best)
+			e.set("engaged", true)
+
 func _lock_target(enemy) -> void:
 	player.target = enemy
 	player.engaged = true
@@ -954,6 +1071,7 @@ func _update_boarding(delta: float) -> void:
 	var target_power: float = boarding_target.crew_hp * 0.15 + 3.0
 	# 被打破的船士气崩溃：船体 ≤10% 时守方战力 -30%
 	target_power *= 0.7
+	boarding_target.last_attacker = player
 	boarding_target.take_crew_damage(player_power)
 	if not boarding_target.alive:
 		boarded = false
@@ -963,8 +1081,13 @@ func _update_boarding(delta: float) -> void:
 # ---------------- 死亡与结算 ----------------
 
 func _on_enemy_died(ship, info: Dictionary) -> void:
-	var result := LootSystem.apply(player, ship, info)
-	hud.ticker(LootSystem.describe(result))
+	# 只有玩家打死的才给战利品；NPC 互殴不产出（避免捡漏刷钱）
+	var by_player: bool = ship.get("last_attacker") == player
+	if by_player:
+		var result := LootSystem.apply(player, ship, info)
+		hud.ticker(LootSystem.describe(result))
+	else:
+		hud.ticker("%s 被击沉" % String(ship.get("display_name")))
 	var eid_raw: Variant = ship.get("enemy_id")
 	var eid := StringName(eid_raw) if eid_raw != null else &""
 	if String(eid) != "":
