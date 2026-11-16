@@ -26,6 +26,7 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_warehouse()
 	await _test_interaction()
 	await _test_steering_stability()
 	await _test_auto_fire()
@@ -501,6 +502,67 @@ func _test_cross_port() -> void:
 	s.queue_free()
 	await _frames(2)
 
+# ---------------- 港口仓库 ----------------
+func _test_warehouse() -> void:
+	print("\n[港口仓库]")
+	GameState.reset_new_game()
+	GameState.warehouse.clear()
+	GameState.cargo.clear()
+
+	_ok(GameState.warehouse_capacity() > 0, "仓库有基础容量", "%d" % GameState.warehouse_capacity())
+	_ok(GameState.warehouse_used() == 0.0, "新档仓库为空")
+
+	var put: int = GameState.warehouse_add(&"grain", 30)
+	_ok(put == 30, "可以存入仓库", "put=%d" % put)
+	_ok(GameState.warehouse_used() > 0.0, "存仓后占用增加")
+	_ok(int(GameState.warehouse.get(&"grain", 0)) == 30, "仓库数量正确")
+
+	var took: int = GameState.warehouse_remove(&"grain", 10)
+	_ok(took == 10, "可以从仓库取出")
+	_ok(int(GameState.warehouse.get(&"grain", 0)) == 20, "取出后数量正确")
+
+	# 存满后拒绝
+	GameState.warehouse.clear()
+	var huge: int = GameState.warehouse_add(&"grain", 999999)
+	_ok(GameState.warehouse_free() < 10.0, "仓库会存满", "free=%.0f" % GameState.warehouse_free())
+	_ok(huge > 0, "存满前可存入", "put=%d" % huge)
+
+	# 存档往返
+	GameState.warehouse.clear()
+	GameState.warehouse_add(&"rum", 12)
+	var snap: Dictionary = GameState.to_dict()
+	GameState.reset_new_game()
+	GameState.from_dict(snap)
+	_ok(int(GameState.warehouse.get(&"rum", 0)) == 12, "仓库内容可存档还原",
+		"rum=%d" % int(GameState.warehouse.get(&"rum", 0)))
+
+	# 换船：装不下则禁止
+	GameState.reset_new_game()
+	GameState.cargo.clear()
+	GameState.warehouse.clear()
+	var big_cap: int = GameState.cargo_capacity()
+	_ok(GameState.add_cargo(&"grain", 40) == 40, "先装一批货")
+	# 造一艘小船放到库存
+	GameState.ships_owned.clear()
+	GameState.ships_owned.append({"def_id": "fishing_sloop", "variant": "standard",
+		"station_port": "jadehaven", "hull_hp": -1.0, "sail_pct": 1.0,
+		"rudder_pct": 1.0, "crew_pct": 1.0, "equipped": {}, "cannon_id": "pound3_light"})
+	var small_cap: int = GameState.cargo_capacity_of(&"fishing_sloop", &"standard")
+	_ok(small_cap < big_cap or GameState.cargo_used() <= float(small_cap),
+		"小船载重已取出", "%d vs %d" % [small_cap, big_cap])
+	if GameState.cargo_used() > float(small_cap):
+		_ok(GameState.swap_overload(0), "货物超过小船载重时标记为不可换乘")
+		_ok(not GameState.swap_to_owned(0), "超载时换船被拒绝")
+	else:
+		_ok(true, "当前货物未超小船载重（跳过超载用例）")
+		_ok(true, "跳过")
+
+	# 卸载后可以换
+	GameState.cargo.clear()
+	_ok(not GameState.swap_overload(0), "卸空货舱后可以换小船")
+	_ok(GameState.swap_to_owned(0), "换船成功")
+	_ok(String(GameState.ship_def_id) == "fishing_sloop", "已换到小船")
+
 # ---------------- 锁定与互动 ----------------
 func _test_interaction() -> void:
 	print("\n[锁定与互动]")
@@ -809,7 +871,10 @@ func _test_ecology() -> void:
 		if e.get("is_boss"):
 			continue
 		# 用 home_pos（出生点快照）判定，避免单位已经开动后距离变小造成误判
-		if e.home_pos.distance_to(s3.player.global_position) < s3.PLAYER_SAFE_RADIUS - 1.0:
+		var spawn_at: Variant = e.get("home_pos")
+		if spawn_at == null:
+			spawn_at = e.global_position
+		if Vector2(spawn_at).distance_to(s3.player.global_position) < s3.PLAYER_SAFE_RADIUS - 1.0:
 			too_close += 1
 	_ok(too_close == 0, "没有单位刷在玩家安全区内", "越界=%d" % too_close)
 

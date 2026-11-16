@@ -69,7 +69,8 @@ var ships_owned: Array = []         # [{def_id, variant, station_port, hull_hp, 
 var current_port: StringName = &"jadehaven"   # 当前船停靠/出发的港口
 
 # --- 货舱 ---
-var cargo: Dictionary = {}          # StringName -> int
+var cargo: Dictionary = {}          # StringName -> int（船上货舱）
+var warehouse: Dictionary = {}      # StringName -> int（母港仓库）
 
 # --- 世界 ---
 var current_map: int = 1
@@ -674,6 +675,9 @@ func cargo_capacity() -> int:
 func swap_to_owned(index: int, port_id: StringName = &"jadehaven") -> bool:
 	if index < 0 or index >= ships_owned.size():
 		return false
+	# 新船装不下当前货物则禁止换乘（船→大船平迁没问题，大→小会被拦）
+	if swap_overload(index):
+		return false
 	var other: Dictionary = ships_owned[index]
 	# 把当前船存回库存（停泊在换乘的港口）
 	ships_owned.append({
@@ -737,6 +741,58 @@ func cargo_used() -> float:
 
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
+
+# ---------------- 港口仓库 ----------------
+
+func warehouse_capacity() -> int:
+	return 800 + 400 * building_level(&"warehouse")
+
+func warehouse_used() -> float:
+	var used := 0.0
+	for id in warehouse.keys():
+		var c := DataRegistry.get_commodity(id)
+		if c != null:
+			used += float(c.volume) * float(warehouse[id])
+	return used
+
+func warehouse_free() -> float:
+	return maxf(0.0, float(warehouse_capacity()) - warehouse_used())
+
+func warehouse_add(id: StringName, amount: int) -> int:
+	var c := DataRegistry.get_commodity(id)
+	if c == null or amount <= 0:
+		return 0
+	var can := int(floor(warehouse_free() / float(c.volume)))
+	var real := mini(amount, can)
+	if real > 0:
+		warehouse[id] = int(warehouse.get(id, 0)) + real
+		EventBus.cargo_changed.emit(cargo_used(), cargo_capacity())
+	return real
+
+func warehouse_remove(id: StringName, amount: int) -> int:
+	var have := int(warehouse.get(id, 0))
+	var real := mini(amount, have)
+	if real > 0:
+		warehouse[id] = have - real
+		if int(warehouse[id]) <= 0:
+			warehouse.erase(id)
+		EventBus.cargo_changed.emit(cargo_used(), cargo_capacity())
+	return real
+
+## 指定船型的载重（用于换船前的容量校验）
+func cargo_capacity_of(def_id: StringName, variant: StringName) -> int:
+	var d: Resource = DataRegistry.get_ship(def_id)
+	if d == null:
+		return 200
+	return int(StatsLib.compute(d, variant, equipped, assigned_crews()).get("cargo_capacity", 200))
+
+## 换乘到 ships_owned[index] 是否装不下当前货物
+func swap_overload(index: int) -> bool:
+	if index < 0 or index >= ships_owned.size():
+		return false
+	var other: Dictionary = ships_owned[index]
+	var cap := cargo_capacity_of(StringName(other.get("def_id", "")), StringName(other.get("variant", "standard")))
+	return cargo_used() > float(cap)
 
 func add_gold(delta: int) -> void:
 	gold = max(0, gold + delta)
@@ -813,6 +869,7 @@ func to_dict() -> Dictionary:
 		},
 		"fleet": _fleet_to_array(),
 		"cargo": _cargo_to_dict(),
+		"warehouse": _cargo_to_dict_of(warehouse),
 		"world": {
 			"current_map": current_map, "pos_x": sea_position.x, "pos_y": sea_position.y,
 			"cleared": cleared_maps.duplicate(), "boss": boss_defeated.duplicate(),
@@ -822,6 +879,12 @@ func to_dict() -> Dictionary:
 		"stats": {"kills": stat_kills, "bosses": stat_bosses, "cleared": game_cleared},
 		"port_stock": _nested_to_dict(port_stock),
 	}
+
+func _cargo_to_dict_of(d: Dictionary) -> Dictionary:
+	var out := {}
+	for k in d.keys():
+		out[String(k)] = int(d[k])
+	return out
 
 func from_dict(d: Dictionary) -> void:
 	var p: Dictionary = d.get("player", {})
@@ -875,6 +938,10 @@ func from_dict(d: Dictionary) -> void:
 	sail_pct = float(s.get("sail_pct", 1.0))
 	rudder_pct = float(s.get("rudder_pct", 1.0))
 	crew_pct = float(s.get("crew_pct", 1.0))
+	warehouse.clear()
+	var wh: Dictionary = d.get("warehouse", {})
+	for k in wh.keys():
+		warehouse[StringName(k)] = int(wh[k])
 	cargo.clear()
 	var c: Dictionary = d.get("cargo", {})
 	for k in c.keys():
@@ -1021,6 +1088,7 @@ func reset_new_game() -> void:
 	cannons_owned = [&"pound3_light"]
 	ships_owned.clear()
 	cargo.clear()
+	warehouse.clear()
 	current_map = 1
 	sea_position = Vector2.ZERO
 	cleared_maps.clear()

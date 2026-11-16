@@ -339,6 +339,12 @@ func _toggle_market() -> void:
 	_rebuild_market()
 	market_root.visible = true
 
+var market_target := "ship"   # ship = 装船，warehouse = 存仓
+
+func _toggle_market_target(t: String) -> void:
+	market_target = t
+	_rebuild_market()
+
 func _rebuild_market() -> void:
 	for c in market_list.get_children():
 		c.queue_free()
@@ -348,6 +354,27 @@ func _rebuild_market() -> void:
 	head.text = "市场行情（每周库存会向满值回归）"
 	head.add_theme_font_size_override("font_size", 18)
 	market_list.add_child(head)
+
+	# 交易目标页签：买入存到哪 / 卖出从哪拿
+	var tab_row := HBoxContainer.new()
+	tab_row.add_theme_constant_override("separation", 8)
+	market_list.add_child(tab_row)
+	var tl := Label.new()
+	tl.text = "交易目标："
+	tl.custom_minimum_size = Vector2(84, 0)
+	tab_row.add_child(tl)
+	var b_ship := Button.new()
+	b_ship.text = "装船" if market_target == "ship" else "装船"
+	b_ship.custom_minimum_size = Vector2(96, 34)
+	b_ship.modulate = Color(1.0, 0.92, 0.6) if market_target == "ship" else Color(1, 1, 1)
+	b_ship.pressed.connect(func(): _toggle_market_target("ship"))
+	tab_row.add_child(b_ship)
+	var b_wh := Button.new()
+	b_wh.text = "存仓"
+	b_wh.custom_minimum_size = Vector2(96, 34)
+	b_wh.modulate = Color(1.0, 0.92, 0.6) if market_target == "warehouse" else Color(1, 1, 1)
+	b_wh.pressed.connect(func(): _toggle_market_target("warehouse"))
+	tab_row.add_child(b_wh)
 	for id in [&"grain", &"timber", &"rum", &"spice"]:
 		var c: Resource = DataRegistry.get_commodity(id)
 		if c == null:
@@ -370,7 +397,8 @@ func _rebuild_market() -> void:
 		row.add_child(name_l)
 		var price_l := Label.new()
 		var have := int(GameState.cargo.get(id, 0))
-		price_l.text = "买 %d / 卖 %d   港口库存 %d｜船上 %d" % [bp, sp, stock, have]
+		var in_wh := int(GameState.warehouse.get(id, 0))
+		price_l.text = "买 %d / 卖 %d   港 %d｜船 %d｜仓 %d" % [bp, sp, stock, have, in_wh]
 		price_l.custom_minimum_size = Vector2(240, 0)
 		row.add_child(price_l)
 		var b_buy := Button.new()
@@ -382,8 +410,19 @@ func _rebuild_market() -> void:
 		var b_sell := Button.new()
 		b_sell.text = "卖10"
 		b_sell.custom_minimum_size = Vector2(72, 32)
-		b_sell.pressed.connect(func(): _sell(cid, 10, sp))
+		var spv := sp
+		b_sell.pressed.connect(func(): _sell(cid, 10, spv))
 		row.add_child(b_sell)
+		var b_to_wh := Button.new()
+		b_to_wh.text = "→仓"
+		b_to_wh.custom_minimum_size = Vector2(60, 32)
+		b_to_wh.pressed.connect(func(): _move_to_warehouse(cid))
+		row.add_child(b_to_wh)
+		var b_to_ship := Button.new()
+		b_to_ship.text = "→船"
+		b_to_ship.custom_minimum_size = Vector2(60, 32)
+		b_to_ship.pressed.connect(func(): _move_to_ship(cid))
+		row.add_child(b_to_ship)
 	# 船上货舱汇总：买的东西到底装在哪儿
 	var sep := HSeparator.new()
 	market_list.add_child(sep)
@@ -408,8 +447,29 @@ func _rebuild_market() -> void:
 		empty.text = "　（空载）"
 		empty.add_theme_font_size_override("font_size", 15)
 		market_list.add_child(empty)
+	var wh_head := Label.new()
+	wh_head.text = "港口仓库  %.0f / %.0f" % [GameState.warehouse_used(), float(GameState.warehouse_capacity())]
+	wh_head.add_theme_font_size_override("font_size", 17)
+	wh_head.add_theme_color_override("font_color", Color(0.72, 0.80, 0.86))
+	market_list.add_child(wh_head)
+	var wh_any := false
+	for id in [&"grain", &"timber", &"rum", &"spice"]:
+		var have_w := int(GameState.warehouse.get(id, 0))
+		if have_w <= 0:
+			continue
+		wh_any = true
+		var cw: Resource = DataRegistry.get_commodity(id)
+		var lw := Label.new()
+		lw.text = "　%s × %d" % [String(cw.display_name), have_w]
+		lw.add_theme_font_size_override("font_size", 15)
+		market_list.add_child(lw)
+	if not wh_any:
+		var empty_w := Label.new()
+		empty_w.text = "　（空）"
+		empty_w.add_theme_font_size_override("font_size", 15)
+		market_list.add_child(empty_w)
 	var tip := Label.new()
-	tip.text = "买到的货物直接装船，随船航行；卖货请到目标港口。"
+	tip.text = "「装船」时买到的货进船仓，「存仓」时进港口仓库；卖出同理。"
 	tip.add_theme_font_size_override("font_size", 13)
 	tip.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
 	market_list.add_child(tip)
@@ -420,14 +480,54 @@ func _rebuild_market() -> void:
 	close.pressed.connect(func(): market_root.visible = false)
 	market_list.add_child(close)
 
+## 船 → 仓 转移
+func _move_to_warehouse(cid: StringName) -> void:
+	var c: Resource = DataRegistry.get_commodity(cid)
+	var have := int(GameState.cargo.get(cid, 0))
+	if have <= 0:
+		_log("船上没有该商品")
+		return
+	if GameState.warehouse_free() < float(c.volume):
+		_log("仓库空间不足")
+		return
+	var n := mini(10, mini(have, int(floor(GameState.warehouse_free() / float(c.volume)))))
+	if n <= 0:
+		return
+	GameState.remove_cargo(cid, n)
+	GameState.warehouse_add(cid, n)
+	_log("已移入仓库：%s × %d" % [c.display_name, n])
+	_rebuild_market()
+	_refresh()
+
+## 仓 → 船 转移
+func _move_to_ship(cid: StringName) -> void:
+	var c: Resource = DataRegistry.get_commodity(cid)
+	var have := int(GameState.warehouse.get(cid, 0))
+	if have <= 0:
+		_log("仓库里没有该商品")
+		return
+	if GameState.cargo_free() < float(c.volume):
+		_log("货舱空间不足")
+		return
+	var n := mini(10, mini(have, int(floor(GameState.cargo_free() / float(c.volume)))))
+	if n <= 0:
+		return
+	GameState.warehouse_remove(cid, n)
+	GameState.add_cargo(cid, n)
+	_log("已装上船：%s × %d" % [c.display_name, n])
+	_rebuild_market()
+	_refresh()
+
 func _buy(cid: StringName, amount: int, price: int) -> void:
 	var c: Resource = DataRegistry.get_commodity(cid)
 	var total := price * amount
 	if GameState.gold < total:
 		_log("金币不足，需要 %d 金" % total)
 		return
-	if GameState.cargo_free() < float(c.volume) * amount:
-		_log("货舱空间不足")
+	var to_wh := market_target == "warehouse"
+	var free_space := GameState.warehouse_free() if to_wh else GameState.cargo_free()
+	if free_space < float(c.volume) * amount:
+		_log("仓库空间不足" if to_wh else "货舱空间不足")
 		return
 	var port: Resource = DataRegistry.get_port(PORT_ID)
 	var stock := GameState.ensure_stock(PORT_ID, cid, int(port.max_stock))
@@ -436,20 +536,28 @@ func _buy(cid: StringName, amount: int, price: int) -> void:
 		return
 	GameState.add_gold(-total)
 	GameState.set_stock(PORT_ID, cid, stock - amount)
-	GameState.add_cargo(cid, amount)
-	_log("买入 %d %s，花费 %d 金" % [amount, c.display_name, total])
+	if to_wh:
+		GameState.warehouse_add(cid, amount)
+	else:
+		GameState.add_cargo(cid, amount)
+	_log("买入 %d %s（%s），花费 %d 金" % [amount, c.display_name,
+		"存入仓库" if to_wh else "装船", total])
 	_rebuild_market()
 	_refresh()
 
 func _sell(cid: StringName, amount: int, price: int) -> void:
-	var have := int(GameState.cargo.get(cid, 0))
+	var from_wh := market_target == "warehouse"
+	var have := int(GameState.warehouse.get(cid, 0)) if from_wh else int(GameState.cargo.get(cid, 0))
 	if have < amount:
-		_log("货舱里没有足够的该商品")
+		_log("仓库里没有足够的该商品" if from_wh else "货舱里没有足够的该商品")
 		return
 	var c: Resource = DataRegistry.get_commodity(cid)
 	var port: Resource = DataRegistry.get_port(PORT_ID)
 	var stock := GameState.ensure_stock(PORT_ID, cid, int(port.max_stock))
-	GameState.remove_cargo(cid, amount)
+	if from_wh:
+		GameState.warehouse_remove(cid, amount)
+	else:
+		GameState.remove_cargo(cid, amount)
 	GameState.set_stock(PORT_ID, cid, stock + amount)
 	GameState.add_gold(price * amount)
 	var margin := maxi(0, price * amount - int(c.base_price) * amount)
@@ -1357,6 +1465,11 @@ func _buy_ship(def_id: StringName, variant: StringName, price: int) -> void:
 	_refresh()
 
 func _swap_ship(index: int) -> void:
+	if GameState.swap_overload(index):
+		var other: Dictionary = GameState.ships_owned[index]
+		var cap := GameState.cargo_capacity_of(StringName(other.get("def_id", "")), StringName(other.get("variant", "standard")))
+		_log("货舱容量不足：当前货物 %.0f 单位，该船仅容 %d · 请先卸货到港口仓库或出售" % [GameState.cargo_used(), cap])
+		return
 	if not GameState.swap_to_owned(index):
 		_log("换乘失败")
 		return
