@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_bone_armor"
+display_name = "白骨甲板"
+slot = &"armor"
+rarity = 4
+armor_add = 85
+price = 58000
+description = "萨默斯用不知什么骨头拼成的甲板，硬得不像骨头。"

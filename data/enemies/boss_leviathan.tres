@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_leviathan"
+display_name = "深渊利维坦"
+kind = &"boss_monster"
+tier = 8
+xp_reward = 1300
+gold_min = 3600
+gold_max = 9200
+loot_commodity = &"spice"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 20
+limb_count = 4
+body_hp = 6600
+attack_interval = 2.5
+attack_damage = 145

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"fifth_rate"
+variant = &"standard"
+display_name = "五级护卫舰"
+tier = 7
+ship_class = "护卫舰"
+base_hp = 7200
+base_speed = 4.5
+turn_rate = 20.0
+cargo_capacity = 3600
+crew_capacity = 240
+cannon_slots = 44
+guns_per_side = 22
+max_cannon_weight = 8
+armor_base = 70
+price = 260000
+description = "海军主力巡防舰，火力与机动兼顾。"

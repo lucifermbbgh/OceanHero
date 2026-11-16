@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"armor_plank"
+display_name = "木板衬里"
+slot = &"armor"
+rarity = 0
+armor_add = 10
+price = 400
+description = "在船体内侧加一层木衬。"

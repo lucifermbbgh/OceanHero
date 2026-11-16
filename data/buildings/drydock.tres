@@ -1,0 +1,15 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"drydock"
+display_name = "船坞"
+description = "修船、造船与改装的地方。"
+effect_text = "每级修理费 -6%，每周产铁 12×等级"
+gold_base = 2500
+timber_base = 120
+iron_base = 60
+weeks_base = 2
+production = {"iron": 12}

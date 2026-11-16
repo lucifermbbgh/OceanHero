@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"fishing_sloop"
+display_name = "单桅渔船"
+tier = 1
+variant = &"standard"
+ship_class = "渔船"
+base_hp = 400
+base_speed = 4.5
+turn_rate = 45.0
+cargo_capacity = 200
+crew_capacity = 6
+cannon_slots = 1
+guns_per_side = 1
+max_cannon_weight = 3
+armor_base = 0
+price = 500
+description = "一条只能装一门小炮的单桅渔船。所有船长的起点。"

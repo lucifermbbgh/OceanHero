@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"fig_mermaid"
+display_name = "人鱼船首像"
+slot = &"figurehead"
+rarity = 1
+boarding_add = 8
+price = 3000
+description = "船员说它能带来好运，接舷时格外勇猛。"

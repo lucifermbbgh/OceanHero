@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"brig"
+display_name = "双桅横帆船"
+tier = 5
+variant = &"standard"
+ship_class = "横帆船"
+base_hp = 3200
+base_speed = 5.2
+turn_rate = 26.0
+cargo_capacity = 2000
+crew_capacity = 110
+cannon_slots = 20
+guns_per_side = 10
+max_cannon_weight = 6
+armor_base = 40
+price = 40000
+description = "真正意义上的战舰，十门侧舷炮足以应付大多数海盗。"

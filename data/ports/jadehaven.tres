@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/port_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"jadehaven"
+display_name = "翡翠港"
+map_id = 0
+position = Vector2(0, 0)
+services = [&"repair", &"market", &"shipyard", &"save"]
+production = {}
+demand = {}
+max_stock = 800

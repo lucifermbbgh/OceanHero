@@ -1,0 +1,15 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"tavern"
+display_name = "酒馆"
+description = "招募船员与打听消息。附带农庄供应伙食。"
+effect_text = "每级招募池 +2、高稀有度概率 +3%，每周产粮 25×等级"
+gold_base = 1800
+timber_base = 60
+iron_base = 10
+weeks_base = 2
+production = {"grain": 25}

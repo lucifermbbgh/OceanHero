@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_shark_king"
+display_name = "黑鳍鲨王"
+kind = &"boss_monster"
+tier = 4
+xp_reward = 480
+gold_min = 1200
+gold_max = 3200
+loot_commodity = &"timber"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 8
+limb_count = 2
+body_hp = 2700
+attack_interval = 2.9
+attack_damage = 78

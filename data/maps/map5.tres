@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map5"
+index = 5
+display_name = "黑鲸海域"
+level_min = 15
+level_max = 21
+hostile = true
+pirates = 10
+monsters = 5
+pirate_boss = &"boss_karl"
+monster_boss = &"boss_black_whale"
+island_seed = 55

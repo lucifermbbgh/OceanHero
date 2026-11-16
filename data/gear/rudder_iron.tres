@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"rudder_iron"
+display_name = "铁箍舵"
+slot = &"rudder"
+rarity = 2
+turn_pct = 0.13
+price = 5000
+description = "加铁箍加固，急转不掉舵。"

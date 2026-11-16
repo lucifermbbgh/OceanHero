@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_storm_dragon"
+display_name = "雷暴海龙"
+kind = &"boss_monster"
+tier = 6
+xp_reward = 830
+gold_min = 2300
+gold_max = 5800
+loot_commodity = &"saltpeter"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 13
+limb_count = 4
+body_hp = 4400
+attack_interval = 2.7
+attack_damage = 108

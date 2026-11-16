@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map2"
+index = 2
+display_name = "珊瑚浅滩"
+level_min = 3
+level_max = 6
+hostile = false
+pirates = 6
+monsters = 3
+pirate_boss = &"boss_barbossa"
+monster_boss = &"boss_coral_serpent"
+island_seed = 22

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_ironhook"
+display_name = "铁钩船首像"
+slot = &"figurehead"
+rarity = 4
+boarding_add = 26
+turn_pct = 0.05
+price = 40000
+description = "卡尔的铁钩。船员说看到它就想跳帮。"

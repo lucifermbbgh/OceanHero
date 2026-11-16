@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_coral_serpent"
+display_name = "珊瑚海蛇"
+kind = &"boss_monster"
+tier = 2
+xp_reward = 220
+gold_min = 500
+gold_max = 1400
+loot_commodity = &"timber"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 4
+limb_count = 2
+body_hp = 1400
+attack_interval = 3.2
+attack_damage = 55

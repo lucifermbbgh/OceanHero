@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/cannon_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"pound6"
+display_name = "6 磅炮"
+pound_class = 3
+damage = 28.0
+reload_seconds = 2.4
+shot_range = 1000.0
+accuracy_mod = 0.01
+price = 900

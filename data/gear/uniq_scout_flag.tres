@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_scout_flag"
+display_name = "独眼罗盘旗"
+slot = &"flag"
+rarity = 3
+speed_pct = 0.04
+turn_pct = 0.06
+price = 12000
+description = "「独眼」杰克的罗盘旗，据说能在浅湾里找到最快的风。"

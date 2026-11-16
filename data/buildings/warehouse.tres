@@ -1,0 +1,15 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"warehouse"
+display_name = "仓库"
+description = "存放货物与停泊船只，附带伐木场。"
+effect_text = "每级 +400 仓储、+2 船位，每周产木材 20×等级"
+gold_base = 1500
+timber_base = 100
+iron_base = 20
+weeks_base = 2
+production = {"timber": 20}

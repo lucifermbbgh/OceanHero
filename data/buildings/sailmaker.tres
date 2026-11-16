@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"sailmaker"
+display_name = "织帆坊"
+description = "造帆、修舵与裁装甲。"
+effect_text = "每级可购买装备稀有度 +1"
+gold_base = 3000
+timber_base = 90
+iron_base = 40
+weeks_base = 2

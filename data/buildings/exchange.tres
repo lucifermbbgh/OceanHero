@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"exchange"
+display_name = "交易所"
+description = "行情、远洋订单与期货。"
+effect_text = "每级卖出价 +3%"
+gold_base = 5000
+timber_base = 70
+iron_base = 50
+weeks_base = 3

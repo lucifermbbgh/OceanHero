@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map7"
+index = 7
+display_name = "骸骨礁群"
+level_min = 28
+level_max = 36
+hostile = true
+pirates = 12
+monsters = 6
+pirate_boss = &"boss_somers"
+monster_boss = &"boss_bone_kraken"
+island_seed = 77

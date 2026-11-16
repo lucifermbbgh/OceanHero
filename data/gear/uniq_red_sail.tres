@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_red_sail"
+display_name = "红胡帆"
+slot = &"sail"
+rarity = 3
+speed_pct = 0.14
+price = 18000
+description = "巴博萨的红帆，浸过某种让布更吃风的东西。"

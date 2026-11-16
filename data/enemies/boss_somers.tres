@@ -1,0 +1,26 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_somers"
+display_name = "「白骨」萨默斯"
+kind = &"boss_pirate"
+tier = 7
+based_on_ship = &"fifth_rate"
+based_on_cannon = &"pound24"
+hp_mult = 1.6
+damage_mult = 0.4
+speed_mult = 1.06
+aggro_radius = 1200.0
+xp_reward = 1000
+gold_min = 3700
+gold_max = 11000
+loot_commodity = &"spice"
+loot_amount = 40
+gear_drop_chance = 1.0
+commendation_reward = 16unique_gear = &"uniq_bone_armor"
+unique_crew_name = "白骨木匠"
+unique_crew_role = &"carpenter"
+unique_crew_stat = 45

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_vander"
+display_name = "「幽灵」范德"
+kind = &"boss_pirate"
+tier = 3
+based_on_ship = &"schooner"
+based_on_cannon = &"pound12"
+hp_mult = 1.6
+damage_mult = 0.6
+speed_mult = 1
+aggro_radius = 1200.0
+xp_reward = 320
+gold_min = 1100
+gold_max = 3200
+loot_commodity = &"spice"
+loot_amount = 40
+gear_drop_chance = 1.0
+commendation_reward = 6unique_gear = &"uniq_ghost_rudder"
+unique_crew_name = "无声舵手"
+unique_crew_role = &"helmsman"
+unique_crew_stat = 46

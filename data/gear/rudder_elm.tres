@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"rudder_elm"
+display_name = "榆木舵"
+slot = &"rudder"
+rarity = 0
+turn_pct = 0.05
+price = 250
+description = "手工削制的榆木舵叶。"

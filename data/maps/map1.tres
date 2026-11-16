@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map1"
+index = 1
+display_name = "浅湾水道"
+level_min = 1
+level_max = 3
+hostile = false
+pirates = 4
+monsters = 2
+pirate_boss = &"boss_jack"
+monster_boss = &"boss_reef_crab"
+island_seed = 11

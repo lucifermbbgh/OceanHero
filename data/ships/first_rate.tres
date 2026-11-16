@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"first_rate"
+variant = &"standard"
+display_name = "一级战列舰"
+tier = 10
+ship_class = "战列舰"
+base_hp = 24000
+base_speed = 3.4
+turn_rate = 10.0
+cargo_capacity = 8000
+crew_capacity = 750
+cannon_slots = 100
+guns_per_side = 50
+max_cannon_weight = 10
+armor_base = 130
+price = 4000000
+description = "三层甲板的旗舰级战列舰。海上的移动要塞。"

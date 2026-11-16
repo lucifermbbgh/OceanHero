@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"third_rate"
+variant = &"standard"
+display_name = "三级战列舰"
+tier = 9
+ship_class = "战列舰"
+base_hp = 16000
+base_speed = 3.8
+turn_rate = 13.0
+cargo_capacity = 6200
+crew_capacity = 500
+cannon_slots = 80
+guns_per_side = 40
+max_cannon_weight = 10
+armor_base = 110
+price = 1500000
+description = "舰队的中坚，火力凶猛但转向笨重。"

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map9"
+index = 9
+display_name = "王冠之海"
+level_min = 45
+level_max = 60
+hostile = true
+pirates = 14
+monsters = 7
+pirate_boss = &"boss_crown"
+monster_boss = &"boss_hydra"
+island_seed = 99

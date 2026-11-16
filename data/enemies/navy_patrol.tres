@@ -1,0 +1,23 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"navy_patrol"
+display_name = "海军巡逻舰"
+kind = &"navy"
+tier = 3
+based_on_ship = &"brig"
+based_on_cannon = &"pound12"
+hp_mult = 1.6
+damage_mult = 1.4
+speed_mult = 0.95
+aggro_radius = 1200.0
+xp_reward = 90
+gold_min = 400
+gold_max = 900
+loot_commodity = &"spice"
+loot_amount = 10
+gear_drop_chance = 0.5
+commendation_reward = 1

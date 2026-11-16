@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/cannon_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"pound3_light"
+display_name = "3 磅轻炮"
+pound_class = 1
+damage = 18.0
+reload_seconds = 2.0
+shot_range = 900.0
+accuracy_mod = 0.0
+price = 200

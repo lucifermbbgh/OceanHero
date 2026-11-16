@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"longship"
+variant = &"standard"
+display_name = "维京长船"
+tier = 3
+ship_class = "长船"
+base_hp = 1400
+base_speed = 5.0
+turn_rate = 38.0
+cargo_capacity = 900
+crew_capacity = 40
+cannon_slots = 8
+guns_per_side = 4
+max_cannon_weight = 4
+armor_base = 15
+price = 6000
+description = "细长的桨帆船，转向灵活但船体单薄。"

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"foundry"
+display_name = "铸造厂"
+description = "造炮与熬硝的地方。"
+effect_text = "每级可购买火炮磅级 +2，每周产硝石 8×等级"
+gold_base = 4000
+timber_base = 50
+iron_base = 120
+weeks_base = 3
+production = {"saltpeter": 8}

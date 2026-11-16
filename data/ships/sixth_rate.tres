@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"sixth_rate"
+variant = &"standard"
+display_name = "六级舰"
+tier = 6
+ship_class = "护卫舰"
+base_hp = 4800
+base_speed = 4.8
+turn_rate = 22.0
+cargo_capacity = 2600
+crew_capacity = 160
+cannon_slots = 28
+guns_per_side = 14
+max_cannon_weight = 7
+armor_base = 50
+price = 100000
+description = "正规军舰的入门级，第一次拥有真正意义上的侧舷齐射。"

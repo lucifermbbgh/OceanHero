@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"armor_oak"
+display_name = "橡木衬"
+slot = &"armor"
+rarity = 1
+armor_add = 25
+price = 2000
+description = "厚橡木板，能挡实心弹。"

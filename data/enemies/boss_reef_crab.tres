@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_reef_crab"
+display_name = "礁石巨蟹"
+kind = &"boss_monster"
+tier = 1
+xp_reward = 140
+gold_min = 300
+gold_max = 900
+loot_commodity = &"timber"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 3
+limb_count = 2
+body_hp = 900
+attack_interval = 3.4
+attack_damage = 45

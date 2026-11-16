@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_ghost_rudder"
+display_name = "幽灵舵轮"
+slot = &"rudder"
+rarity = 3
+turn_pct = 0.22
+price = 20000
+description = "转起来没有声音的舵轮，据说原主早已不在。"

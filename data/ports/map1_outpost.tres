@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/port_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"map1_outpost"
+display_name = "浅湾哨站"
+map_id = 1
+position = Vector2(3400, 5050)
+services = [&"repair", &"market"]
+production = {"timber": 0.6}
+demand = {"spice": 1.5}
+max_stock = 800

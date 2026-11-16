@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map8"
+index = 8
+display_name = "深渊裂流"
+level_min = 36
+level_max = 45
+hostile = true
+pirates = 13
+monsters = 6
+pirate_boss = &"boss_davy"
+monster_boss = &"boss_leviathan"
+island_seed = 88

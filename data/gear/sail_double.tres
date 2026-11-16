@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"sail_double"
+display_name = "双层帆"
+slot = &"sail"
+rarity = 2
+speed_pct = 0.09
+price = 6000
+description = "双层帆布，逆风时优势明显。"

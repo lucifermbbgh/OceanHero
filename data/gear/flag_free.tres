@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"flag_free"
+display_name = "自由旗"
+slot = &"flag"
+rarity = 0
+price = 800
+description = "一面没有任何阵营纹章的白旗。"

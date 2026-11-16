@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"governor"
+display_name = "总督府"
+description = "翡翠港的最高行政机关。"
+effect_text = "每级 +1 任务槽、+50 仓储上限"
+gold_base = 3000
+timber_base = 80
+iron_base = 30
+weeks_base = 3

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_bone_kraken"
+display_name = "骸骨大王乌贼"
+kind = &"boss_monster"
+tier = 7
+xp_reward = 1030
+gold_min = 2900
+gold_max = 7300
+loot_commodity = &"spice"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 16
+limb_count = 4
+body_hp = 5400
+attack_interval = 2.6
+attack_damage = 125

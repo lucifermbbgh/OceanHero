@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_storm_sail"
+display_name = "风暴之帆"
+slot = &"sail"
+rarity = 4
+speed_pct = 0.19
+turn_pct = 0.04
+price = 52000
+description = "艾琳的帆，风越大它越快。"

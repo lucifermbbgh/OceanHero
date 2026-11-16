@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_mist_jelly"
+display_name = "迷雾水母主"
+kind = &"boss_monster"
+tier = 3
+xp_reward = 340
+gold_min = 800
+gold_max = 2200
+loot_commodity = &"spice"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 6
+limb_count = 2
+body_hp = 2000
+attack_interval = 3
+attack_damage = 65

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map3"
+index = 3
+display_name = "迷雾海峡"
+level_min = 6
+level_max = 10
+hostile = true
+pirates = 8
+monsters = 4
+pirate_boss = &"boss_vander"
+monster_boss = &"boss_mist_jelly"
+island_seed = 33

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/cannon_def.gd" id="1_c"]
+
+[resource]
+script = ExtResource("1_c")
+id = &"carronade68"
+display_name = "68 磅卡隆炮"
+pound_class = 10
+damage = 155.0
+reload_seconds = 3.0
+shot_range = 1100.0
+accuracy_mod = -0.05
+price = 240000

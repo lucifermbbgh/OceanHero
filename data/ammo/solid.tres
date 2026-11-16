@@ -1,0 +1,15 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ammo_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"solid"
+display_name = "实心弹"
+damage_mult = 1.0
+accuracy_mod = 0.0
+to_hull = 1.0
+to_sail = 0.25
+to_rudder = 0.4
+to_crew = 0.1
+price_per_shot = 1

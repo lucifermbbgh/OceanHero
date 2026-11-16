@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_raider_armor"
+display_name = "剪径者胸甲"
+slot = &"armor"
+rarity = 3
+armor_add = 60
+price = 22000
+description = "从商船队抢来的拼装装甲，厚得离谱。"

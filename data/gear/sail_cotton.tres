@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"sail_cotton"
+display_name = "棉帆"
+slot = &"sail"
+rarity = 0
+speed_pct = 0.03
+price = 300
+description = "最普通的棉质船帆。"

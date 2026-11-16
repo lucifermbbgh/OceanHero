@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"armor_copper"
+display_name = "铜皮包板"
+slot = &"armor"
+rarity = 2
+armor_add = 45
+price = 8000
+description = "铜皮包覆船肋，兼具防蛀与抗弹。"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/cannon_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"pound12"
+display_name = "12 磅炮"
+pound_class = 5
+damage = 46.0
+reload_seconds = 3.0
+shot_range = 1150.0
+accuracy_mod = 0.02
+price = 4500

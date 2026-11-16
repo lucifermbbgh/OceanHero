@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"sail_linen"
+display_name = "亚麻帆"
+slot = &"sail"
+rarity = 1
+speed_pct = 0.06
+price = 1500
+description = "织得更密的亚麻帆，吃风更稳。"

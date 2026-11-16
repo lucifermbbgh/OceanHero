@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_crown_relic"
+display_name = "王冠遗物"
+slot = &"flag"
+rarity = 4
+speed_pct = 0.12
+turn_pct = 0.12
+price = 120000
+description = "无名船长唯一的遗物。没人知道它为什么在王冠之海中央。"

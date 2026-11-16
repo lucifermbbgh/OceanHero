@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"sand_junk"
+display_name = "平底沙船"
+tier = 2
+variant = &"standard"
+ship_class = "沙船"
+base_hp = 900
+base_speed = 4.2
+turn_rate = 30.0
+cargo_capacity = 600
+crew_capacity = 18
+cannon_slots = 4
+guns_per_side = 2
+max_cannon_weight = 6
+armor_base = 10
+price = 2000
+description = "沿海常见的平底货船，载重不错，打起来很勉强。"

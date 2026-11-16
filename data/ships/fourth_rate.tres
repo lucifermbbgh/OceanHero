@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"fourth_rate"
+variant = &"standard"
+display_name = "四级战列舰"
+tier = 8
+ship_class = "战列舰"
+base_hp = 10800
+base_speed = 4.1
+turn_rate = 16.0
+cargo_capacity = 4800
+crew_capacity = 350
+cannon_slots = 60
+guns_per_side = 30
+max_cannon_weight = 9
+armor_base = 90
+price = 650000
+description = "两甲板战列舰，护墙厚实。"

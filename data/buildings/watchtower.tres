@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"watchtower"
+display_name = "瞭望塔"
+description = "打探海域动向。"
+effect_text = "每级视野 +100px"
+gold_base = 2000
+timber_base = 110
+iron_base = 30
+weeks_base = 2

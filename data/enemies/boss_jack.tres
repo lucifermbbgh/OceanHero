@@ -1,0 +1,26 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_jack"
+display_name = "「独眼」杰克"
+kind = &"boss_pirate"
+tier = 1
+based_on_ship = &"sand_junk"
+based_on_cannon = &"pound6"
+hp_mult = 1.4
+damage_mult = 0.8
+speed_mult = 0.95
+aggro_radius = 1200.0
+xp_reward = 120
+gold_min = 400
+gold_max = 1200
+loot_commodity = &"spice"
+loot_amount = 40
+gear_drop_chance = 1.0
+commendation_reward = 3unique_gear = &"uniq_scout_flag"
+unique_crew_name = "老罗盘手"
+unique_crew_role = &"lookout"
+unique_crew_stat = 42

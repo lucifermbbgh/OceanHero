@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map6"
+index = 6
+display_name = "风暴角"
+level_min = 21
+level_max = 28
+hostile = true
+pirates = 11
+monsters = 5
+pirate_boss = &"boss_irene"
+monster_boss = &"boss_storm_dragon"
+island_seed = 66

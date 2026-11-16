@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"uniq_abyss_flag"
+display_name = "深渊之旗"
+slot = &"flag"
+rarity = 4
+speed_pct = 0.08
+turn_pct = 0.10
+price = 70000
+description = "戴维的旗。挂上它，海流都会让路。"

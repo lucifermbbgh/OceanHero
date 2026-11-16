@@ -1,0 +1,26 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_karl"
+display_name = "「铁钩」卡尔"
+kind = &"boss_pirate"
+tier = 5
+based_on_ship = &"brig"
+based_on_cannon = &"pound18"
+hp_mult = 2.5
+damage_mult = 0.45
+speed_mult = 1.04
+aggro_radius = 1200.0
+xp_reward = 620
+gold_min = 2200
+gold_max = 6600
+loot_commodity = &"spice"
+loot_amount = 40
+gear_drop_chance = 1.0
+commendation_reward = 10unique_gear = &"uniq_ironhook"
+unique_crew_name = "铁钩打手"
+unique_crew_role = &"raider"
+unique_crew_stat = 48

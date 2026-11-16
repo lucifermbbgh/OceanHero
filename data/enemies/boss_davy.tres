@@ -1,0 +1,26 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_davy"
+display_name = "「深渊」戴维"
+kind = &"boss_pirate"
+tier = 8
+based_on_ship = &"fourth_rate"
+based_on_cannon = &"pound32"
+hp_mult = 1.5
+damage_mult = 0.4
+speed_mult = 1.05
+aggro_radius = 1200.0
+xp_reward = 1250
+gold_min = 4600
+gold_max = 13800
+loot_commodity = &"spice"
+loot_amount = 40
+gear_drop_chance = 1.0
+commendation_reward = 20unique_gear = &"uniq_abyss_flag"
+unique_crew_name = "深渊引水人"
+unique_crew_role = &"sailmaster"
+unique_crew_stat = 50

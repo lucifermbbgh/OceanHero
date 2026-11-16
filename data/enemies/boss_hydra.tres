@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_def.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+id = &"boss_hydra"
+display_name = "九头蛇·涅柔斯"
+kind = &"boss_monster"
+tier = 9
+xp_reward = 1650
+gold_min = 4500
+gold_max = 11500
+loot_commodity = &"spice"
+loot_amount = 30
+gear_drop_chance = 1.0
+commendation_reward = 25
+limb_count = 4
+body_hp = 8200
+attack_interval = 2.4
+attack_damage = 170
