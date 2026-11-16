@@ -49,6 +49,7 @@ var disengage_timer := 0.0
 var _last_target = null
 var wander_heading := 0.0
 var wander_timer := 0.0
+var home_pos := Vector2.ZERO
 var last_attacker = null
 var heading := 0.0
 var nav_target = null
@@ -166,6 +167,7 @@ func setup_enemy(edef: Resource, level_scale: float = 1.0) -> void:
 	base_reload_ref = cannon_reload
 	wander_heading = heading
 	wander_timer = RngService.randf_range(2.0, 6.0)
+	home_pos = global_position
 	queue_redraw()
 
 # ---------------- 状态查询 ----------------
@@ -283,7 +285,11 @@ func _ai_steer(delta: float) -> float:
 			return 0.0
 		throttle = 0.6
 		return _turn_toward(to_target.angle())
-	# 无目标：缓慢巡游。每隔几秒换一次航向，而不是恒定舵角原地打转
+	# 无目标：在"属地"附近缓慢巡游，不会全图乱窜去追玩家
+	var to_home: Vector2 = home_pos - global_position
+	if home_pos != Vector2.ZERO and to_home.length() > 1300.0:
+		throttle = 0.7
+		return _turn_toward(to_home.angle())
 	wander_timer -= delta
 	if wander_timer <= 0.0:
 		wander_timer = RngService.randf_range(4.0, 9.0)

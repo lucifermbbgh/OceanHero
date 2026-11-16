@@ -44,6 +44,15 @@ const FACTION_ENEMIES := {
 	"merchant": [],
 }
 const AI_TICK := 0.6
+## 刷新与密度控制
+const SPAWN_MARGIN := 300.0
+const PLAYER_SAFE_RADIUS := 1150.0   # 玩家出生点周围不刷怪（略大于 1 倍射程，避免一进场就挨打）
+const NEAR_RING_MIN := 1150.0        # 视野边缘"迎接"单位的距离带
+const NEAR_RING_MAX := 1650.0
+const NEAR_UNITS := 3                # 出生点附近保留几个单位，避免一进场面对空海
+const DENSITY_CELL := 2000.0         # 密度网格边长
+const MAX_PER_CELL := 3              # 单个网格内的单位上限
+const MAX_ATTACKERS_ON_PLAYER := 3   # 同时追打玩家的单位上限
 
 var hunter_timer := 45.0
 var ai_timer := 0.0
@@ -586,10 +595,11 @@ func _spawn_pirate() -> void:
 	var e = ShipScene.instantiate()
 	e.setup_enemy(DataRegistry.get_enemy(&"pirate_scout"), _map_scale())
 	e.loot_mult = _loot_mult()
-	e.position = _random_spawn_pos()
+	e.position = _random_spawn_pos(enemies.size() < NEAR_UNITS)
 	e.died.connect(_on_enemy_died)
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
+	e.home_pos = e.global_position
 	enemies.append(e)
 
 func _spawn_monster() -> void:
@@ -601,7 +611,7 @@ func _spawn_monster() -> void:
 	var m = MonsterScene.instantiate()
 	m.setup(DataRegistry.get_enemy(&"reef_crab"), _map_scale())
 	m.loot_mult = _loot_mult()
-	m.position = _random_spawn_pos()
+	m.position = _random_spawn_pos(enemies.size() < NEAR_UNITS)
 	m.died.connect(_on_enemy_died)
 	add_child(m)
 	enemies.append(m)
@@ -617,6 +627,7 @@ func _spawn_navy_patrol() -> void:
 	e.died.connect(_on_enemy_died)
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
+	e.home_pos = e.global_position
 	enemies.append(e)
 
 ## 中立商船：被海盗追，不还手
@@ -632,6 +643,7 @@ func _spawn_merchant() -> void:
 	e.died.connect(_on_enemy_died)
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
+	e.home_pos = e.global_position
 	enemies.append(e)
 
 func _count_kind(kind: String) -> int:
@@ -645,11 +657,40 @@ func _count_kind(kind: String) -> int:
 			n += 1
 	return n
 
-func _random_spawn_pos() -> Vector2:
-	var ang := RngService.randf() * TAU
-	var dist := 480.0 + RngService.randf() * 680.0
-	var p: Vector2 = player.position + Vector2.RIGHT.rotated(ang) * dist
-	return p.clamp(Vector2(200, 200), Vector2(SEA_SIZE - 200, SEA_SIZE - 200))
+## 在整张图里找一个"不挤、不贴着玩家"的落点
+## near=true 时在玩家视野边缘的环带里取点（只给少量"迎接"单位用）
+func _random_spawn_pos(near: bool = false) -> Vector2:
+	if near and player != null and is_instance_valid(player):
+		var ang := RngService.randf() * TAU
+		var dist := RngService.randf_range(NEAR_RING_MIN, NEAR_RING_MAX)
+		return (player.global_position + Vector2.RIGHT.rotated(ang) * dist).clamp(
+			Vector2(SPAWN_MARGIN, SPAWN_MARGIN), Vector2(SEA_SIZE - SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
+	for attempt in range(40):
+		var p := Vector2(
+			RngService.randf_range(SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN),
+			RngService.randf_range(SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
+		if player != null and is_instance_valid(player):
+			if p.distance_to(player.global_position) < PLAYER_SAFE_RADIUS:
+				continue
+		if _units_in_cell(p) >= MAX_PER_CELL:
+			continue
+		return p
+	# 实在找不到就丢到远离玩家的一角
+	var fallback := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5)
+	if player != null and is_instance_valid(player):
+		fallback = player.global_position + Vector2(2200, 2200)
+	return fallback.clamp(Vector2(SPAWN_MARGIN, SPAWN_MARGIN), Vector2(SEA_SIZE - SPAWN_MARGIN, SEA_SIZE - SPAWN_MARGIN))
+
+func _units_in_cell(p: Vector2) -> int:
+	var cell := Vector2(floor(p.x / DENSITY_CELL), floor(p.y / DENSITY_CELL))
+	var n := 0
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		var ep: Vector2 = e.global_position
+		if Vector2(floor(ep.x / DENSITY_CELL), floor(ep.y / DENSITY_CELL)) == cell:
+			n += 1
+	return n
 
 # ---------------- 主循环 ----------------
 
@@ -764,6 +805,7 @@ func _spawn_navy() -> void:
 	e.died.connect(_on_enemy_died)
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
+	e.home_pos = e.global_position
 	enemies.append(e)
 	hud.ticker("赏金猎人编队出现！（通缉度 %d）" % GameState.notoriety())
 
@@ -972,21 +1014,21 @@ func _faction_ai(delta: float) -> void:
 		# 1~2 图：谁都不主动
 		if not hostile_map:
 			continue
-		# 海怪：3 图以上无差别攻击（不看战力）
-		if is_mon:
-			if e.get("target") == null and player != null and is_instance_valid(player):
-				e.set("target", player)
-			continue
 		# 已有有效目标就跳过
 		var cur = e.get("target")
 		if cur != null and is_instance_valid(cur) and cur.get("alive"):
+			continue
+		# 海怪：3 图以上无差别攻击（不看战力），但仍受围攻上限约束
+		if is_mon:
+			if player != null and is_instance_valid(player) 				and _count_targeting_player() < MAX_ATTACKERS_ON_PLAYER 				and e.global_position.distance_to(player.global_position) < 1100.0:
+				e.set("target", player)
 			continue
 		var fac := String(e.get("faction"))
 		# 商船只逃不打
 		if fac == "merchant":
 			continue
 		var best = null
-		var best_d := 1500.0
+		var best_d := 1100.0
 		for o in units:
 			if o == e:
 				continue
@@ -998,9 +1040,43 @@ func _faction_ai(delta: float) -> void:
 				best = o
 		if best == null:
 			continue
+		# 围攻上限：避免整张图的敌人一起扑向玩家
+		if best == player and _count_targeting_player() >= MAX_ATTACKERS_ON_PLAYER:
+			continue
 		if _will_attack(e, best):
 			e.set("target", best)
 			e.set("engaged", true)
+
+## 调试/记录用：当前海域的密度快照
+func debug_stats() -> Dictionary:
+	var near := 0
+	var min_d := 1.0e9
+	var cells := {}
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		var d: float = e.global_position.distance_to(player.global_position)
+		min_d = minf(min_d, d)
+		if d < 1200.0:
+			near += 1
+		var ep: Vector2 = e.global_position
+		var k := "%d_%d" % [int(floor(ep.x / DENSITY_CELL)), int(floor(ep.y / DENSITY_CELL))]
+		cells[k] = int(cells.get(k, 0)) + 1
+	return {
+		"units": enemies.size(),
+		"within_1200": near,
+		"nearest": min_d,
+		"targeting_player": _count_targeting_player(),
+		"max_cell": cells.values().max() if not cells.is_empty() else 0,
+		"fps": Engine.get_frames_per_second(),
+	}
+
+func _count_targeting_player() -> int:
+	var n := 0
+	for e in enemies:
+		if is_instance_valid(e) and e.get("target") == player:
+			n += 1
+	return n
 
 func _lock_target(enemy) -> void:
 	player.target = enemy

@@ -531,6 +531,34 @@ func _test_ecology() -> void:
 	_ok(s3._count_faction("merchant") >= 1, "图 3 有中立商船", "count=%d" % s3._count_faction("merchant"))
 	_ok(s3.enemies.size() <= s3.MAX_UNITS, "同屏单位不超过上限", "count=%d" % s3.enemies.size())
 
+	# 刷新密度：不贴着玩家、网格内不超限
+	var too_close := 0
+	for e in s3.enemies:
+		if e.get("is_boss"):
+			continue
+		if e.global_position.distance_to(s3.player.global_position) < s3.PLAYER_SAFE_RADIUS - 1.0:
+			too_close += 1
+	_ok(too_close == 0, "没有单位刷在玩家安全区内", "越界=%d" % too_close)
+
+	var cell_map := {}
+	var overflow := 0
+	for e in s3.enemies:
+		if e.get("is_boss"):
+			continue
+		var ep: Vector2 = e.global_position
+		var key := "%d_%d" % [int(floor(ep.x / s3.DENSITY_CELL)), int(floor(ep.y / s3.DENSITY_CELL))]
+		cell_map[key] = int(cell_map.get(key, 0)) + 1
+		if int(cell_map[key]) > s3.MAX_PER_CELL + 1:
+			overflow += 1
+	_ok(overflow == 0, "网格内单位数受控", "溢出=%d" % overflow)
+
+	# 围攻上限：跑一段时间后追打玩家的单位不超过 3
+	for i in range(240):
+		await get_tree().physics_frame
+	_ok(s3._count_targeting_player() <= s3.MAX_ATTACKERS_ON_PLAYER,
+		"同时追打玩家的单位不超过上限",
+		"targeting=%d / 上限 %d" % [s3._count_targeting_player(), s3.MAX_ATTACKERS_ON_PLAYER])
+
 	# NPC 互殴不给玩家战利品
 	GameState.add_gold(0)
 	var merchant = null
