@@ -14,6 +14,7 @@ var _player_name: Label
 var _player_bars := {}
 var _target_panel: PanelContainer
 var _target_name: Label
+var _target_range: Label
 var _target_bars := {}
 var _ticker: Label
 var _hint: Label
@@ -143,7 +144,7 @@ func _build_quest_panel(root: Control) -> void:
 func _build_target_panel(root: Control) -> void:
 	_target_panel = PanelContainer.new()
 	_target_panel.position = Vector2(1180, 18)
-	_target_panel.custom_minimum_size = Vector2(320, 170)
+	_target_panel.custom_minimum_size = Vector2(320, 200)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.10, 0.04, 0.04, 0.85)
 	style.border_color = Color(0.65, 0.25, 0.25, 0.8)
@@ -158,6 +159,10 @@ func _build_target_panel(root: Control) -> void:
 	_target_name.text = "目标"
 	_target_name.add_theme_font_size_override("font_size", 16)
 	vb.add_child(_target_name)
+	_target_range = Label.new()
+	_target_range.text = ""
+	_target_range.add_theme_font_size_override("font_size", 13)
+	vb.add_child(_target_range)
 	for key in ["hull", "sail", "rudder", "crew"]:
 		var hb := HBoxContainer.new()
 		vb.add_child(hb)
@@ -263,6 +268,13 @@ func update_all(player, target) -> void:
 	if target != null and is_instance_valid(target) and target.alive:
 		_target_panel.visible = true
 		_target_name.text = target.display_name
+		if player != null and is_instance_valid(player):
+			var dist: float = player.global_position.distance_to(target.global_position)
+			var rng: float = player.cannon_range
+			var in_range := dist <= rng
+			_target_range.text = "距离 %d / 射程 %d%s" % [int(dist), int(rng), "" if in_range else "（超出射程）"]
+			_target_range.add_theme_color_override("font_color",
+				Color(0.6, 0.9, 0.6) if in_range else Color(0.9, 0.55, 0.5))
 		_set_bar(_target_bars, "hull", _pct_of(target, "hull") * 100.0)
 		_set_bar(_target_bars, "sail", _pct_of(target, "sail") * 100.0)
 		_set_bar(_target_bars, "rudder", _pct_of(target, "rudder") * 100.0)

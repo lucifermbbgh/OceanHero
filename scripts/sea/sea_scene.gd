@@ -147,6 +147,8 @@ func _spawn_boss(enemy_id: StringName, pos: Vector2, is_monster: bool) -> void:
 		e.died.connect(_on_enemy_died)
 		e.disengaged.connect(_on_enemy_disengaged)
 		add_child(e)
+		e.home_pos = e.global_position
+		e.obstacles = islands
 		enemies.append(e)
 	hud.ticker("发现 Boss：%s" % String(edef.display_name))
 
@@ -242,6 +244,7 @@ func _spawn_player() -> void:
 		player.position = GameState.sea_position
 	player.died.connect(_on_player_died)
 	add_child(player)
+	player.obstacles = islands
 
 func _build_camera() -> void:
 	camera = Camera2D.new()
@@ -604,6 +607,7 @@ func _spawn_pirate() -> void:
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
 	e.home_pos = e.global_position
+	e.obstacles = islands
 	enemies.append(e)
 
 func _spawn_monster() -> void:
@@ -632,6 +636,7 @@ func _spawn_navy_patrol() -> void:
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
 	e.home_pos = e.global_position
+	e.obstacles = islands
 	enemies.append(e)
 
 ## 中立商船：被海盗追，不还手
@@ -648,6 +653,7 @@ func _spawn_merchant() -> void:
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
 	e.home_pos = e.global_position
+	e.obstacles = islands
 	enemies.append(e)
 
 func _count_kind(kind: String) -> int:
@@ -776,7 +782,8 @@ func _physics_process(delta: float) -> void:
 			var push: float = 1.0 - d / avoid_r
 			n.external_push += to_ship.normalized() * push * PUSH_STRENGTH
 			if n.get("terrain_slow") != null:
-				n.terrain_slow = minf(float(n.terrain_slow), 0.55)
+				# 越靠里越慢：边缘基本不减速，深处才明显拖慢
+				n.terrain_slow = minf(float(n.terrain_slow), lerpf(1.0, 0.45, push))
 			# 实质压到岛上 → 搁浅
 			if d < r + 20.0 and n == player and ground_cooldown <= 0.0:
 				ground_cooldown = 1.5
@@ -850,6 +857,7 @@ func _spawn_navy() -> void:
 	e.disengaged.connect(_on_enemy_disengaged)
 	add_child(e)
 	e.home_pos = e.global_position
+	e.obstacles = islands
 	enemies.append(e)
 	hud.ticker("赏金猎人编队出现！（通缉度 %d）" % GameState.notoriety())
 
@@ -934,7 +942,8 @@ func _route_to(target: Vector2) -> Array:
 			var b: Vector2 = pts[i + 1]
 			for isl in islands:
 				var c: Vector2 = isl[0]
-				var r: float = isl[1] + AVOID_MARGIN * 0.75
+				# 比减速区（岛半径 + AVOID_MARGIN）再外扩 110px，避免刚出航线就进减速带
+				var r: float = isl[1] + AVOID_MARGIN + 110.0
 				if not _segment_hits_circle(a, b, c, r):
 					continue
 				var wp := _tangent_point(a, c, r, b)

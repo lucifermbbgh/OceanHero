@@ -50,6 +50,7 @@ var _last_target = null
 var wander_heading := 0.0
 var wander_timer := 0.0
 var home_pos := Vector2.ZERO
+var obstacles: Array = []      # 场景注入的岛屿列表 [[中心, 半径], ...]
 var last_attacker = null
 var heading := 0.0
 var nav_target = null
@@ -264,7 +265,31 @@ func _turn_toward(want: float) -> float:
 	var diff := wrapf(want - heading, -PI, PI)
 	return clampf(diff * 2.0, -1.0, 1.0)
 
+## 前视避障：正前方 320px 若压进岛屿减速带，就沿切线滑开
+func _avoidance_turn() -> float:
+	if obstacles.is_empty():
+		return 0.0
+	var look: Vector2 = global_position + Vector2.RIGHT.rotated(heading) * 320.0
+	for o in obstacles:
+		var c: Vector2 = o[0]
+		var r: float = o[1] + 150.0 + 90.0
+		if look.distance_to(c) >= r:
+			continue
+		var away: Vector2 = global_position - c
+		if away.length() < 1.0:
+			away = Vector2.RIGHT
+		var tangent := Vector2(-away.y, away.x).normalized()
+		var d1 := absf(wrapf(tangent.angle() - heading, -PI, PI))
+		var d2 := absf(wrapf((-tangent).angle() - heading, -PI, PI))
+		var dir := tangent if d1 <= d2 else -tangent
+		return _turn_toward(dir.angle())
+	return 0.0
+
 func _ai_steer(delta: float) -> float:
+	var avoid := _avoidance_turn()
+	if avoid != 0.0:
+		throttle = maxf(throttle, 0.4)
+		return avoid
 	if faction == "merchant" and target != null and is_instance_valid(target):
 		# 商船逃向远离威胁的方向
 		var away: Vector2 = global_position - target.global_position
@@ -465,6 +490,9 @@ func _draw() -> void:
 		draw_rect(Rect2(-w * 0.5, y, w * hull_pct(), 4), Color(0.75, 0.25, 0.25))
 	if is_player:
 		draw_circle(Vector2.ZERO, 3.0, Color(0.9, 0.8, 0.3))
+		# 锁定目标时显示自己的火炮射程圈
+		if target != null and is_instance_valid(target):
+			draw_arc(Vector2.ZERO, cannon_range, 0, TAU, 64, Color(0.55, 0.85, 1.0, 0.35), 3.0)
 	# 阵营标签（美术资源到位后改为头顶信息栏，见 02-systems-design §16.3）
 	if not is_player:
 		var tag := ""

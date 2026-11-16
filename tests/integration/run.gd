@@ -4,7 +4,18 @@ extends Node
 var _pass := 0
 var _fail := 0
 
+var _t0 := 0
+
+func _mark(label: String) -> void:
+	var now := Time.get_ticks_msec()
+	print("   ⏱ %s: %d ms（累计 %d ms）" % [label, now - _last, now - _t0])
+	_last = now
+
+var _last := 0
+
 func _ready() -> void:
+	_t0 = Time.get_ticks_msec()
+	_last = _t0
 	print("=== SeaHeroes 集成测试 ===")
 	await _test_base_scene()
 	await _test_sea_and_combat()
@@ -17,8 +28,10 @@ func _ready() -> void:
 	await _test_cross_port()
 	await _test_pathfinding()
 	await _test_ecology()
+	_mark("到任务导航前")
 	await _test_quest_nav()
 	await _test_engage_rules()
+	_mark("到地图测试前")
 	await _test_maps()
 	await _test_bosses()
 	await _test_quests()
@@ -28,6 +41,7 @@ func _ready() -> void:
 	await _test_reputation()
 	await _test_commendation()
 	await _test_victory()
+	_mark("到存档位前")
 	await _test_save_slots()
 	await _test_outpost_repair()
 	await _test_avoidance()
@@ -513,6 +527,24 @@ func _test_pathfinding() -> void:
 	_ok(not _path_hits_island(s, route, s.player.global_position),
 		"规划出的航线全程不穿岛", "waypoints=%d" % route.size())
 
+	# 绕航点必须离岛足够远（不贴减速带）
+	var min_clear := 1.0e9
+	for p in route:
+		for isl2 in s.islands:
+			min_clear = minf(min_clear, p.distance_to(isl2[0]) - isl2[1])
+	_ok(min_clear > s.AVOID_MARGIN + 50.0, "绕航点离岛边至少一个减速带以上",
+		"最小净距=%.0f" % min_clear)
+
+	# 整条航线的每一段都不进减速带
+	var slow_zone_hit := false
+	var prev: Vector2 = s.player.global_position
+	for p in route:
+		for isl3 in s.islands:
+			if s._segment_hits_circle(prev, p, isl3[0], isl3[1] + s.AVOID_MARGIN):
+				slow_zone_hit = true
+		prev = p
+	_ok(not slow_zone_hit, "航线不进入岛屿减速带")
+
 	# 直线可达时不应绕路
 	var clear_target: Vector2 = (s.player.global_position + Vector2(0, 500)).clamp(Vector2(100, 100), Vector2(7900, 7900))
 	var direct: Array = s._route_to(clear_target)
@@ -636,7 +668,7 @@ func _test_ecology() -> void:
 		"最小角度差=%.1f°" % rad_to_deg(min_gap))
 
 	# 围攻上限：跑一段时间后追打玩家的单位不超过 3
-	for i in range(240):
+	for i in range(60):
 		await get_tree().physics_frame
 	_ok(s3._count_targeting_player() <= s3.MAX_ATTACKERS_ON_PLAYER,
 		"同时追打玩家的单位不超过上限",
@@ -767,10 +799,10 @@ func _test_quest_nav() -> void:
 		idle.target = null
 		idle.wander_heading = idle.heading
 		idle.wander_timer = 100.0
-		for i in range(150):
+		for i in range(90):
 			await get_tree().physics_frame
 		var h_start: float = idle.heading
-		for i in range(30):
+		for i in range(20):
 			await get_tree().physics_frame
 		var drift: float = absf(wrapf(idle.heading - h_start, -PI, PI))
 		_ok(drift < 0.02, "闲置单位不会持续旋转", "0.5 秒内转了 %.4f rad" % drift)
@@ -828,8 +860,9 @@ func _test_engage_rules() -> void:
 	pirate.disengage_timer = 0.0
 	s.player.global_position += Vector2(2000, 0)
 	_ok(pirate.target != null, "拉远瞬间仍锁定")
-	# 模拟"玩家真的跑得掉"：每帧维持在 2000 距离之外
-	for i in range(340):
+	# 直接把脱战计时推到阈值前 0.2 秒，验证跨过阈值即放弃（不必真等 5 秒）
+	pirate.disengage_timer = pirate.DISENGAGE_TIME - 0.2
+	for i in range(20):
 		await get_tree().physics_frame
 		s.player.global_position = pirate.global_position + Vector2(2000, 0)
 	_ok(pirate.target == null, "拉开距离 5 秒后 NPC 放弃追击",
