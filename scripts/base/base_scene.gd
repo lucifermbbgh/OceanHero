@@ -762,16 +762,23 @@ func _toggle_quests() -> void:
 	_rebuild_quests()
 	quest_root.visible = true
 
+func _cancel_quest(index: int) -> void:
+	if GameState.quest_cancel(index):
+		_log("已放弃任务，它回到了任务板")
+		_rebuild_quests()
+		_refresh()
+
 func _rebuild_quests() -> void:
 	for c in quest_list.get_children():
 		c.queue_free()
-	_yard_title_to(quest_list, "任务板 —— 进行中 %d/3 · 通缉度 %d" % [
-		GameState.quests_active.size(), GameState.notoriety()])
+	_yard_title_to(quest_list, "任务板 —— 进行中 %d · 可接 %d · 通缉度 %d" % [
+		GameState.quests_active.size(), GameState.quests_available.size(), GameState.notoriety()])
 
-	_yard_title_to(quest_list, "进行中")
+	_yard_title_to(quest_list, "进行中（可随时放弃，放弃后回到看板）")
 	if GameState.quests_active.is_empty():
 		quest_list.add_child(_lbl("　（没有进行中的任务）", 400, Color(0.5, 0.55, 0.55)))
-	for q in GameState.quests_active:
+	for i in range(GameState.quests_active.size()):
+		var q: Dictionary = GameState.quests_active[i]
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 10)
 		quest_list.add_child(hb)
@@ -779,8 +786,14 @@ func _rebuild_quests() -> void:
 		hb.add_child(_lbl("%d / %d" % [int(q.get("progress", 0)), int(q.get("amount", 1))], 110,
 			Color(0.75, 0.85, 0.6)))
 		hb.add_child(_lbl("+%d 金" % int(q.get("reward_gold", 0)), 120, Color(0.9, 0.82, 0.45)))
+		var qidx := i
+		var cancel := Button.new()
+		cancel.text = "放弃"
+		cancel.custom_minimum_size = Vector2(76, 26)
+		cancel.pressed.connect(func(): _cancel_quest(qidx))
+		hb.add_child(cancel)
 
-	_yard_title_to(quest_list, "可接任务（每周刷新）")
+	_yard_title_to(quest_list, "可接任务（看板清空后于每周结算刷新 9 个）")
 	if GameState.quests_available.is_empty():
 		quest_list.add_child(_lbl("　（没有可接任务）", 400, Color(0.5, 0.55, 0.55)))
 	for i in range(GameState.quests_available.size()):

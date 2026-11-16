@@ -45,6 +45,9 @@ const FACTION_ENEMIES := {
 }
 const AI_TICK := 0.6
 ## 刷新与密度控制
+const ISLAND_KINDS := ["grain", "timber", "iron", "spice"]
+const ISLAND_STOCK := 30          # 每座岛的采集储量
+const GATHER_RANGE := 190.0       # 采集判定距离（从岛边算）
 const SPAWN_MARGIN := 300.0
 const PLAYER_SAFE_RADIUS := 1150.0   # 玩家出生点周围不刷怪（略大于 1 倍射程，避免一进场就挨打）
 const NEAR_RING_MIN := 1150.0        # 视野边缘"迎接"单位的距离带
@@ -80,7 +83,7 @@ func _ready() -> void:
 	_build_port_ui()
 	var pd: Resource = DataRegistry.get_port(OUTPOST_ID)
 	if pd != null:
-		outpost_pos = pd.position
+		outpost_pos = _anchor_port_to_island(pd.position)
 	_spawn_map_contents()
 	_spawn_salvages()
 	_spawn_escort_if_needed()
@@ -99,7 +102,29 @@ func _generate_islands() -> void:
 			pos = pos.lerp(Vector2(6600, 6600), 0.6)
 		if pos.distance_to(BACK_GATE) < 500.0 or pos.distance_to(FORWARD_GATE) < 500.0:
 			pos = pos.lerp(Vector2(1600, 4000), 0.5)
-		islands.append([pos, rng.randf_range(260.0, 460.0)])
+		# [位置, 半径, 资源类型, 剩余储量]
+		var kind: String = ISLAND_KINDS[i % ISLAND_KINDS.size()]
+		var key := "m%d_%d" % [map_index, i]
+		islands.append([pos, rng.randf_range(260.0, 460.0), kind,
+			GameState.island_stock_of(key, ISLAND_STOCK)])
+
+## 把港口贴到最近岛屿的岸边，而不是漂在海面
+func _anchor_port_to_island(want: Vector2) -> Vector2:
+	var best = null
+	var best_d := 1.0e9
+	for isl in islands:
+		var d: float = Vector2(isl[0]).distance_to(want)
+		if d < best_d:
+			best_d = d
+			best = isl
+	if best == null:
+		return want
+	var c: Vector2 = best[0]
+	var r: float = float(best[1])
+	var dir: Vector2 = (want - c)
+	if dir.length() < 1.0:
+		dir = Vector2.DOWN
+	return c + dir.normalized() * (r + 96.0)
 
 func _spawn_map_contents() -> void:
 	var pirates := int(map_def.pirates) if map_def != null else 4
@@ -149,6 +174,7 @@ func _spawn_boss(enemy_id: StringName, pos: Vector2, is_monster: bool) -> void:
 		add_child(e)
 		e.home_pos = e.global_position
 		e.obstacles = islands
+		e.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
 		enemies.append(e)
 	hud.ticker("发现 Boss：%s" % String(edef.display_name))
 
@@ -195,6 +221,12 @@ func _draw() -> void:
 		draw_circle(isl[0], isl[1], Color(0.30, 0.34, 0.20))
 		draw_circle(isl[0], isl[1] * 0.72, Color(0.36, 0.40, 0.24))
 		draw_arc(isl[0], isl[1], 0, TAU, 40, Color(0.50, 0.55, 0.33), 5.0)
+		var kname := {"grain": "谷物", "timber": "木材", "iron": "铁矿", "spice": "香料"}
+		var stock := int(isl[3])
+		var lcol := Color(0.85, 0.88, 0.6) if stock > 0 else Color(0.45, 0.48, 0.45)
+		draw_string(ThemeDB.fallback_font, isl[0] + Vector2(-34, -float(isl[1]) - 18),
+			"%s %d" % [String(kname.get(String(isl[2]), isl[2])), stock],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, lcol)
 	# 任务目标标记（运输/护航 → 哨站）
 	for q in GameState.quests_active:
 		var qt := String(q.get("type", ""))
@@ -249,6 +281,7 @@ func _spawn_player() -> void:
 	player.died.connect(_on_player_died)
 	add_child(player)
 	player.obstacles = islands
+	player.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
 
 func _build_camera() -> void:
 	camera = Camera2D.new()
@@ -637,6 +670,7 @@ func _spawn_pirate() -> void:
 	add_child(e)
 	e.home_pos = e.global_position
 	e.obstacles = islands
+	e.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
 	enemies.append(e)
 
 func _spawn_monster() -> void:
@@ -666,6 +700,7 @@ func _spawn_navy_patrol() -> void:
 	add_child(e)
 	e.home_pos = e.global_position
 	e.obstacles = islands
+	e.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
 	enemies.append(e)
 
 ## 中立商船：被海盗追，不还手
@@ -683,6 +718,7 @@ func _spawn_merchant() -> void:
 	add_child(e)
 	e.home_pos = e.global_position
 	e.obstacles = islands
+	e.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
 	enemies.append(e)
 
 func _count_kind(kind: String) -> int:
@@ -841,6 +877,7 @@ func _process(delta: float) -> void:
 	hud.set_prompt(interact_prompt())
 	_refresh_cargo_hud()
 	_refresh_hint()
+	_refresh_nav_hint()
 	if camera != null and player != null and is_instance_valid(player):
 		camera.position = player.position
 	# 互动提示统一由 interact_prompt() 提供，这里不再重复一套
@@ -874,6 +911,7 @@ func _spawn_navy() -> void:
 	add_child(e)
 	e.home_pos = e.global_position
 	e.obstacles = islands
+	e.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
 	enemies.append(e)
 	hud.ticker("赏金猎人编队出现！（通缉度 %d）" % GameState.notoriety())
 
@@ -893,6 +931,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					hud.ticker("商船安全抵达，护航完成")
 				_toggle_outpost()
 			elif _try_collect_salvage():
+				pass
+			elif _try_gather_island():
 				pass
 			elif player.global_position.distance_to(BACK_GATE) < 240.0:
 				_go_back()
@@ -1196,6 +1236,10 @@ func interact_prompt() -> String:
 		if escort_ship != null and is_instance_valid(escort_ship) and escort_ship.alive:
 			return "按 E 让商船靠港 / 进入浅湾哨站"
 		return "按 E 进入浅湾哨站"
+	var isl = _nearest_gatherable()
+	if isl != null:
+		var kname := {"grain": "谷物", "timber": "木材", "iron": "铁矿", "spice": "香料"}
+		return "按 E 采集 %s（剩 %d）" % [String(kname.get(String(isl[2]), isl[2])), int(isl[3])]
 	if _nearest_salvage_dist() < 250.0:
 		return "按 E 打捞沉船残骸"
 	if player.global_position.distance_to(BACK_GATE) < 240.0:
@@ -1254,6 +1298,69 @@ func _refresh_hint() -> void:
 		hud.set_combat_hint("脱离中 · 保持距离 %.0f 秒" % left)
 	else:
 		hud.set_combat_hint("被追击 · 距离 %d / 需拉开 %d" % [int(min_d), int(need)])
+
+# ---------------- 岛屿采集 ----------------
+
+func _nearest_gatherable():
+	if player == null or not is_instance_valid(player):
+		return null
+	var best = null
+	var best_edge := 1.0e9
+	for isl in islands:
+		if int(isl[3]) <= 0:
+			continue
+		var edge: float = player.global_position.distance_to(isl[0]) - float(isl[1])
+		if edge <= GATHER_RANGE and edge < best_edge:
+			best_edge = edge
+			best = isl
+	return best
+
+## 按 E 采集：矿岛出建筑资源，其余出贸易货物
+func _try_gather_island() -> bool:
+	var isl = _nearest_gatherable()
+	if isl == null:
+		return false
+	var kind := String(isl[2])
+	var left := int(isl[3])
+	if kind == "iron":
+		var got := mini(left, 8)
+		GameState.resources["iron"] = int(GameState.resources.get("iron", 0)) + got
+		isl[3] = left - got
+		hud.ticker("采集到 铁矿 ×%d" % got)
+	else:
+		var cid := StringName(kind)
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c == null:
+			return false
+		var want := mini(left, 10)
+		var real: int = GameState.add_cargo(cid, want)
+		if real <= 0:
+			hud.ticker("货舱已满，无法采集")
+			return true
+		isl[3] = left - real
+		hud.ticker("采集到 %s ×%d" % [String(c.display_name), real])
+	for idx in range(islands.size()):
+		if islands[idx] == isl:
+			GameState.set_island_stock("m%d_%d" % [map_index, idx], int(isl[3]))
+			break
+	if int(isl[3]) <= 0:
+		hud.ticker("这座岛已被采空，下周再生")
+	queue_redraw()
+	return true
+
+## 顶部罗盘：告诉玩家下一片海域怎么走
+func _refresh_nav_hint() -> void:
+	if player == null or not is_instance_valid(player) or hud == null:
+		return
+	if map_index >= 9:
+		hud.set_nav_hint("航道尽头 · 王冠之海")
+		return
+	var d := int(player.global_position.distance_to(FORWARD_GATE))
+	var dir_txt := "↓" if FORWARD_GATE.y > player.global_position.y else "↑"
+	if GameState.is_map_cleared(map_index):
+		hud.set_nav_hint("前方航门 %s %dm · 已开启（靠近按 E）" % [dir_txt, d])
+	else:
+		hud.set_nav_hint("前方航门 %s %dm · 击败本图 Boss 解锁" % [dir_txt, d])
 
 func _lock_target(enemy) -> void:
 	player.auto_fire = false

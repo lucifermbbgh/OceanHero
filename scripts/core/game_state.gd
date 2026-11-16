@@ -71,6 +71,7 @@ var current_port: StringName = &"jadehaven"   # 当前船停靠/出发的港口
 # --- 货舱 ---
 var cargo: Dictionary = {}          # StringName -> int（船上货舱）
 var warehouse: Dictionary = {}      # StringName -> int（母港仓库）
+var island_stock: Dictionary = {}   # "m1_0" -> 剩余储量（岛屿采集）
 
 # --- 世界 ---
 var current_map: int = 1
@@ -303,20 +304,32 @@ func check_victory() -> bool:
 
 # ---------------- 任务 ----------------
 
+## 接取任务。接取数量不设上限，看板存量也不设上限
 func quest_accept(index: int) -> bool:
 	if index < 0 or index >= quests_available.size():
-		return false
-	if quests_active.size() >= 3:
 		return false
 	var q: Dictionary = quests_available[index]
 	quests_available.remove_at(index)
 	quests_active.append(q)
 	return true
 
+## 放弃任务：放回看板，可以再次接取
+func quest_cancel(index: int) -> bool:
+	if index < 0 or index >= quests_active.size():
+		return false
+	var q: Dictionary = quests_active[index]
+	quests_active.remove_at(index)
+	q["progress"] = 0
+	quests_available.append(q)
+	return true
+
+## 每周看板刷新：只在看板**没有存量任务**时补满 9 个；有存量则不动
 func refresh_quests() -> void:
+	if not quests_available.is_empty():
+		return
 	quests_available.clear()
 	var comms: Array = DataRegistry.commodities.keys()
-	for i in range(3):
+	for i in range(9):
 		var t: String = ["hunt", "trade", "transport", "escort", "gather"][RngService.randi_range(0, 4)]
 		var q := {"id": "q_%d_%d" % [Time.get_ticks_usec(), i], "type": t, "progress": 0,
 			"reward_xp": 40 + level * 12, "reward_comm": 1,
@@ -742,6 +755,19 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 岛屿采集 ----------------
+
+func island_stock_of(key: String, default_value: int) -> int:
+	return int(island_stock.get(key, default_value))
+
+func set_island_stock(key: String, value: int) -> void:
+	island_stock[key] = maxi(0, value)
+
+## 周结算：所有岛屿储量回复，最多回到上限
+func regen_islands(cap: int, add_per_week: int) -> void:
+	for k in island_stock.keys():
+		island_stock[k] = mini(cap, int(island_stock[k]) + add_per_week)
+
 # ---------------- 港口仓库 ----------------
 
 func warehouse_capacity() -> int:
@@ -870,6 +896,7 @@ func to_dict() -> Dictionary:
 		"fleet": _fleet_to_array(),
 		"cargo": _cargo_to_dict(),
 		"warehouse": _cargo_to_dict_of(warehouse),
+		"island_stock": island_stock.duplicate(),
 		"world": {
 			"current_map": current_map, "pos_x": sea_position.x, "pos_y": sea_position.y,
 			"cleared": cleared_maps.duplicate(), "boss": boss_defeated.duplicate(),
@@ -938,6 +965,10 @@ func from_dict(d: Dictionary) -> void:
 	sail_pct = float(s.get("sail_pct", 1.0))
 	rudder_pct = float(s.get("rudder_pct", 1.0))
 	crew_pct = float(s.get("crew_pct", 1.0))
+	island_stock.clear()
+	var isl_d: Dictionary = d.get("island_stock", {})
+	for k in isl_d.keys():
+		island_stock[String(k)] = int(isl_d[k])
 	warehouse.clear()
 	var wh: Dictionary = d.get("warehouse", {})
 	for k in wh.keys():
@@ -1089,6 +1120,7 @@ func reset_new_game() -> void:
 	ships_owned.clear()
 	cargo.clear()
 	warehouse.clear()
+	island_stock.clear()
 	current_map = 1
 	sea_position = Vector2.ZERO
 	cleared_maps.clear()

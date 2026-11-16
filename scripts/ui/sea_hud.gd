@@ -26,6 +26,7 @@ var _quest_rows: Array = []
 var _quest_panel: PanelContainer = null
 var _prompt_lbl: Label
 var _hint_lbl: Label
+var _nav_lbl: Label
 var _cargo_panel: PanelContainer = null
 var _cargo_label: Label
 var _cargo_btn: Button
@@ -40,6 +41,7 @@ func _ready() -> void:
 	add_child(root)
 
 	_build_prompt(root)
+	_build_nav_hint(root)
 	_build_cargo_panel(root)
 	_build_player_panel(root)
 	_build_quest_panel(root)
@@ -166,6 +168,20 @@ func toggle_cargo() -> void:
 func update_cargo(text: String) -> void:
 	if _cargo_label != null:
 		_cargo_label.text = text
+
+func _build_nav_hint(root: Control) -> void:
+	_nav_lbl = Label.new()
+	_nav_lbl.text = ""
+	_nav_lbl.add_theme_font_size_override("font_size", 14)
+	_nav_lbl.add_theme_color_override("font_color", Color(0.62, 0.78, 0.86))
+	_nav_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_nav_lbl.position = Vector2(500, 62)
+	_nav_lbl.custom_minimum_size = Vector2(600, 24)
+	root.add_child(_nav_lbl)
+
+func set_nav_hint(text: String) -> void:
+	if _nav_lbl != null:
+		_nav_lbl.text = text
 
 ## 交战状态提示（被追击 / 脱离进度）
 func set_combat_hint(text: String) -> void:

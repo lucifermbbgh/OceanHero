@@ -51,6 +51,7 @@ var wander_heading := 0.0
 var wander_timer := 0.0
 var home_pos := Vector2.ZERO
 var obstacles: Array = []      # 场景注入的岛屿列表 [[中心, 半径], ...]
+var world_bounds := Rect2(0, 0, 8000, 8000)   # 场景注入：航行边界
 var auto_fire := false         # 玩家：锁定后是否持续自动开火（按「开火」切换）
 var _avoiding := false         # 是否正在绕障（带滞回）
 var _avoid_side := 1.0         # 锁定的绕行侧，进入时决定，离开前不变
@@ -213,6 +214,9 @@ func _physics_process(delta: float) -> void:
 	_update_steering(delta)
 	_update_firing(delta)
 	move_and_slide()
+	# 不允许驶出海域边界（玩家与 NPC 都受限）
+	var b := world_bounds
+	global_position = global_position.clamp(b.position + Vector2(70, 70), b.end - Vector2(70, 70))
 	queue_redraw()
 
 func _update_steering(delta: float) -> void:

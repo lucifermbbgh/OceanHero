@@ -18,6 +18,7 @@ func _on_week_advanced(week_index: int) -> void:
 	if GameState != null:
 		GameState.refresh_tavern()
 		GameState.tick_exchange()
+		GameState.regen_islands(30, 10)
 		GameState.refresh_quests()
 		GameState.reset_donations()
 		GameState.decay_notoriety()

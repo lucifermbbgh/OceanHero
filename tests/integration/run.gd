@@ -26,6 +26,8 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_quest_board()
+	await _test_island_and_bounds()
 	await _test_warehouse()
 	await _test_interaction()
 	await _test_steering_stability()
@@ -501,6 +503,127 @@ func _test_cross_port() -> void:
 	sea.queue_free()
 	s.queue_free()
 	await _frames(2)
+
+# ---------------- 任务板规则 ----------------
+func _test_quest_board() -> void:
+	print("\n[任务板]")
+	GameState.reset_new_game()
+	GameState.quests_available.clear()
+	GameState.quests_active.clear()
+
+	GameState.refresh_quests()
+	_ok(GameState.quests_available.size() == 9, "看板为空时刷新 9 个任务",
+		"count=%d" % GameState.quests_available.size())
+
+	var before: int = GameState.quests_available.size()
+	GameState.refresh_quests()
+	_ok(GameState.quests_available.size() == before, "有存量时不刷新看板")
+
+	# 接取不设上限
+	for i in range(9):
+		if GameState.quests_available.is_empty():
+			break
+		GameState.quest_accept(0)
+	_ok(GameState.quests_active.size() == 9, "接取数量不再受 3 个上限限制",
+		"active=%d" % GameState.quests_active.size())
+
+	# 放弃 → 回到看板
+	var board_before: int = GameState.quests_available.size()
+	var title: String = String(GameState.quests_active[0].get("title", ""))
+	_ok(GameState.quest_cancel(0), "可以放弃任务")
+	_ok(GameState.quests_available.size() == board_before + 1, "放弃的任务回到看板")
+	_ok(GameState.quests_active.size() == 8, "进行中数量减一")
+	var back := false
+	for q in GameState.quests_available:
+		if String(q.get("title", "")) == title:
+			back = true
+	_ok(back, "回到看板的是同一个任务")
+
+	# 再次接取
+	var idx := 0
+	for i in range(GameState.quests_available.size()):
+		if String(GameState.quests_available[i].get("title", "")) == title:
+			idx = i
+			break
+	_ok(GameState.quest_accept(idx), "放弃后可以重新接取")
+	GameState.quests_available.clear()
+	GameState.quests_active.clear()
+
+# ---------------- 岛屿与边界 ----------------
+func _test_island_and_bounds() -> void:
+	print("\n[岛屿与边界]")
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	GameState.island_stock.clear()
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+
+	_ok(s.islands.size() > 0, "岛屿已生成")
+	var isl: Array = s.islands[0]
+	_ok(isl.size() >= 4, "岛屿带资源字段", "fields=%d" % isl.size())
+	_ok(int(isl[3]) > 0, "岛屿有初始储量", "stock=%d" % int(isl[3]))
+
+	# 港口贴在岛上
+	var nearest = null
+	var nd := 1.0e9
+	for i2 in s.islands:
+		var d2: float = Vector2(i2[0]).distance_to(s.outpost_pos)
+		if d2 < nd:
+			nd = d2
+			nearest = i2
+	if nearest != null:
+		var gap: float = s.outpost_pos.distance_to(Vector2(nearest[0])) - float(nearest[1])
+		_ok(absf(gap - 96.0) < 6.0, "哨站建在岛屿岸边", "离岸边 %.0f px" % gap)
+
+	# 采集：谷物岛
+	var grain_isl = null
+	for i3 in s.islands:
+		if String(i3[2]) == "grain":
+			grain_isl = i3
+			break
+	if grain_isl != null:
+		GameState.cargo.clear()
+		s.player.global_position = Vector2(grain_isl[0]) + Vector2(float(grain_isl[1]) + 100.0, 0)
+		_ok(String(s.interact_prompt()).contains("采集"), "靠近岛屿提示按 E 采集", s.interact_prompt())
+		var before_stock: int = int(grain_isl[3])
+		var got: bool = s._try_gather_island()
+		_ok(got, "可以在岛屿采集")
+		_ok(int(GameState.cargo.get(&"grain", 0)) > 0, "采集的货物进了货舱",
+			"grain=%d" % int(GameState.cargo.get(&"grain", 0)))
+		_ok(int(grain_isl[3]) < before_stock, "采集后岛屿储量下降")
+	else:
+		_ok(false, "图 1 应有一座谷物岛")
+
+	# 采集：铁矿岛进建筑资源
+	var iron_isl = null
+	for i4 in s.islands:
+		if String(i4[2]) == "iron":
+			iron_isl = i4
+			break
+	if iron_isl != null:
+		s.player.global_position = Vector2(iron_isl[0]) + Vector2(float(iron_isl[1]) + 100.0, 0)
+		var iron_before: int = int(GameState.resources.get("iron", 0))
+		_ok(s._try_gather_island(), "可以采集铁矿")
+		_ok(int(GameState.resources.get("iron", 0)) > iron_before, "铁矿进入建筑资源")
+	else:
+		_ok(true, "本图无铁矿岛（跳过）")
+
+	# 边界限制
+	s.player.global_position = Vector2(-5000, -5000)
+	await _physics_wait(3)
+	var p: Vector2 = s.player.global_position
+	_ok(p.x >= 0.0 and p.y >= 0.0, "玩家不会跑出地图边界", "pos=(%.0f,%.0f)" % [p.x, p.y])
+	s.player.global_position = Vector2(99999, 99999)
+	await _physics_wait(3)
+	var p2: Vector2 = s.player.global_position
+	_ok(p2.x <= 8000.0 and p2.y <= 8000.0, "玩家不会越过另一侧边界", "pos=(%.0f,%.0f)" % [p2.x, p2.y])
+	s.queue_free()
+	await _frames(2)
+
+func _physics_wait(n: int) -> void:
+	for i in range(n):
+		await get_tree().physics_frame
 
 # ---------------- 港口仓库 ----------------
 func _test_warehouse() -> void:
@@ -1187,12 +1310,13 @@ func _test_quests() -> void:
 	print("\n[任务]")
 	GameState.reset_new_game()
 	GameState.refresh_quests()
-	_ok(GameState.quests_available.size() == 3, "刷新 3 个任务", "实得 %d" % GameState.quests_available.size())
+	_ok(GameState.quests_available.size() == 9, "刷新 9 个任务", "实得 %d" % GameState.quests_available.size())
 	var q: Dictionary = GameState.quests_available[0]
 	_ok(String(q.title) != "" and int(q.reward_gold) > 0, "任务有标题与奖励")
 	_ok(GameState.quest_accept(0), "接受任务")
 	_ok(GameState.quests_active.size() == 1, "进入进行中")
-	_ok(not GameState.quest_accept(5), "越界索引被拒绝")
+	_ok(not GameState.quest_accept(999), "越界索引被拒绝")
+	_ok(not GameState.quest_cancel(999), "放弃越界索引被拒绝")
 
 	# 人工构造一个讨伐任务验证进度与发奖
 	GameState.quests_active.clear()
