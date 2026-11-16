@@ -527,6 +527,44 @@ func _test_quest_nav() -> void:
 	var h_target = s3._quest_nav_target(GameState.quests_active[0])
 	_ok(h_target != null, "讨伐任务导航到最近的海盗")
 
+	# 护航任务：任务行显示商船状态
+	GameState.quests_active.clear()
+	GameState.quests_active.append({"id": "n4", "type": "escort", "amount": 1, "progress": 0,
+		"title": "护送商船", "reward_gold": 100, "reward_xp": 0, "reward_comm": 0})
+	var s4 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s4)
+	await _frames(3)
+	var note: String = s4._quest_note(GameState.quests_active[0])
+	_ok(note.contains("⚑") and note.contains("%"), "护航任务显示商船状态", note)
+	s4.escort_ship = null
+	_ok(String(s4._quest_note(GameState.quests_active[0])).contains("失联"), "商船丢失后显示失联")
+	s4.queue_free()
+	await _frames(2)
+
+	# 阵营倾向（声望 ≥3000 视为加入）
+	GameState.reset_new_game()
+	_ok(GameState.aligned_faction() == "", "声望不足时无阵营倾向")
+	GameState.reputation["royal_navy"] = 3200
+	_ok(GameState.aligned_faction() == "royal_navy", "海军声望 3200 → 倾向海军")
+	GameState.reputation["black_sail"] = 5000
+	_ok(GameState.aligned_faction() == "black_sail", "黑帆声望更高时倾向黑帆")
+
+	# 同势力标签映射：海盗单位在加入黑帆后应显示"同势力"
+	GameState.current_map = 1
+	var s5 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s5)
+	await _frames(3)
+	var pirate5 = null
+	for e in s5.enemies:
+		if String(e.get("faction")) == "pirate":
+			pirate5 = e
+			break
+	_ok(pirate5 != null, "找到海盗单位用于标签判定")
+	_ok(GameState.aligned_faction() == "black_sail", "当前倾向黑帆")
+	s5.queue_free()
+	await _frames(2)
+	GameState.reputation["black_sail"] = 0
+
 	# 贸易任务没有具体地点
 	var trade := {"type": "trade", "amount": 100, "progress": 0}
 	_ok(s3._quest_nav_target(trade) == null, "贸易任务没有导航点")

@@ -22,6 +22,7 @@ var _ammo_buttons := {}
 var _fire_btn: Button
 var _board_btn: Button
 var _quest_rows: Array = []
+var _quest_panel: PanelContainer = null
 var _retreat_btn: Button
 var _ticker_timer := 0.0
 
@@ -115,7 +116,8 @@ func _build_player_panel(root: Control) -> void:
 	_bar_row(vb, "crew", "船员", Color(0.45, 0.72, 0.45))
 
 func _build_quest_panel(root: Control) -> void:
-	var vb := _make_panel(root, Vector2(20, 182), Vector2(380, 150))
+	var vb := _make_panel(root, Vector2(20, 182), Vector2(470, 150))
+	_quest_panel = vb.get_parent() as PanelContainer
 	var title := Label.new()
 	title.text = "任务追踪"
 	title.add_theme_font_size_override("font_size", 15)
@@ -127,7 +129,7 @@ func _build_quest_panel(root: Control) -> void:
 		vb.add_child(hb)
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", 13)
-		l.custom_minimum_size = Vector2(268, 0)
+		l.custom_minimum_size = Vector2(352, 0)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hb.add_child(l)
 		var b := Button.new()
@@ -227,7 +229,9 @@ func _build_command_bar(root: Control) -> void:
 	hb.add_child(ret)
 
 ## 刷新任务追踪面板；targets[i] 为「导航是否可用」
-func update_quests(active: Array, can_nav: Array) -> void:
+func update_quests(active: Array, can_nav: Array, notes: Array = []) -> void:
+	if _quest_panel != null:
+		_quest_panel.visible = not active.is_empty()
 	for i in range(_quest_rows.size()):
 		var row: Dictionary = _quest_rows[i]
 		var hb: HBoxContainer = row.row
@@ -238,7 +242,10 @@ func update_quests(active: Array, can_nav: Array) -> void:
 			var fac_txt := ""
 			if fac != "":
 				fac_txt = "　[%s]" % String(GameState.FACTION_NAMES.get(fac, ""))
-			row.label.text = "%s　%s%s" % [String(q.get("title", "任务")), prog, fac_txt]
+			var note := ""
+			if i < notes.size():
+				note = String(notes[i])
+			row.label.text = "%s　%s%s%s" % [String(q.get("title", "任务")), prog, fac_txt, note]
 			hb.visible = true
 			row.button.disabled = not bool(can_nav[i]) if i < can_nav.size() else true
 		else:

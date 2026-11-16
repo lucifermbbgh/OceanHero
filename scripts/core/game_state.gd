@@ -459,6 +459,16 @@ func on_deliver(commodity: StringName, amount: int) -> void:
 			q["progress"] = int(q.get("progress", 0)) + amount
 	_quest_check()
 
+## 玩家当前最亲近的阵营（声望 ≥ 3000 才算"加入"），用于单位标识
+func aligned_faction() -> String:
+	var best := ""
+	var best_v := 3000
+	for f in FACTIONS:
+		if rep_of(f) >= best_v and rep_of(f) > best_v - 1:
+			best_v = rep_of(f)
+			best = f
+	return best
+
 func notoriety() -> int:
 	return int(reputation.get("notoriety", 0))
 

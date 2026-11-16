@@ -406,6 +406,10 @@ func _draw() -> void:
 		hull_col = Color(0.24, 0.42, 0.62)
 	elif faction == "pirate":
 		hull_col = Color(0.62, 0.24, 0.24)
+	elif faction == "navy":
+		hull_col = Color(0.30, 0.36, 0.68)
+	elif faction == "merchant":
+		hull_col = Color(0.30, 0.55, 0.35)
 	var pts := PackedVector2Array([
 		Vector2(26, 0), Vector2(10, 11), Vector2(-20, 9),
 		Vector2(-26, 0), Vector2(-20, -9), Vector2(10, -11),
@@ -428,3 +432,32 @@ func _draw() -> void:
 		draw_rect(Rect2(-w * 0.5, y, w * hull_pct(), 4), Color(0.75, 0.25, 0.25))
 	if is_player:
 		draw_circle(Vector2.ZERO, 3.0, Color(0.9, 0.8, 0.3))
+	# 阵营标签（美术资源到位后改为头顶信息栏，见 02-systems-design §16.3）
+	if not is_player:
+		var tag := ""
+		var tag_col := Color(0.8, 0.8, 0.8)
+		match faction:
+			"pirate":
+				tag = "海盗"
+				tag_col = Color(0.95, 0.55, 0.5)
+			"navy":
+				tag = "海军"
+				tag_col = Color(0.65, 0.75, 1.0)
+			"merchant":
+				tag = "商船"
+				tag_col = Color(0.6, 0.95, 0.7)
+		if tag != "":
+			# 阵营 id 与单位 faction 名称不同，需要映射
+			var aligned := ""
+			if GameState != null:
+				var a: String = GameState.aligned_faction()
+				if (a == "royal_navy" and faction == "navy") 					or (a == "merchant" and faction == "merchant") 					or (a == "black_sail" and faction == "pirate"):
+					aligned = a
+			if aligned != "":
+				tag = "同势力"
+				tag_col = Color(0.55, 1.0, 0.6)
+			# 抵消船体旋转，让标签始终水平
+			draw_set_transform(Vector2(-26, -44), -rotation, Vector2.ONE)
+			draw_string(ThemeDB.fallback_font, Vector2.ZERO, tag,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, tag_col)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

@@ -867,9 +867,23 @@ func _on_quest_nav(index: int) -> void:
 
 func _refresh_quest_hud() -> void:
 	var can_nav: Array = []
+	var notes: Array = []
 	for q in GameState.quests_active:
 		can_nav.append(_quest_nav_target(q) != null)
-	hud.update_quests(GameState.quests_active, can_nav)
+		notes.append(_quest_note(q))
+	hud.update_quests(GameState.quests_active, can_nav, notes)
+
+## 任务行的附加状态（目前只有护航任务显示商船情况）
+func _quest_note(q: Dictionary) -> String:
+	if String(q.get("type", "")) != "escort":
+		return ""
+	if escort_ship == null or not is_instance_valid(escort_ship):
+		return "　⚑ 失联"
+	if not escort_ship.alive:
+		return "　⚑ 已损毁"
+	var pct := int(escort_ship.hull_pct() * 100.0)
+	var dist := int(player.global_position.distance_to(escort_ship.global_position))
+	return "　⚑ %d%% · %dm" % [pct, dist]
 
 func _lock_target(enemy) -> void:
 	player.target = enemy
