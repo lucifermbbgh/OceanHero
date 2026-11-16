@@ -70,20 +70,49 @@ func reload_all() -> void:
 	_reload()
 	EventBus.ticker.emit("数据已热重载")
 
+var _manifest_cache: PackedStringArray = []
+
+## 导出后 res:// 里的目录扫描拿不到文件，所以优先读 data/manifest.txt。
+## 清单不存在时（例如新增了数据但忘了跑 tools/gen_manifest.sh）回退到目录扫描。
+func _manifest_paths() -> PackedStringArray:
+	if not _manifest_cache.is_empty():
+		return _manifest_cache
+	var f := FileAccess.open("res://data/manifest.txt", FileAccess.READ)
+	if f == null:
+		return PackedStringArray()
+	var txt := f.get_as_text()
+	f.close()
+	var out := PackedStringArray()
+	for line in txt.split("
+", false):
+		var p := line.strip_edges()
+		if p.begins_with("res://"):
+			out.append(p)
+	_manifest_cache = out
+	return out
+
 func _load_dir(path: String) -> Dictionary:
 	var out := {}
-	var dir := DirAccess.open(path)
-	if dir == null:
-		return out
-	for f in dir.get_files():
-		if not (f.ends_with(".tres") or f.ends_with(".res")):
-			continue
-		var res: Resource = load(path.path_join(f))
+	var prefix := path + "/"
+	var files: Array = []
+	for p in _manifest_paths():
+		if p.begins_with(prefix):
+			files.append(p)
+	if files.is_empty():
+		# 回退：编辑器内直接扫目录
+		var dir := DirAccess.open(path)
+		if dir == null:
+			return out
+		for f in dir.get_files():
+			if f.ends_with(".tres") or f.ends_with(".res"):
+				files.append(path.path_join(f))
+	for fp in files:
+		var res: Resource = load(fp)
 		if res == null:
-			push_warning("[DataRegistry] 载入失败: %s" % f)
+			push_warning("[DataRegistry] 载入失败: %s" % fp)
 			continue
 		if res.get("id") == null or String(res.get("id")) == "":
-			push_warning("[DataRegistry] 缺少 id: %s" % f)
+			push_warning("[DataRegistry] 缺少 id: %s" % fp)
 			continue
 		out[StringName(res.get("id"))] = res
 	return out

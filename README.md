@@ -56,7 +56,8 @@
 - 测试报告：`docs/05-test-report-phase-1.md` ~ `05-test-report-phase-4.md`
 - 平衡报告：`docs/07-balance-report.md`（含可复跑的出海模拟器）
 - **Demo 说明**：`docs/08-demo-guide.md`
-- **实测记录表**：`docs/09-playtest-record.md`（64 条用例，结果待填）
+- **实测记录表**：`docs/09-playtest-record.md`（案例待回填）
+- **构建与游玩**：`docs/10-build-and-play.md`（macOS / Windows 导出与运行说明）
 - 下一步：真人试玩 → 按实测结果调优 → Boss 特异性深化 → 各图港口 → 音效 → 美术替换
 
 ## 操作

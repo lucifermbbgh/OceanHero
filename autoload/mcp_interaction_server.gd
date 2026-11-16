@@ -52,6 +52,10 @@ func _ready() -> void:
 	# editor-launched run gets neither and stays on 9090 with an empty token,
 	# which is how the plugin tells its own instances apart from user-started
 	# ones (see get_instance_info).
+	# 仅编辑器/调试运行时启用：发行版（导出包）不开放本地调试端口
+	if not OS.has_feature("editor"):
+		set_process(false)
+		return
 	var env_port: String = OS.get_environment("GODOT_BRIDGE_PORT")
 	if env_port != "":
 		var parsed: int = int(env_port)

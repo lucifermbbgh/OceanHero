@@ -10,3 +10,4 @@ export_presets.cfg
 
 # 临时文件
 *.tmp
+export/
