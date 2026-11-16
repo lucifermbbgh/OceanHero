@@ -536,7 +536,7 @@ func _test_steering_stability() -> void:
 
 # ---------------- 自动开火 ----------------
 func _test_auto_fire() -> void:
-	print("\n[自动开火]")
+	print("\n[手动开火]")
 	GameState.reset_new_game()
 	GameState.current_map = 1
 	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
@@ -546,32 +546,38 @@ func _test_auto_fire() -> void:
 	e.global_position = s.player.global_position + Vector2(400, 0)
 	s._lock_target(e)
 	e.target = s.player
-	_ok(not s.player.auto_fire, "锁定后默认不自动开火")
+	_ok(not s.player.auto_fire, "锁定后不会自动进入开火状态")
 
-	# 关闭状态：等一个装填周期也不应开火
-	for i in range(140):
+	# 锁定后等一个装填周期：一发都不该打出去
+	for i in range(160):
 		await get_tree().physics_frame
-	_ok(s.player.volleys_fired == 0, "未开启时不会自动开火", "volleys=%d" % s.player.volleys_fired)
+	_ok(s.player.volleys_fired == 0, "锁定后不会自动开火", "volleys=%d" % s.player.volleys_fired)
+	_ok(e.hull_hp == e.hull_max, "未开火前敌船毫发无损", "%.0f/%.0f" % [e.hull_hp, e.hull_max])
 
-	# 开启：持续齐射
+	# 点一次「开火」= 只打一轮
 	s._on_fire_pressed()
-	_ok(s.player.auto_fire, "点「开火」进入自动开火")
-	for i in range(300):
-		await get_tree().physics_frame
-	_ok(s.player.volleys_fired >= 2, "自动开火会连续齐射", "volleys=%d" % s.player.volleys_fired)
+	_ok(s.player.volleys_fired == 1, "点一次开火只打一轮", "volleys=%d" % s.player.volleys_fired)
+	_ok(e.hull_hp < e.hull_max, "该轮齐射造成伤害")
 
-	# 关闭：停止开火
+	var v_before: int = s.player.volleys_fired
 	s._on_fire_pressed()
-	_ok(not s.player.auto_fire, "再点一次「停火」关闭")
-	var n_after: int = s.player.volleys_fired
+	_ok(s.player.volleys_fired == v_before, "装填中点击不会再打一轮", "volleys=%d" % s.player.volleys_fired)
+
 	for i in range(200):
 		await get_tree().physics_frame
-	_ok(s.player.volleys_fired == n_after, "停火后不再射击", "volleys=%d" % s.player.volleys_fired)
+		if s.player.ready_to_fire():
+			break
+	s._on_fire_pressed()
+	_ok(s.player.volleys_fired >= 2, "装填完成后可再次手动开火", "volleys=%d" % s.player.volleys_fired)
 
-	# 无目标时按钮不生效
+	var v2: int = s.player.volleys_fired
+	for i in range(160):
+		await get_tree().physics_frame
+	_ok(s.player.volleys_fired == v2, "不开火时绝不会自己射击", "volleys=%d" % s.player.volleys_fired)
+
 	s.player.target = null
 	s._on_fire_pressed()
-	_ok(not s.player.auto_fire, "没有目标时不会进入自动开火")
+	_ok(s.player.volleys_fired == v2, "没有目标时点开火不会射击")
 	s.queue_free()
 	await _frames(2)
 

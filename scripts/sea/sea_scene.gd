@@ -1173,9 +1173,7 @@ func _count_targeting_player() -> int:
 	return n
 
 func _lock_target(enemy) -> void:
-	if player.auto_fire and player.target != enemy:
-		player.auto_fire = false
-		hud.ticker("已切换目标，自动开火关闭")
+	player.auto_fire = false
 	player.target = enemy
 	player.engaged = true
 	enemy.target = player
@@ -1191,13 +1189,9 @@ func _on_fire_pressed() -> void:
 	if t == null or not is_instance_valid(t) or not t.alive:
 		hud.ticker("先锁定一个目标")
 		return
-	player.auto_fire = not player.auto_fire
-	if player.auto_fire:
-		hud.ticker("自动开火：开（进入射程后持续齐射）")
-		# 立刻尝试打一轮，避免空等
-		player.try_fire()
-	else:
-		hud.ticker("自动开火：关")
+	var res: Dictionary = player.try_fire()
+	if not res.get("ok", false):
+		hud.ticker(String(res.get("reason", "无法开火")))
 
 func _on_ammo_selected(id: StringName) -> void:
 	var a: Resource = DataRegistry.get_ammo(id)

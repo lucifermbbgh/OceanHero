@@ -290,17 +290,13 @@ func update_all(player, target) -> void:
 			_fire_btn.text = "开火"
 			_fire_btn.disabled = true
 			_fire_btn.modulate = Color(1, 1, 1)
-		elif player.auto_fire:
-			_fire_btn.text = "停火"
-			_fire_btn.disabled = false
-			_fire_btn.modulate = Color(1.0, 0.75, 0.55)
 		elif player.reload_timer > 0.0:
 			_fire_btn.text = "装填 %.1fs" % player.reload_timer
-			_fire_btn.disabled = false
+			_fire_btn.disabled = true
 			_fire_btn.modulate = Color(1, 1, 1)
 		elif not player.can_target(t):
 			_fire_btn.text = "超出射程"
-			_fire_btn.disabled = false
+			_fire_btn.disabled = true
 			_fire_btn.modulate = Color(1, 1, 1)
 		else:
 			_fire_btn.text = "开火！"

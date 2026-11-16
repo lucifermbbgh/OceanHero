@@ -365,10 +365,9 @@ func _update_firing(delta: float) -> void:
 	# 锁定即开始装填；是否开火由玩家决定
 	if reload_timer > 0.0:
 		reload_timer -= delta
-	# 玩家：只有打开"自动开火"才持续射击，否则必须手动触发 try_fire()
+	# 玩家：任何情况下都不会自己开火，必须由玩家点「开火」才打一轮
 	if is_player:
-		if auto_fire and reload_timer <= 0.0 and can_target(target):
-			_fire_at(target)
+		auto_fire = false
 		return
 	# 商船只逃不打
 	if faction == "merchant":
