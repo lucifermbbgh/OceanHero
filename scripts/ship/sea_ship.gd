@@ -439,6 +439,10 @@ func _fire_at(enemy) -> void:
 func take_damage(res: Dictionary) -> void:
 	if not alive:
 		return
+	# 被动还击：被打且当前没有目标时，锁定攻击者
+	if not is_player and target == null and last_attacker != null and is_instance_valid(last_attacker):
+		target = last_attacker
+		engaged = true
 	damage_taken += float(res.get("hull", 0.0))
 	hull_hp = maxf(0.0, hull_hp - float(res.get("hull", 0.0)))
 	sail_hp = maxf(0.0, sail_hp - float(res.get("sail", 0.0)))

@@ -205,11 +205,15 @@ func _draw() -> void:
 		draw_string(ThemeDB.fallback_font, outpost_pos + Vector2(-40, -150), "任务",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0.95, 0.85, 0.35))
 
-	# 打捞点
+	# 打捞点：画得更醒目，并标注文字
 	for sv in salvages:
-		draw_arc(sv, 44.0, 0, TAU, 20, Color(0.75, 0.62, 0.35), 3.0)
-		draw_line(sv + Vector2(-24, 0), sv + Vector2(24, 0), Color(0.7, 0.58, 0.3), 3.0)
-		draw_line(sv + Vector2(0, -24), sv + Vector2(0, 24), Color(0.7, 0.58, 0.3), 3.0)
+		draw_circle(sv, 62.0, Color(0.95, 0.82, 0.35, 0.12))
+		draw_arc(sv, 62.0, 0, TAU, 28, Color(0.95, 0.82, 0.35, 0.75), 4.0)
+		draw_arc(sv, 44.0, 0, TAU, 20, Color(0.85, 0.70, 0.35), 3.0)
+		draw_line(sv + Vector2(-24, 0), sv + Vector2(24, 0), Color(0.85, 0.7, 0.35), 3.0)
+		draw_line(sv + Vector2(0, -24), sv + Vector2(0, 24), Color(0.85, 0.7, 0.35), 3.0)
+		draw_string(ThemeDB.fallback_font, sv + Vector2(-38, -84), "打捞点",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.85, 0.4))
 
 	# 后退航门
 	var back_label := "母港航门" if map_index <= 1 else "返回 %s" % _map_name(map_index - 1)
@@ -809,6 +813,7 @@ func _process(delta: float) -> void:
 	_update_escort()
 	_faction_ai(delta)
 	_refresh_quest_hud()
+	hud.set_prompt(interact_prompt())
 	if camera != null and player != null and is_instance_valid(player):
 		camera.position = player.position
 	if hud != null and player != null:
@@ -1172,12 +1177,38 @@ func _count_targeting_player() -> int:
 			n += 1
 	return n
 
+## 当前可做的 E 互动（用于 HUD 提示）
+func interact_prompt() -> String:
+	if player == null or not is_instance_valid(player):
+		return ""
+	if player.global_position.distance_to(outpost_pos) < 240.0:
+		if escort_ship != null and is_instance_valid(escort_ship) and escort_ship.alive:
+			return "按 E 让商船靠港 / 进入浅湾哨站"
+		return "按 E 进入浅湾哨站"
+	if _nearest_salvage_dist() < 250.0:
+		return "按 E 打捞沉船残骸"
+	if player.global_position.distance_to(BACK_GATE) < 240.0:
+		return "按 E 返回母港"
+	if player.global_position.distance_to(FORWARD_GATE) < 240.0:
+		if map_index >= 9:
+			return "已是航道尽头"
+		if GameState.is_map_cleared(map_index):
+			return "按 E 前往下一海域"
+		return "航门锁闭 · 击败本图 Boss 才能开启"
+	return ""
+
+func _nearest_salvage_dist() -> float:
+	var best := 1.0e9
+	for sv in salvages:
+		best = minf(best, player.global_position.distance_to(sv))
+	return best
+
 func _lock_target(enemy) -> void:
 	player.auto_fire = false
 	player.target = enemy
 	player.engaged = true
-	enemy.target = player
-	enemy.engaged = true
+	# 锁定只是"瞄准/观察"，不强迫对方开战。
+	# 敌方是否还击由它自己的 AI 决定；只有真的打疼它，它才会被动还手（见 take_damage）
 	hud.ticker("锁定：%s" % enemy.display_name)
 
 # ---------------- HUD 回调 ----------------

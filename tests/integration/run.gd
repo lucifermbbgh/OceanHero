@@ -26,6 +26,7 @@ func _ready() -> void:
 	await _test_buildings()
 	await _test_exchange()
 	await _test_cross_port()
+	await _test_interaction()
 	await _test_steering_stability()
 	await _test_auto_fire()
 	await _test_pathfinding()
@@ -499,6 +500,67 @@ func _test_cross_port() -> void:
 	sea.queue_free()
 	s.queue_free()
 	await _frames(2)
+
+# ---------------- 锁定与互动 ----------------
+func _test_interaction() -> void:
+	print("\n[锁定与互动]")
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+
+	# 锁定不等于宣战
+	var e = s.enemies[0]
+	e.global_position = s.player.global_position + Vector2(400, 0)
+	e.target = null
+	s._lock_target(e)
+	_ok(e.target == null, "锁定后敌方不会立刻锁定玩家")
+	var hp0: float = s.player.hull_hp
+	for i in range(120):
+		await get_tree().physics_frame
+	_ok(e.target == null, "静置期间敌方仍未交战", "target=%s" % str(e.target != null))
+	_ok(is_equal_approx(s.player.hull_hp, hp0), "玩家没有受到伤害")
+
+	# 被打之后才还手
+	e.last_attacker = s.player
+	e.take_damage({"hull": 1.0, "sail": 0.0, "rudder": 0.0, "crew": 0.0})
+	_ok(e.target == s.player, "被攻击后才会被动还击")
+	s.queue_free()
+	await _frames(2)
+
+	# 互动提示
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	GameState.quests_active.clear()
+	GameState.quests_active.append({"id": "g1", "type": "gather", "amount": 3, "progress": 0,
+		"title": "打捞 3 处沉船残骸", "reward_gold": 100, "reward_xp": 0, "reward_comm": 0})
+	var s2 = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s2)
+	await _frames(3)
+	_ok(s2.salvages.size() > 0, "采集任务生成打捞点", "count=%d" % s2.salvages.size())
+
+	s2.player.global_position = Vector2(3800, 3800)
+	_ok(s2.interact_prompt() == "", "远离互动物时没有提示")
+
+	var sv: Vector2 = s2.salvages[0]
+	s2.player.global_position = sv + Vector2(80, 0)
+	_ok(s2.interact_prompt().contains("打捞"), "靠近打捞点提示按 E 打捞", s2.interact_prompt())
+
+	var prog_before: int = int(GameState.quests_active[0].get("progress", 0))
+	var collected: bool = s2._try_collect_salvage()
+	_ok(collected, "在打捞点可以成功打捞")
+	_ok(int(GameState.quests_active[0].get("progress", 0)) == prog_before + 1, "打捞后采集任务进度 +1",
+		"progress=%d" % int(GameState.quests_active[0].get("progress", 0)))
+	_ok(s2.salvages.size() == 2, "打捞点被消耗", "left=%d" % s2.salvages.size())
+
+	s2.player.global_position = s2.outpost_pos + Vector2(120, 0)
+	_ok(s2.interact_prompt().contains("哨站"), "靠近哨站提示进入", s2.interact_prompt())
+	s2.player.global_position = s2.BACK_GATE + Vector2(100, 0)
+	_ok(s2.interact_prompt().contains("母港"), "靠近返回航门有提示", s2.interact_prompt())
+	s2.queue_free()
+	await _frames(2)
+	GameState.quests_active.clear()
 
 # ---------------- 转向稳定性 ----------------
 func _test_steering_stability() -> void:

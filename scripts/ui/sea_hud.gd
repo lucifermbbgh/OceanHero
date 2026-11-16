@@ -24,6 +24,7 @@ var _fire_btn: Button
 var _board_btn: Button
 var _quest_rows: Array = []
 var _quest_panel: PanelContainer = null
+var _prompt_lbl: Label
 var _retreat_btn: Button
 var _ticker_timer := 0.0
 
@@ -34,6 +35,7 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
+	_build_prompt(root)
 	_build_player_panel(root)
 	_build_quest_panel(root)
 	_build_target_panel(root)
@@ -115,6 +117,24 @@ func _build_player_panel(root: Control) -> void:
 	_bar_row(vb, "sail", "风帆", Color(0.85, 0.82, 0.7))
 	_bar_row(vb, "rudder", "舵机", Color(0.55, 0.7, 0.85))
 	_bar_row(vb, "crew", "船员", Color(0.45, 0.72, 0.45))
+
+func _build_prompt(root: Control) -> void:
+	_prompt_lbl = Label.new()
+	_prompt_lbl.text = ""
+	_prompt_lbl.visible = false
+	_prompt_lbl.add_theme_font_size_override("font_size", 18)
+	_prompt_lbl.add_theme_color_override("font_color", Color(0.95, 0.88, 0.6))
+	_prompt_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_prompt_lbl.position = Vector2(400, 806)
+	_prompt_lbl.custom_minimum_size = Vector2(800, 30)
+	root.add_child(_prompt_lbl)
+
+## 场景每帧告诉 HUD 当前可以按 E 做什么
+func set_prompt(text: String) -> void:
+	if _prompt_lbl == null:
+		return
+	_prompt_lbl.text = text
+	_prompt_lbl.visible = text != ""
 
 func _build_quest_panel(root: Control) -> void:
 	var vb := _make_panel(root, Vector2(20, 182), Vector2(470, 150))
