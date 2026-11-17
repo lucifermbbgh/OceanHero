@@ -391,8 +391,9 @@ func _build_port_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	port_ui.add_child(root)
 	port_panel = PanelContainer.new()
-	port_panel.position = Vector2(360, 80)
-	port_panel.custom_minimum_size = Vector2(760, 520)
+	port_panel.position = Vector2(16, 72)
+	port_panel.custom_minimum_size = Vector2(1568, 812)
+	port_panel.size = Vector2(1568, 812)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.04, 0.09, 0.12, 0.97)
 	style.border_color = Color(0.5, 0.75, 0.6, 0.8)
@@ -1464,6 +1465,9 @@ func _spawn_navy() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and port_panel != null and port_panel.visible:
+			port_panel.visible = false
+			return
 		if event.keycode == KEY_E:
 			if port_panel != null and port_panel.visible:
 				port_panel.visible = false

@@ -234,6 +234,22 @@ func _build_ui() -> void:
 	quest_list.custom_minimum_size = Vector2(710, 0)
 	qscroll.add_child(quest_list)
 
+	# 商品详情弹窗
+	goods_root = PanelContainer.new()
+	goods_root.position = Vector2(16, 72)
+	goods_root.custom_minimum_size = Vector2(1568, 812)
+	goods_root.add_theme_stylebox_override("panel", _panel_style())
+	goods_root.visible = false
+	root.add_child(goods_root)
+	var gscroll := ScrollContainer.new()
+	gscroll.custom_minimum_size = Vector2(1530, 780)
+	gscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	goods_root.add_child(gscroll)
+	goods_list = VBoxContainer.new()
+	goods_list.add_theme_constant_override("separation", 6)
+	goods_list.custom_minimum_size = Vector2(1510, 0)
+	gscroll.add_child(goods_list)
+
 	# 经济总览面板
 	overview_root = PanelContainer.new()
 	overview_root.position = Vector2(300, 90)
@@ -499,8 +515,8 @@ func _rebuild_market() -> void:
 	var head_row := HBoxContainer.new()
 	head_row.add_theme_constant_override("separation", 8)
 	market_list.add_child(head_row)
-	for spec in [["商品", 90], ["买价", 70], ["卖价", 70], ["周涨跌", 90], ["8 周走势", 100],
-			["库存", 80], ["船上", 60], ["仓库", 60], ["操作", 380]]:
+	for spec in [["商品", 100], ["买价", 80], ["卖价", 80], ["周涨跌", 100], ["8 周走势", 120],
+			["库存", 90], ["船上", 70], ["仓库", 70], ["操作", 140]]:
 		var hl := Label.new()
 		hl.text = String(spec[0])
 		hl.custom_minimum_size = Vector2(int(spec[1]), 0)
@@ -560,37 +576,12 @@ func _rebuild_market() -> void:
 		row.add_child(_cell(str(stock), 80))
 		row.add_child(_cell(str(have), 60))
 		row.add_child(_cell(str(in_wh), 60))
-		var b_buy := Button.new()
-		b_buy.text = "买10"
-		b_buy.custom_minimum_size = Vector2(72, 32)
-		var cid: StringName = id
-		b_buy.pressed.connect(func(): _buy(cid, 10, bp))
-		row.add_child(b_buy)
-		var b_sell := Button.new()
-		b_sell.text = "卖10"
-		b_sell.custom_minimum_size = Vector2(72, 32)
-		var spv := sp
-		b_sell.pressed.connect(func(): _sell(cid, 10, spv))
-		row.add_child(b_sell)
-		var b_to_wh := Button.new()
-		b_to_wh.text = "→仓"
-		b_to_wh.custom_minimum_size = Vector2(60, 32)
-		b_to_wh.pressed.connect(func(): _move_to_warehouse(cid))
-		row.add_child(b_to_wh)
-		var b_to_ship := Button.new()
-		b_to_ship.text = "→船"
-		b_to_ship.custom_minimum_size = Vector2(60, 32)
-		b_to_ship.pressed.connect(func(): _move_to_ship(cid))
-		row.add_child(b_to_ship)
-		var b_detail := Button.new()
-		b_detail.text = "明细"
-		b_detail.custom_minimum_size = Vector2(60, 32)
-		var cid_d: StringName = id
-		b_detail.pressed.connect(func(): _toggle_detail(cid_d))
-		row.add_child(b_detail)
-
-		if expanded_cid == id:
-			_add_detail_block(id, int(c.base_price), stock, max_stock, bp)
+		var b_trade := Button.new()
+		b_trade.text = "交易"
+		b_trade.custom_minimum_size = Vector2(90, 32)
+		var cid_t: StringName = id
+		b_trade.pressed.connect(func(): _open_goods(cid_t))
+		row.add_child(b_trade)
 	_add_market_metrics(String(PORT_ID))
 
 	# 船上货舱汇总：买的东西到底装在哪儿
@@ -709,14 +700,22 @@ func _rebuild_events_tab() -> void:
 	if GameState.market_events.is_empty():
 		market_list.add_child(_lbl("　（本周没有市场事件）", 400, Color(0.55, 0.6, 0.6)))
 		return
+	var ehead := HBoxContainer.new()
+	ehead.add_theme_constant_override("separation", 12)
+	market_list.add_child(ehead)
+	for spec in [["港口", 180], ["事件", 120], ["影响商品", 110], ["影响幅度", 260], ["剩余", 100]]:
+		ehead.add_child(_cell(String(spec[0]), int(spec[1]), Color(0.62, 0.72, 0.78)))
+	market_list.add_child(HSeparator.new())
 	for e in GameState.market_events:
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 12)
 		market_list.add_child(hb)
-		hb.add_child(_lbl(_port_display(String(e.get("port", ""))), 180))
-		hb.add_child(_lbl(String(e.get("name", "")), 120, Color(0.9, 0.82, 0.45)))
-		hb.add_child(_lbl(String(e.get("desc", "")), 260, Color(0.8, 0.85, 0.7)))
-		hb.add_child(_lbl("剩 %d 周" % int(e.get("weeks", 0)), 100))
+		hb.add_child(_cell(_port_display(String(e.get("port", ""))), 180))
+		hb.add_child(_cell(String(e.get("name", "")), 120, Color(0.9, 0.82, 0.45)))
+		var tgt := String(e.get("target", ""))
+		hb.add_child(_cell("全部" if tgt == "" else tgt, 110))
+		hb.add_child(_cell(String(e.get("desc", "")), 260, Color(0.8, 0.85, 0.7)))
+		hb.add_child(_cell("剩 %d 周" % int(e.get("weeks", 0)), 100))
 
 ## 表格单元格
 func _cell(text: String, width: int, col: Color = Color(0.86, 0.88, 0.86)) -> Label:
@@ -1687,6 +1686,189 @@ func _rebuild_overview() -> void:
 		overview_list.add_child(_lbl("　第 %d 年：收入 %d ｜ 支出 %d ｜ 利润 %+d ｜ 净资产 %d" % [
 			int(r0.get("year", 0)), int(r0.get("income_total", 0)), int(r0.get("expense_total", 0)),
 			int(r0.get("net", 0)), int(r0.get("net_worth", 0))], 780, Color(0.82, 0.86, 0.8)))
+
+# ---------------- 商品详情弹窗（0.19.1） ----------------
+
+var goods_root: PanelContainer = null
+var goods_list: VBoxContainer = null
+var goods_cid: StringName = &""
+var goods_qty := 1
+var goods_chart_index := 0
+var goods_chart: Control = null
+var goods_qty_edit: LineEdit = null
+const CHART_NAMES := ["价格走势", "边际分析", "均衡价格", "价格弹性", "港口规模"]
+
+func _open_goods(cid: StringName) -> void:
+	goods_cid = cid
+	goods_qty = 1
+	goods_chart_index = 0
+	_rebuild_goods()
+	goods_root.visible = true
+
+func _close_goods() -> void:
+	goods_root.visible = false
+
+func _rebuild_goods() -> void:
+	for c in goods_list.get_children():
+		c.queue_free()
+	var c: Resource = DataRegistry.get_commodity(goods_cid)
+	if c == null:
+		return
+	var port: Resource = DataRegistry.get_port(PORT_ID)
+	var max_stock := int(TIER_STOCK_REF.get(GameState.home_port_tier, 40))
+	var stock := GameState.ensure_stock(PORT_ID, goods_cid, max_stock)
+	var demand := 1.0
+	if port != null:
+		demand = float(port.demand.get(String(goods_cid), 1.0))
+	var mod := GameState.price_modifier(String(PORT_ID), goods_cid)
+	var bp := int(round(float(MarketModel.buy_price(c.base_price, stock, max_stock, demand))
+		* mod * (1.0 - GameState.rep_discount())))
+	var sp := int(round(float(MarketModel.sell_price(c.base_price, stock, max_stock, 1.0))
+		* (1.0 + GameState.sell_bonus()) * mod))
+	var have := int(GameState.cargo.get(goods_cid, 0)) + int(GameState.warehouse.get(goods_cid, 0))
+
+	_yard_title_to(goods_list, "%s —— 买 %d / 卖 %d" % [String(c.display_name), bp, sp])
+	# 图表切换
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 8)
+	goods_list.add_child(tabs)
+	for i in range(CHART_NAMES.size()):
+		var tb := Button.new()
+		tb.text = String(CHART_NAMES[i])
+		tb.custom_minimum_size = Vector2(120, 30)
+		tb.modulate = Color(1.0, 0.92, 0.6) if i == goods_chart_index else Color(1, 1, 1)
+		var idx: int = i
+		tb.pressed.connect(func(): goods_chart_index = idx; _rebuild_goods())
+		tabs.add_child(tb)
+	# 图表
+	goods_chart = load("res://scripts/ui/econ_chart.gd").new()
+	goods_chart.custom_minimum_size = Vector2(1400, 240)
+	goods_list.add_child(goods_chart)
+	goods_chart.setup(goods_chart_index, _chart_data(goods_cid, int(c.base_price), stock, max_stock), "")
+
+	# 指标明细
+	_yard_title_to(goods_list, "指标明细")
+	var hist: Array = GameState.price_history_of(String(PORT_ID), goods_cid)
+	var em0 = load("res://scripts/systems/econ_math.gd")
+	var e: float = float(em0.piecewise_elasticity(float(stock) / float(max_stock)))
+	var eq: float = float(c.base_price) * (1.0 + e * (1.0 - float(stock) / float(max_stock)))
+	var cur: float = float(bp)
+	var dev: float = (cur - eq) / maxf(0.01, eq)
+	var step_v: float = (eq - cur) * 0.25
+	var etype := "富有弹性" if e >= 0.70 else ("单位弹性附近" if e >= 0.40 else "缺乏弹性")
+	goods_list.add_child(_lbl("　供给弹性 %.2f（%s）　库存 %d/%d" % [e, etype, stock, max_stock],
+		700, Color(0.78, 0.85, 0.8)))
+	goods_list.add_child(_lbl("　均衡价 %.1f　当前 %.1f　偏离 %+.1f%%　本周回归步长 %+.2f" % [
+		eq, cur, dev * 100.0, step_v], 700, Color(0.78, 0.85, 0.8)))
+	goods_list.add_child(_lbl("　声望折扣 %d%%（%s）　关税 5%%（跨海域贸易）" % [
+		int(GameState.rep_discount() * 100.0), GameState.rep_discount_name()], 700, Color(0.78, 0.85, 0.8)))
+	var opp := int(round(float(bp * goods_qty) * 0.001 * 8.0))
+	goods_list.add_child(_lbl("　本次成本：采购 %d　机会成本 %d　合计 %d" % [
+		bp * goods_qty, opp, bp * goods_qty + opp], 700, Color(0.9, 0.75, 0.55)))
+
+	# 数量控件
+	var qrow := HBoxContainer.new()
+	qrow.add_theme_constant_override("separation", 8)
+	goods_list.add_child(qrow)
+	var minus := Button.new()
+	minus.text = "−"
+	minus.custom_minimum_size = Vector2(44, 30)
+	minus.pressed.connect(func(): _goods_set_qty(goods_qty - 1, stock, have))
+	qrow.add_child(minus)
+	goods_qty_edit = LineEdit.new()
+	goods_qty_edit.text = str(goods_qty)
+	goods_qty_edit.custom_minimum_size = Vector2(110, 30)
+	goods_qty_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	goods_qty_edit.text_submitted.connect(func(_t): _goods_set_qty(int(_t), stock, have))
+	goods_qty_edit.focus_exited.connect(func(): _goods_set_qty(int(goods_qty_edit.text), stock, have))
+	qrow.add_child(goods_qty_edit)
+	var plus := Button.new()
+	plus.text = "＋"
+	plus.custom_minimum_size = Vector2(44, 30)
+	plus.pressed.connect(func(): _goods_set_qty(goods_qty + 1, stock, have))
+	qrow.add_child(plus)
+	qrow.add_child(_lbl("上限：买 %d / 卖 %d" % [stock, have], 300, Color(0.62, 0.7, 0.66)))
+
+	# 买卖
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 12)
+	goods_list.add_child(brow)
+	var buy_btn := Button.new()
+	buy_btn.text = "买入 %d" % goods_qty
+	buy_btn.custom_minimum_size = Vector2(150, 34)
+	buy_btn.disabled = stock <= 0 or GameState.gold < bp * goods_qty
+	buy_btn.pressed.connect(func(): _goods_choose_storage(bp))
+	brow.add_child(buy_btn)
+	var sell_btn := Button.new()
+	sell_btn.text = "卖出 %d" % goods_qty
+	sell_btn.custom_minimum_size = Vector2(150, 34)
+	sell_btn.disabled = have <= 0
+	sell_btn.pressed.connect(func(): _sell(goods_cid, goods_qty, sp); _goods_set_qty(goods_qty, stock, have))
+	brow.add_child(sell_btn)
+	var close_b := Button.new()
+	close_b.text = "关闭"
+	close_b.custom_minimum_size = Vector2(100, 34)
+	close_b.pressed.connect(_close_goods)
+	brow.add_child(close_b)
+
+func _goods_set_qty(v: int, stock: int, have: int) -> void:
+	var cap := maxi(stock, have)
+	if cap <= 0:
+		cap = 1
+	goods_qty = clampi(v, 1, cap)
+	_rebuild_goods()
+
+func _goods_choose_storage(price: int) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "存放位置"
+	dlg.dialog_text = "买入 %d 件 %s：装船（货舱）还是存仓（港口仓库）？" % [goods_qty, String(goods_cid)]
+	dlg.ok_button_text = "装船"
+	dlg.add_button("存仓", true, "warehouse")
+	add_child(dlg)
+	dlg.confirmed.connect(func():
+		_buy(goods_cid, goods_qty, price)
+		dlg.queue_free()
+		_rebuild_goods())
+	dlg.custom_action.connect(func(action: StringName):
+		if String(action) == "warehouse":
+			GameState.record_purchase(goods_cid, goods_qty, price * goods_qty)
+			GameState.add_gold(-price * goods_qty)
+			GameState.warehouse[goods_cid] = int(GameState.warehouse.get(goods_cid, 0)) + goods_qty
+			var ms := int(TIER_STOCK_REF.get(GameState.home_port_tier, 40))
+			GameState.ensure_stock(PORT_ID, goods_cid, ms)
+			GameState.port_stock[PORT_ID][goods_cid] = maxi(0, int(GameState.port_stock[PORT_ID][goods_cid]) - goods_qty)
+			dlg.queue_free()
+			_rebuild_goods())
+	dlg.popup_centered()
+
+func _chart_data(cid: StringName, base_price: int, stock: int, max_stock: int) -> Dictionary:
+	var d := {}
+	d["history"] = GameState.price_history_of(String(PORT_ID), cid)
+	var em = load("res://scripts/systems/econ_math.gd")
+	var mc: Array = []
+	for i in range(0, 41):
+		var s := maxi(0, stock - i * 3)
+		var r := clampf(float(s) / float(max_stock), 0.0, 1.0)
+		mc.append(float(base_price) * (1.0 + em.piecewise_elasticity(r) * (1.0 - r)))
+	d["mc"] = mc
+	d["mr"] = float(base_price) * 1.6
+	var supply: Array = []
+	var demand: Array = []
+	for i in range(0, 41):
+		var q := float(i) / 40.0
+		supply.append(float(base_price) * (1.0 + 0.55 * (1.0 - q)))
+		demand.append(float(base_price) * 1.5 / (1.0 + 0.55 * q))
+	d["supply"] = supply
+	d["demand"] = demand
+	var curve: Array = []
+	for i in range(0, 41):
+		var qq := 0.05 + float(i) / 40.0 * 2.0
+		curve.append(float(base_price) * 1.2 / qq)
+	d["curve"] = curve
+	d["labels"] = ["渔村", "乡镇", "城市"]
+	d["coefs"] = [1.20, 1.00, 0.85]
+	d["vol"] = [40, 90, 160]
+	return d
 
 # ---------------- 面板统一规范（0.19） ----------------
 
