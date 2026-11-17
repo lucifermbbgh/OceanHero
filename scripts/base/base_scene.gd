@@ -463,8 +463,8 @@ func _rebuild_market() -> void:
 	var head_row := HBoxContainer.new()
 	head_row.add_theme_constant_override("separation", 8)
 	market_list.add_child(head_row)
-	for spec in [["商品", 100], ["买价", 80], ["卖价", 80], ["周涨跌", 100],
-			["库存", 90], ["船上", 70], ["仓库", 70], ["操作", 380]]:
+	for spec in [["商品", 90], ["买价", 70], ["卖价", 70], ["周涨跌", 90], ["8 周走势", 100],
+			["库存", 80], ["船上", 60], ["仓库", 60], ["操作", 380]]:
 		var hl := Label.new()
 		hl.text = String(spec[0])
 		hl.custom_minimum_size = Vector2(int(spec[1]), 0)
@@ -498,9 +498,9 @@ func _rebuild_market() -> void:
 		market_list.add_child(row)
 		var have := int(GameState.cargo.get(id, 0))
 		var in_wh := int(GameState.warehouse.get(id, 0))
-		row.add_child(_cell(c.display_name, 100))
-		row.add_child(_cell(str(bp), 80))
-		row.add_child(_cell(str(sp), 80))
+		row.add_child(_cell(c.display_name, 90))
+		row.add_child(_cell(str(bp), 70))
+		row.add_child(_cell(str(sp), 70))
 		var chg_text := "—"
 		var chg_col := Color(0.55, 0.6, 0.6)
 		if GameState.has_price_history(String(PORT_ID), id):
@@ -514,10 +514,14 @@ func _rebuild_market() -> void:
 				# 下跌用绿色
 				chg_text = "↓%d%%" % int(round(chg * 100.0))
 				chg_col = Color(0.45, 0.85, 0.55)
-		row.add_child(_cell(chg_text, 100, chg_col))
-		row.add_child(_cell(str(stock), 90))
-		row.add_child(_cell(str(have), 70))
-		row.add_child(_cell(str(in_wh), 70))
+		row.add_child(_cell(chg_text, 90, chg_col))
+		var spark: Control = load("res://scripts/ui/sparkline.gd").new()
+		var hist: Array = GameState.price_history_of(String(PORT_ID), id)
+		spark.set_values(hist, Color(0.92, 0.45, 0.42) if chg > 0.0 else Color(0.45, 0.85, 0.55))
+		row.add_child(spark)
+		row.add_child(_cell(str(stock), 80))
+		row.add_child(_cell(str(have), 60))
+		row.add_child(_cell(str(in_wh), 60))
 		var b_buy := Button.new()
 		b_buy.text = "买10"
 		b_buy.custom_minimum_size = Vector2(72, 32)
@@ -739,6 +743,11 @@ func _add_market_metrics(pk: String) -> void:
 	market_list.add_child(_cell("　　" + "　｜　".join(parts), 1400, Color(0.72, 0.8, 0.76)))
 	var line2 := "　　回归速度 25%%/周　｜　单周涨跌上限 ±15%%　｜　生效事件 %d 条" % GameState.market_events.size()
 	market_list.add_child(_cell(line2, 1400, Color(0.72, 0.8, 0.76)))
+	var line3 := "　　交叉弹性传导阈值 ±%d%%：涨跌幅超过该值才会影响关联商品（上限 ±%d%%）" % [
+		int(GameState.CROSS_THRESHOLD * 100.0), int(GameState.CROSS_CAP * 100.0)]
+	market_list.add_child(_cell(line3, 1400, Color(0.62, 0.7, 0.66)))
+	market_list.add_child(_cell("　　关联：朗姆酒↔香料（互补 0.4）　｜　谷物→朗姆酒（替代 -0.3）　｜　木材↔铁矿（互补 0.2）",
+		1400, Color(0.62, 0.7, 0.66)))
 
 ## 世界市场：跨港情报页（不参与交易）
 func _rebuild_world_market() -> void:
@@ -774,8 +783,36 @@ func _rebuild_world_market() -> void:
 				continue
 			var bp := MarketModel.buy_price(int(c.base_price), st, stock_cap, 1.0)
 			parts.append("%s %d" % [String(c.display_name), bp])
-		hb.add_child(_lbl(" / ".join(parts) if not parts.is_empty() else "（无货）", 380,
+		hb.add_child(_lbl(" / ".join(parts) if not parts.is_empty() else "（无货）", 340,
 			Color(0.82, 0.86, 0.7)))
+		# 边际提示：以谷物为例，按货舱余量与两地差价估算
+		var em2 = load("res://scripts/systems/econ_math.gd")
+		var local_buy := 0
+		var there_buy := 0
+		var cg: Resource = DataRegistry.get_commodity(&"grain")
+		if cg != null:
+			var lstock := GameState.ensure_stock(PORT_ID, &"grain", 400)
+			local_buy = int(round(float(MarketModel.buy_price(cg.base_price, lstock, 400, 1.0))
+				* GameState.price_modifier(String(PORT_ID), &"grain")))
+			var tstock := GameState.ensure_stock(StringName(k), &"grain", stock_cap)
+			there_buy = int(round(float(MarketModel.sell_price(cg.base_price, tstock, stock_cap, 1.0))
+				* GameState.price_modifier(String(k), &"grain")))
+		var cap_left: float = GameState.cargo_free()
+		var mt: Dictionary = em2.marginal_trade(local_buy, there_buy, cap_left, float(cg.volume), 999999)
+		var mtxt := "—"
+		var mcol := Color(0.6, 0.65, 0.65)
+		match String(mt.get("reason", "")):
+			"ok":
+				mtxt = "还能吃进 %d 件" % int(mt.get("count", 0))
+				mcol = Color(0.5, 0.88, 0.6)
+			"capacity":
+				mtxt = "货舱已满"
+			"unprofitable":
+				mtxt = "不划算"
+				mcol = Color(0.9, 0.55, 0.5)
+			_:
+				mtxt = "无可比价"
+		hb.add_child(_lbl(mtxt, 180, mcol))
 
 const TIER_STOCK_REF := {1: 40, 2: 90, 3: 160}
 

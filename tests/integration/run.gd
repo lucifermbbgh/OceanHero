@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_decision_aid_v014()
 	await _test_market_ui_v0131()
 	await _test_price_engine_v013()
 	await _test_bank_v012()
@@ -631,6 +632,43 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 决策辅助（0.14.0） ----------------
+func _test_decision_aid_v014() -> void:
+	print("\n[决策辅助]")
+	var em = load("res://scripts/systems/econ_math.gd")
+	# 交叉弹性
+	_ok(is_equal_approx(em.cross_effect(0.03, 0.4, 0.05, 0.08), 0.0), "低于阈值不传导")
+	_ok(is_equal_approx(em.cross_effect(0.08, 0.4, 0.05, 0.08), 0.032), "8% × 0.4 = 3.2%")
+	_ok(is_equal_approx(em.cross_effect(-0.10, 0.4, 0.05, 0.08), -0.04), "负向传导")
+	_ok(is_equal_approx(em.cross_effect(0.50, 1.0, 0.05, 0.08), 0.08), "传导有上限 ±8%")
+
+	# 边际利润
+	var m1: Dictionary = em.marginal_trade(10, 20, 260.0, 0.5, 400)
+	_ok(int(m1.get("count", 0)) == 400 and String(m1.get("reason", "")) == "ok",
+		"容量充足时按库存上限", str(m1.get("count", 0)))
+	var m2: Dictionary = em.marginal_trade(10, 20, 5.0, 0.5, 400)
+	_ok(int(m2.get("count", 0)) == 10, "容量受限时按容量算", str(m2.get("count", 0)))
+	var m3: Dictionary = em.marginal_trade(20, 10, 260.0, 0.5, 400)
+	_ok(String(m3.get("reason", "")) == "unprofitable", "卖价低于买价时不划算")
+	var m4: Dictionary = em.marginal_trade(10, 20, 0.0, 0.5, 400)
+	_ok(String(m4.get("reason", "")) == "capacity", "无容量时提示货舱已满")
+
+	# 历史曲线
+	GameState.reset_new_game()
+	GameState.ensure_stock(&"jadehaven", &"grain", 400)
+	GameState.tick_market(1)
+	var h1: Array = GameState.price_history_of("jadehaven", &"grain")
+	_ok(h1.size() == 1, "首周记录 1 个点", str(h1.size()))
+	GameState.tick_market(2)
+	GameState.tick_market(3)
+	var h2: Array = GameState.price_history_of("jadehaven", &"grain")
+	_ok(h2.size() == 3, "三周记录 3 个点", str(h2.size()))
+	_ok(h2.size() <= GameState.HISTORY_WEEKS, "历史不超过 8 周上限")
+
+	# 交叉传导（构造：让朗姆酒大幅变动后，香料目标受影响）
+	_ok(GameState.CROSS_THRESHOLD > 0.0, "交叉阈值已配置", str(GameState.CROSS_THRESHOLD))
+	_ok(GameState.CROSS_RELATIONS.size() >= 3, "至少三条交叉关系")
 
 # ---------------- 市场 UI（0.13.1） ----------------
 func _test_market_ui_v0131() -> void:

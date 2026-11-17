@@ -773,6 +773,17 @@ const DRIFT_NOISE := 0.03
 
 var price_drift: Dictionary = {}     # "port|cid" -> 漂移倍率（1.0 为基准）
 var market_events: Array = []        # 当前生效事件
+var price_history: Dictionary = {}   # "port|cid" -> Array[int]（千分比漂移，最多 8 周）
+
+## 交叉弹性：替代（正）/ 互补（负）系数；只在同港口传导，单层不级联
+const CROSS_RELATIONS := [
+	{"a": &"rum", "b": &"spice", "coef": 0.4},
+	{"a": &"grain", "b": &"rum", "coef": -0.3},
+	{"a": &"timber", "b": &"iron", "coef": 0.2},
+]
+const CROSS_THRESHOLD := 0.05
+const CROSS_CAP := 0.08
+const HISTORY_WEEKS := 8
 
 func _drift_key(port_key: String, cid: StringName) -> String:
 	return "%s|%s" % [port_key, String(cid)]
@@ -784,6 +795,23 @@ func price_drift_of(port_key: String, cid: StringName) -> float:
 ## 某港某商品当前受事件影响后的价格倍率
 func price_modifier(port_key: String, cid: StringName) -> float:
 	return price_drift_of(port_key, cid) * MarketEvents.effect_at(market_events, port_key, cid)
+
+## 某港口某商品的 8 周历史（千分比）
+func price_history_of(port_key: String, cid: StringName) -> Array:
+	return price_history.get(_drift_key(port_key, cid), [])
+
+## 交叉弹性：计算某商品本港受到的传导（来自其他商品的变化）
+func _cross_transmission(port_key: String, cid: StringName) -> float:
+	var total := 0.0
+	for rel in CROSS_RELATIONS:
+		if String(rel["b"]) != String(cid):
+			continue
+		var src_key := _drift_key(port_key, StringName(rel["a"]))
+		var cur := float(price_drift.get(src_key, 1.0))
+		var prev := float(price_drift.get(src_key + "|prev", cur))
+		var chg := EconMath.change_pct(prev, cur)
+		total += EconMath.cross_effect(chg, float(rel["coef"]), CROSS_THRESHOLD, CROSS_CAP)
+	return clampf(total, -CROSS_CAP, CROSS_CAP)
 
 ## 周结算：事件推进与生成、价格漂移回归
 func tick_market(week: int) -> Array:
@@ -800,11 +828,17 @@ func tick_market(week: int) -> Array:
 			var key := _drift_key(port_key, cid)
 			var cur := float(price_drift.get(key, 1.0))
 			var target := MarketEvents.effect_at(market_events, port_key, cid)
+			target *= (1.0 + _cross_transmission(port_key, cid))
 			price_drift[key + "|prev"] = cur
 			var next_v := EconMath.mean_revert(cur, target, DRIFT_SPEED)
 			next_v += EconMath.seeded_noise([hash(port_key), int(hash(String(cid))), week], DRIFT_NOISE)
 			next_v = clampf(next_v, DRIFT_MIN, DRIFT_MAX)
 			price_drift[key] = next_v
+			var hist: Array = price_history.get(key, [])
+			hist.append(int(round(next_v * 1000.0)))
+			while hist.size() > HISTORY_WEEKS:
+				hist.pop_front()
+			price_history[key] = hist
 	return events_out
 
 ## 是否有上周对比数据（首周没有）
@@ -1480,7 +1514,8 @@ func to_dict() -> Dictionary:
 		"port_registry": port_registry.duplicate(true),
 		"contraband": contraband.duplicate(),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
-		"market": {"drift": price_drift.duplicate(), "events": market_events.duplicate(true)},
+		"market": {"drift": price_drift.duplicate(), "events": market_events.duplicate(true),
+			"history": price_history.duplicate(true)},
 		"license": {"has": has_privateer_license, "legal": license_is_legal},
 		"black_closed_week": black_closed_week,
 		"auctions": auctions.duplicate(true),
@@ -1570,6 +1605,10 @@ func from_dict(d: Dictionary) -> void:
 	market_events.clear()
 	for e0 in mk.get("events", []):
 		market_events.append(e0)
+	price_history.clear()
+	var hist_d: Dictionary = mk.get("history", {})
+	for k in hist_d.keys():
+		price_history[String(k)] = hist_d[k]
 	var bk: Dictionary = d.get("bank", {})
 	bank_deposit = int(bk.get("deposit", 0))
 	loans.clear()
@@ -1770,6 +1809,7 @@ func reset_new_game() -> void:
 	loans.clear()
 	price_drift.clear()
 	market_events.clear()
+	price_history.clear()
 	contraband.clear()
 	has_privateer_license = false
 	license_is_legal = false

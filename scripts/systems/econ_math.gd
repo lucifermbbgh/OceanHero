@@ -30,6 +30,24 @@ static func clamp_swing(old_value: float, new_value: float, cap: float) -> float
 	var hi := old_value * (1.0 + cap)
 	return clampf(new_value, lo, hi)
 
+## 交叉弹性传导：源涨跌幅 × 系数，上限 ±cap
+static func cross_effect(source_change: float, coef: float, threshold: float, cap: float) -> float:
+	if absf(source_change) < threshold:
+		return 0.0
+	return clampf(source_change * coef, -cap, cap)
+
+## 边际利润：按容量与库存逐件累加，返回 {count, total, reason}
+static func marginal_trade(buy_price: int, sell_price: int, capacity_left: float,
+		volume: float, stock: int) -> Dictionary:
+	var can_by_cap := int(floor(capacity_left / maxf(0.01, volume)))
+	var can := mini(can_by_cap, stock)
+	if can <= 0:
+		return {"count": 0, "total": 0, "reason": "capacity" if can_by_cap <= 0 else "stock"}
+	var per := sell_price - buy_price
+	if per <= 0:
+		return {"count": 0, "total": 0, "reason": "unprofitable"}
+	return {"count": can, "total": per * can, "reason": "ok"}
+
 ## 涨价幅度（正数=涨）
 static func change_pct(old_value: float, new_value: float) -> float:
 	if is_zero_approx(old_value):
