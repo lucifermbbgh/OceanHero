@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_market_ui_v0131()
 	await _test_price_engine_v013()
 	await _test_bank_v012()
 	await _test_black_market_v011()
@@ -630,6 +631,24 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 市场 UI（0.13.1） ----------------
+func _test_market_ui_v0131() -> void:
+	print("\n[市场 UI]")
+	GameState.reset_new_game()
+	GameState.ensure_stock(&"jadehaven", &"grain", 400)
+	# 首周没有历史 → 无涨跌
+	_ok(not GameState.has_price_history("jadehaven", &"grain"), "首周没有对比数据")
+	GameState.tick_market(1)
+	_ok(GameState.has_price_history("jadehaven", &"grain"), "跨周后有对比数据")
+	# 价格明细
+	var ex = load("res://scripts/systems/econ_explain.gd")
+	var info: Dictionary = ex.price_breakdown("jadehaven", &"grain", 10, 190, 400, 1.0, 1.0)
+	_ok(info.get("steps", []).size() >= 4, "明细至少 4 步", str(info.get("steps", []).size()))
+	_ok(int(info.get("result", 0)) > 0, "明细给出最终价")
+	var metrics: Dictionary = info.get("metrics", {})
+	_ok(metrics.has("elasticity"), "明细含弹性系数")
+	_ok(metrics.has("stock_ratio"), "明细含库存比例")
 
 # ---------------- 价格引擎（0.13.0） ----------------
 func _test_price_engine_v013() -> void:

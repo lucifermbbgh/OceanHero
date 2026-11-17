@@ -141,8 +141,8 @@ func _build_ui() -> void:
 
 	# 市场面板
 	market_root = PanelContainer.new()
-	market_root.position = Vector2(280, 80)
-	market_root.custom_minimum_size = Vector2(560, 420)
+	market_root.position = Vector2(16, 72)
+	market_root.custom_minimum_size = Vector2(1568, 812)
 	market_root.add_theme_stylebox_override("panel", _panel_style())
 	market_root.visible = false
 	root.add_child(market_root)
@@ -370,6 +370,12 @@ func _do_repair() -> void:
 	_log("修理完成，花费 %d 金" % cost)
 	_refresh()
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and market_root != null and market_root.visible:
+			market_root.visible = false
+			get_viewport().set_input_as_handled()
+
 func _toggle_market() -> void:
 	if market_root.visible:
 		market_root.visible = false
@@ -383,6 +389,7 @@ func _toggle_market() -> void:
 
 var market_target := "ship"   # ship = 装船，warehouse = 存仓
 var market_tab := "local"     # local = 本地市场，world = 世界市场
+var expanded_cid: StringName = &""   # 展开明细的商品
 var bank_root: PanelContainer = null
 var bank_list: VBoxContainer = null
 var black_root: PanelContainer = null
@@ -452,6 +459,20 @@ func _rebuild_market() -> void:
 	b_wh.modulate = Color(1.0, 0.92, 0.6) if market_target == "warehouse" else Color(1, 1, 1)
 	b_wh.pressed.connect(func(): _toggle_market_target("warehouse"))
 	tab_row.add_child(b_wh)
+	# 表头
+	var head_row := HBoxContainer.new()
+	head_row.add_theme_constant_override("separation", 8)
+	market_list.add_child(head_row)
+	for spec in [["商品", 100], ["买价", 80], ["卖价", 80], ["周涨跌", 100],
+			["库存", 90], ["船上", 70], ["仓库", 70], ["操作", 380]]:
+		var hl := Label.new()
+		hl.text = String(spec[0])
+		hl.custom_minimum_size = Vector2(int(spec[1]), 0)
+		hl.add_theme_font_size_override("font_size", 13)
+		hl.add_theme_color_override("font_color", Color(0.62, 0.72, 0.78))
+		head_row.add_child(hl)
+	market_list.add_child(HSeparator.new())
+
 	for id in [&"grain", &"timber", &"rum", &"spice"]:
 		var c: Resource = DataRegistry.get_commodity(id)
 		if c == null:
@@ -475,16 +496,26 @@ func _rebuild_market() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		market_list.add_child(row)
-		var name_l := Label.new()
-		name_l.text = c.display_name
-		name_l.custom_minimum_size = Vector2(90, 0)
-		row.add_child(name_l)
-		var price_l := Label.new()
 		var have := int(GameState.cargo.get(id, 0))
 		var in_wh := int(GameState.warehouse.get(id, 0))
-		price_l.text = "买 %d / 卖 %d %s   港 %d｜船 %d｜仓 %d" % [bp, sp, arrow, stock, have, in_wh]
-		price_l.custom_minimum_size = Vector2(240, 0)
-		row.add_child(price_l)
+		row.add_child(_cell(c.display_name, 100))
+		row.add_child(_cell(str(bp), 80))
+		row.add_child(_cell(str(sp), 80))
+		var chg_text := "—"
+		var chg_col := Color(0.55, 0.6, 0.6)
+		if GameState.has_price_history(String(PORT_ID), id):
+			if absf(chg) < 0.005:
+				chg_text = "持平"
+			elif chg > 0.0:
+				chg_text = "↑%d%%" % int(round(chg * 100.0))
+				chg_col = Color(0.55, 0.9, 0.6)
+			else:
+				chg_text = "↓%d%%" % int(round(chg * 100.0))
+				chg_col = Color(0.9, 0.6, 0.55)
+		row.add_child(_cell(chg_text, 100, chg_col))
+		row.add_child(_cell(str(stock), 90))
+		row.add_child(_cell(str(have), 70))
+		row.add_child(_cell(str(in_wh), 70))
 		var b_buy := Button.new()
 		b_buy.text = "买10"
 		b_buy.custom_minimum_size = Vector2(72, 32)
@@ -507,6 +538,17 @@ func _rebuild_market() -> void:
 		b_to_ship.custom_minimum_size = Vector2(60, 32)
 		b_to_ship.pressed.connect(func(): _move_to_ship(cid))
 		row.add_child(b_to_ship)
+		var b_detail := Button.new()
+		b_detail.text = "明细"
+		b_detail.custom_minimum_size = Vector2(60, 32)
+		var cid_d: StringName = id
+		b_detail.pressed.connect(func(): _toggle_detail(cid_d))
+		row.add_child(b_detail)
+
+		if expanded_cid == id:
+			_add_detail_block(id, int(c.base_price), stock, max_stock, bp)
+	_add_market_metrics(String(PORT_ID))
+
 	# 船上货舱汇总：买的东西到底装在哪儿
 	var sep := HSeparator.new()
 	market_list.add_child(sep)
@@ -631,6 +673,70 @@ func _rebuild_events_tab() -> void:
 		hb.add_child(_lbl(String(e.get("name", "")), 120, Color(0.9, 0.82, 0.45)))
 		hb.add_child(_lbl(String(e.get("desc", "")), 260, Color(0.8, 0.85, 0.7)))
 		hb.add_child(_lbl("剩 %d 周" % int(e.get("weeks", 0)), 100))
+
+## 表格单元格
+func _cell(text: String, width: int, col: Color = Color(0.86, 0.88, 0.86)) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.custom_minimum_size = Vector2(width, 0)
+	l.add_theme_font_size_override("font_size", 14)
+	l.add_theme_color_override("font_color", col)
+	return l
+
+## 展开/收起价格明细
+func _toggle_detail(cid: StringName) -> void:
+	expanded_cid = &"" if expanded_cid == cid else cid
+	_rebuild_market()
+
+## 价格明细区块
+func _add_detail_block(cid: StringName, base_price: int, stock: int, max_stock: int, final_price: int) -> void:
+	var ex = load("res://scripts/systems/econ_explain.gd")
+	var pk := String(PORT_ID)
+	var me = load("res://scripts/systems/market_events.gd")
+	var info: Dictionary = ex.price_breakdown(pk, cid, base_price, stock, max_stock,
+		float(me.effect_at(GameState.market_events, pk, cid)),
+		GameState.price_drift_of(pk, cid))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	market_list.add_child(box)
+	for st in info.get("steps", []):
+		var hl := HBoxContainer.new()
+		hl.add_theme_constant_override("separation", 10)
+		box.add_child(hl)
+		hl.add_child(_cell("　　" + String(st.get("label", "")), 150, Color(0.7, 0.78, 0.8)))
+		var v := int(st.get("value", 0))
+		var sgn := "+%d" % v if v >= 0 else str(v)
+		hl.add_child(_cell(sgn, 70, Color(0.9, 0.85, 0.6)))
+		hl.add_child(_cell(String(st.get("note", "")), 380, Color(0.62, 0.7, 0.66)))
+	var total := HBoxContainer.new()
+	total.add_theme_constant_override("separation", 10)
+	box.add_child(total)
+	total.add_child(_cell("　　= 最终买价", 150, Color(0.85, 0.88, 0.6)))
+	total.add_child(_cell(str(final_price), 70, Color(0.95, 0.88, 0.5)))
+
+## 本周市场指标行
+func _add_market_metrics(pk: String) -> void:
+	var sep := HSeparator.new()
+	market_list.add_child(sep)
+	var title := Label.new()
+	title.text = "本周市场指标"
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color(0.62, 0.8, 0.7))
+	market_list.add_child(title)
+	var em = load("res://scripts/systems/econ_math.gd")
+	var parts: Array = []
+	for cid in [&"grain", &"timber", &"rum", &"spice"]:
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c == null:
+			continue
+		var max_stock := 400
+		var stock := GameState.ensure_stock(PORT_ID, cid, max_stock)
+		var ratio := clampf(float(stock) / float(max_stock), 0.0, 1.0)
+		parts.append("%s 弹性 %.2f（库存 %d%%）" % [String(c.display_name), em.piecewise_elasticity(ratio),
+			int(ratio * 100.0)])
+	market_list.add_child(_cell("　　" + "　｜　".join(parts), 1400, Color(0.72, 0.8, 0.76)))
+	var line2 := "　　回归速度 25%%/周　｜　单周涨跌上限 ±15%%　｜　生效事件 %d 条" % GameState.market_events.size()
+	market_list.add_child(_cell(line2, 1400, Color(0.72, 0.8, 0.76)))
 
 ## 世界市场：跨港情报页（不参与交易）
 func _rebuild_world_market() -> void:

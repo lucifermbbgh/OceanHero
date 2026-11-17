@@ -807,6 +807,10 @@ func tick_market(week: int) -> Array:
 			price_drift[key] = next_v
 	return events_out
 
+## 是否有上周对比数据（首周没有）
+func has_price_history(port_key: String, cid: StringName) -> bool:
+	return price_drift.has(_drift_key(port_key, cid) + "|prev")
+
 ## 价格涨跌（相对上周）
 func price_change_pct(port_key: String, cid: StringName) -> float:
 	var cur := price_drift_of(port_key, cid)
