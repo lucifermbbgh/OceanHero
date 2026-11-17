@@ -440,6 +440,11 @@ func _fire_at(enemy) -> void:
 		enemy_armor = float(raw_armor)
 	var dfd := {"armor": enemy_armor, "evasion": 0.0}
 	var res: Dictionary = CombatResolver.volley(atk, dfd, ammo)
+	# 海军制式火炮：持有即 +10% 火炮伤害（不消耗）
+	if is_player and GameState != null and int(GameState.contraband.get(&"navy_gear", 0)) > 0:
+		for k2 in ["hull", "sail", "rudder", "crew"]:
+			if res.has(k2):
+				res[k2] = float(res[k2]) * 1.10
 	# 链弹打的是帆索，海怪没有帆 → 完全无效
 	var is_monster: bool = enemy.has_method("alive_limbs")
 	if not (is_monster and ammo_id == &"chain"):

@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_bank_v012()
 	await _test_black_market_v011()
 	await _test_auction_v010()
 	await _test_economy_v09()
@@ -628,6 +629,73 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 银行（0.12.0） ----------------
+func _test_bank_v012() -> void:
+	print("\n[银行]")
+	GameState.reset_new_game()
+	GameState.add_gold(100000)
+	_ok(GameState.bank_deposit_gold(10000), "可以存款")
+	_ok(GameState.bank_deposited() == 10000, "存款额正确")
+	_ok(GameState.bank_credit() == 10000, "可贷额度 = 存款额")
+	_ok(GameState.bank_withdraw(3000), "可以取款")
+	_ok(GameState.bank_deposited() == 7000, "取款后余额正确")
+
+	# 无存款不能贷
+	GameState.bank_withdraw(7000)
+	_ok(not bool(GameState.bank_borrow(1000, 12).get("ok", true)), "无存款不能贷款")
+	GameState.bank_deposit_gold(10000)
+
+	# 超额度被拒
+	_ok(not bool(GameState.bank_borrow(20000, 12).get("ok", true)), "超过存款额被拒")
+
+	# 三档利率
+	var r12: Dictionary = GameState.bank_borrow(10000, 12)
+	_ok(bool(r12.get("ok", false)), "一季期贷款成功")
+	_ok(is_equal_approx(GameState.loan_rate, 0.002), "一季期利率 0.2%", str(GameState.loan_rate))
+	_ok(int(r12.get("interest", 0)) == 240, "一季期利息 240", str(r12.get("interest", 0)))
+	_ok(not bool(GameState.bank_borrow(10000, 12).get("ok", true)), "已有贷款时不能再借")
+
+	# 提前还款
+	GameState.gold = 100000
+	var rep: Dictionary = GameState.bank_repay()
+	_ok(bool(rep.get("ok", false)), "可以提前还清")
+	_ok(not GameState.loan_active(), "还清后无贷款")
+
+	# 半年 / 一年 利率
+	GameState.bank_deposit_gold(10000)
+	var r26: Dictionary = GameState.bank_borrow(10000, 26)
+	_ok(is_equal_approx(GameState.loan_rate, 0.003) and int(r26.get("interest", 0)) == 780,
+		"半年期 0.3% / 利息 780", "%s / %d" % [str(GameState.loan_rate), int(r26.get("interest", 0))])
+	GameState.gold = 100000
+	GameState.bank_repay()
+	GameState.bank_deposit_gold(10000)
+	var r52: Dictionary = GameState.bank_borrow(10000, 52)
+	_ok(is_equal_approx(GameState.loan_rate, 0.005) and int(r52.get("interest", 0)) == 2600,
+		"一年期 0.5% / 利息 2600", "%s / %d" % [str(GameState.loan_rate), int(r52.get("interest", 0))])
+
+	# 破产：到期现金不足
+	GameState.gold = 10
+	GameState.loan_weeks_left = 1
+	var ev: Array = GameState.bank_tick_week()
+	var bankrupt := false
+	for e in ev:
+		if String(e.get("type", "")) == "bankrupt":
+			bankrupt = true
+	GameState.gold = 10
+	var ev2: Array = GameState.bank_tick_week()
+	for e in ev2:
+		if String(e.get("type", "")) == "bankrupt":
+			bankrupt = true
+	_ok(bankrupt or not GameState.loan_active(), "到期现金不足会触发结算")
+
+	# 全城互通：存款是全局唯一的
+	GameState.reset_new_game()
+	GameState.add_gold(5000)
+	GameState.bank_deposit_gold(5000)
+	_ok(GameState.bank_deposited() == 5000, "存款为全局账户")
+	GameState.current_map = 5
+	_ok(GameState.bank_deposited() == 5000, "换地图后存款仍在（全城互通）")
 
 # ---------------- 黑市（0.11.0） ----------------
 func _test_black_market_v011() -> void:

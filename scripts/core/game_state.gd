@@ -761,6 +761,137 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 银行（0.12） ----------------
+
+const DEPOSIT_RATE := 0.001                  # 存款周利率 0.1%
+const LOAN_RATES := {12: 0.002, 26: 0.003, 52: 0.005}   # 一季/半年/一年
+
+var bank_deposit := 0
+var loan_principal := 0
+var loan_weeks := 0
+var loan_rate := 0.0
+var loan_weeks_left := 0
+var loan_interest_total := 0
+var loan_interest_paid := 0
+var loan_month_counter := 0
+
+func loan_active() -> bool:
+	return loan_principal > 0
+
+## 可贷额度：不超过当前存款
+func bank_credit() -> int:
+	return bank_deposit
+
+func bank_deposited() -> int:
+	return bank_deposit
+
+## 月付息额（4 周）
+func loan_monthly_due() -> int:
+	if not loan_active():
+		return 0
+	var per_week := int(round(float(loan_principal) * loan_rate * 4.0))
+	return mini(per_week, maxi(0, loan_interest_total - loan_interest_paid))
+
+func bank_deposit_gold(amount: int) -> bool:
+	if amount <= 0 or gold < amount:
+		return false
+	add_gold(-amount)
+	bank_deposit += amount
+	return true
+
+func bank_withdraw(amount: int) -> bool:
+	if amount <= 0 or amount > bank_deposit:
+		return false
+	bank_deposit -= amount
+	add_gold(amount)
+	return true
+
+## 借款：需有存款，且金额不超过存款额
+func bank_borrow(amount: int, weeks: int) -> Dictionary:
+	if loan_active():
+		return {"ok": false, "reason": "已有未还贷款"}
+	if bank_deposit <= 0:
+		return {"ok": false, "reason": "需先有存款才能贷款"}
+	if amount <= 0 or amount > bank_deposit:
+		return {"ok": false, "reason": "贷款额不能超过存款额（%d）" % bank_deposit}
+	if not LOAN_RATES.has(weeks):
+		return {"ok": false, "reason": "不支持的期限"}
+	loan_principal = amount
+	loan_weeks = weeks
+	loan_rate = float(LOAN_RATES[weeks])
+	loan_weeks_left = weeks
+	loan_interest_total = int(round(float(amount) * loan_rate * float(weeks)))
+	loan_interest_paid = 0
+	loan_month_counter = 0
+	add_gold(amount)
+	return {"ok": true, "interest": loan_interest_total}
+
+## 提前还清（按已过周数结算利息）
+func bank_repay() -> Dictionary:
+	if not loan_active():
+		return {"ok": false, "reason": "没有未还贷款"}
+	var elapsed := loan_weeks - loan_weeks_left
+	var due_interest := int(round(float(loan_principal) * loan_rate * float(maxi(0, elapsed))))
+	var owe := loan_principal + maxi(0, due_interest - loan_interest_paid)
+	if gold < owe:
+		return {"ok": false, "reason": "现金不足，需要 %d" % owe}
+	add_gold(-owe)
+	_clear_loan()
+	return {"ok": true, "paid": owe}
+
+func _clear_loan() -> void:
+	loan_principal = 0
+	loan_weeks = 0
+	loan_rate = 0.0
+	loan_weeks_left = 0
+	loan_interest_total = 0
+	loan_interest_paid = 0
+	loan_month_counter = 0
+
+## 破产：清空存款与现金、海军声望归零、通缉度 +60
+func bank_bankrupt() -> void:
+	bank_deposit = 0
+	gold = 0
+	reputation["royal_navy"] = 0
+	reputation["notoriety"] = mini(100, notoriety() + 60)
+	_clear_loan()
+
+## 每周结算：存款计息、贷款还息、到期还款与破产判定
+func bank_tick_week() -> Array:
+	var events: Array = []
+	if bank_deposit > 0:
+		var interest := int(round(float(bank_deposit) * DEPOSIT_RATE * 4.0))
+		if interest > 0 and TimeService.total_weeks() % 4 == 0:
+			bank_deposit += interest
+			events.append({"type": "deposit_interest", "amount": interest})
+	if not loan_active():
+		return events
+	loan_month_counter += 1
+	loan_weeks_left -= 1
+	# 每月付息
+	if loan_month_counter >= 4:
+		loan_month_counter = 0
+		var due := loan_monthly_due()
+		if due > 0:
+			if gold < due:
+				bank_bankrupt()
+				events.append({"type": "bankrupt", "reason": "interest"})
+				return events
+			add_gold(-due)
+			loan_interest_paid += due
+			events.append({"type": "loan_interest", "amount": due})
+	# 到期还本息
+	if loan_weeks_left <= 0:
+		var remain := loan_principal + maxi(0, loan_interest_total - loan_interest_paid)
+		if gold < remain:
+			bank_bankrupt()
+			events.append({"type": "bankrupt", "reason": "maturity"})
+			return events
+		add_gold(-remain)
+		events.append({"type": "loan_repaid", "amount": remain})
+		_clear_loan()
+	return events
+
 # ---------------- 黑市 ----------------
 
 ## 违禁品：id -> {名称, 价格, 说明}
@@ -1260,6 +1391,9 @@ func to_dict() -> Dictionary:
 		"island_tier": island_tier.duplicate(),
 		"port_registry": port_registry.duplicate(true),
 		"contraband": contraband.duplicate(),
+		"bank": {"deposit": bank_deposit, "principal": loan_principal, "weeks": loan_weeks,
+			"rate": loan_rate, "left": loan_weeks_left, "itotal": loan_interest_total,
+			"ipaid": loan_interest_paid, "month": loan_month_counter},
 		"license": {"has": has_privateer_license, "legal": license_is_legal},
 		"black_closed_week": black_closed_week,
 		"auctions": auctions.duplicate(true),
@@ -1341,6 +1475,15 @@ func from_dict(d: Dictionary) -> void:
 	var ups_d: Dictionary = d.get("island_upgrade_start", {})
 	for k in ups_d.keys():
 		island_upgrade_start[String(k)] = int(ups_d[k])
+	var bk: Dictionary = d.get("bank", {})
+	bank_deposit = int(bk.get("deposit", 0))
+	loan_principal = int(bk.get("principal", 0))
+	loan_weeks = int(bk.get("weeks", 0))
+	loan_rate = float(bk.get("rate", 0.0))
+	loan_weeks_left = int(bk.get("left", 0))
+	loan_interest_total = int(bk.get("itotal", 0))
+	loan_interest_paid = int(bk.get("ipaid", 0))
+	loan_month_counter = int(bk.get("month", 0))
 	contraband.clear()
 	var cb: Dictionary = d.get("contraband", {})
 	for k in cb.keys():
@@ -1524,6 +1667,8 @@ func reset_new_game() -> void:
 	island_upgrade_start.clear()
 	island_tier.clear()
 	port_registry.clear()
+	bank_deposit = 0
+	_clear_loan()
 	contraband.clear()
 	has_privateer_license = false
 	license_is_legal = false

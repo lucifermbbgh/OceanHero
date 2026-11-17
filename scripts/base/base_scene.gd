@@ -122,6 +122,9 @@ func _build_ui() -> void:
 		_action_button(vb, "交易所", _toggle_exchange)
 	if GameState.home_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
+	if GameState.home_port_tier >= 3:
+		_action_button(vb, "银行", _toggle_bank)
+		_action_button(vb, "黑市", _toggle_black)
 	_action_button(vb, _port_upgrade_label(), _do_upgrade_port)
 	_action_button(vb, "出航", _set_sail)
 	_action_button(vb, "存档", _toggle_save)
@@ -226,6 +229,38 @@ func _build_ui() -> void:
 	quest_list.add_theme_constant_override("separation", 5)
 	quest_list.custom_minimum_size = Vector2(710, 0)
 	qscroll.add_child(quest_list)
+
+	# 银行面板
+	bank_root = PanelContainer.new()
+	bank_root.position = Vector2(280, 80)
+	bank_root.custom_minimum_size = Vector2(760, 460)
+	bank_root.add_theme_stylebox_override("panel", _panel_style())
+	bank_root.visible = false
+	root.add_child(bank_root)
+	var bkscroll := ScrollContainer.new()
+	bkscroll.custom_minimum_size = Vector2(730, 420)
+	bkscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	bank_root.add_child(bkscroll)
+	bank_list = VBoxContainer.new()
+	bank_list.add_theme_constant_override("separation", 6)
+	bank_list.custom_minimum_size = Vector2(710, 0)
+	bkscroll.add_child(bank_list)
+
+	# 黑市面板
+	black_root = PanelContainer.new()
+	black_root.position = Vector2(280, 80)
+	black_root.custom_minimum_size = Vector2(760, 460)
+	black_root.add_theme_stylebox_override("panel", _panel_style())
+	black_root.visible = false
+	root.add_child(black_root)
+	var kscroll := ScrollContainer.new()
+	kscroll.custom_minimum_size = Vector2(730, 420)
+	kscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	black_root.add_child(kscroll)
+	black_list = VBoxContainer.new()
+	black_list.add_theme_constant_override("separation", 6)
+	black_list.custom_minimum_size = Vector2(710, 0)
+	kscroll.add_child(black_list)
 
 	# 存档面板
 	save_root = PanelContainer.new()
@@ -348,6 +383,10 @@ func _toggle_market() -> void:
 
 var market_target := "ship"   # ship = 装船，warehouse = 存仓
 var market_tab := "local"     # local = 本地市场，world = 世界市场
+var bank_root: PanelContainer = null
+var bank_list: VBoxContainer = null
+var black_root: PanelContainer = null
+var black_list: VBoxContainer = null
 
 func _toggle_market_target(t: String) -> void:
 	market_target = t
@@ -1324,6 +1363,170 @@ func _dismiss_crew(cid: StringName) -> void:
 	_rebuild_tavern()
 
 ## 升级按钮文案：满级显示当前等级，否则显示所需资源
+# ---------------- 银行（0.12） ----------------
+
+func _toggle_bank() -> void:
+	if bank_root.visible:
+		bank_root.visible = false
+		return
+	_rebuild_bank()
+	bank_root.visible = true
+
+func _rebuild_bank() -> void:
+	for c in bank_list.get_children():
+		c.queue_free()
+	_rebuild_bank_rows()
+
+func _rebuild_bank_rows() -> void:
+	_yard_title_to(bank_list, "银行 —— 现金 %d · 全城通存通取" % GameState.gold)
+	_yard_title_to(bank_list, "存款 %d（周息 0.1%%，每月结算）" % GameState.bank_deposited())
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	bank_list.add_child(hb)
+	for amt in [1000, 10000]:
+		var db := Button.new()
+		db.text = "存入 %d" % amt
+		db.custom_minimum_size = Vector2(110, 30)
+		db.disabled = GameState.gold < amt
+		var av: int = amt
+		db.pressed.connect(func(): _bank_deposit(av))
+		hb.add_child(db)
+	var wb := Button.new()
+	wb.text = "全部取出"
+	wb.custom_minimum_size = Vector2(110, 30)
+	wb.disabled = GameState.bank_deposited() <= 0
+	wb.pressed.connect(func(): _bank_withdraw_all())
+	hb.add_child(wb)
+
+	_yard_title_to(bank_list, "贷款（额度 = 存款额，当前可贷 %d）" % GameState.bank_credit())
+	if GameState.loan_active():
+		bank_list.add_child(_lbl("　已借 %d · 剩余 %d 周 · 下次付息 %d 金" % [
+			GameState.loan_principal, GameState.loan_weeks_left, GameState.loan_monthly_due()],
+			600, Color(0.9, 0.82, 0.45)))
+		var rb := Button.new()
+		rb.text = "提前还清"
+		rb.custom_minimum_size = Vector2(120, 30)
+		rb.pressed.connect(func(): _bank_repay())
+		bank_list.add_child(rb)
+	else:
+		var lb := HBoxContainer.new()
+		lb.add_theme_constant_override("separation", 8)
+		bank_list.add_child(lb)
+		var tiers := [[12, "一季 0.2%/周"], [26, "半年 0.3%/周"], [52, "一年 0.5%/周"]]
+		for t in tiers:
+			var weeks: int = int(t[0])
+			var bb := Button.new()
+			bb.text = "借 %s" % String(t[1])
+			bb.custom_minimum_size = Vector2(150, 30)
+			bb.disabled = GameState.bank_credit() <= 0
+			bb.pressed.connect(func(): _bank_borrow(weeks))
+			lb.add_child(bb)
+
+func _bank_deposit(amount: int) -> void:
+	if GameState.bank_deposit_gold(amount):
+		_log("存入 %d 金" % amount)
+		_rebuild_bank_rows()
+		_refresh()
+
+func _bank_withdraw_all() -> void:
+	var amt := GameState.bank_deposited()
+	if GameState.bank_withdraw(amt):
+		_log("取出 %d 金" % amt)
+		_rebuild_bank_rows()
+		_refresh()
+
+func _bank_borrow(weeks: int) -> void:
+	var r: Dictionary = GameState.bank_borrow(GameState.bank_credit(), weeks)
+	if bool(r.get("ok", false)):
+		_log("贷款到账，到期利息 %d" % int(r.get("interest", 0)))
+		_rebuild_bank_rows()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "贷款失败")))
+
+func _bank_repay() -> void:
+	var r: Dictionary = GameState.bank_repay()
+	if bool(r.get("ok", false)):
+		_log("已还清 %d 金" % int(r.get("paid", 0)))
+		_rebuild_bank_rows()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "还款失败")))
+
+# ---------------- 母港黑市（0.12） ----------------
+
+func _toggle_black() -> void:
+	if black_root.visible:
+		black_root.visible = false
+		return
+	_rebuild_black()
+	black_root.visible = true
+
+func _rebuild_black() -> void:
+	for c in black_list.get_children():
+		c.queue_free()
+	_yard_title_to(black_list, "黑市 —— 现金 %d · 通缉度 %d" % [GameState.gold, GameState.notoriety()])
+	if not GameState.black_market_open():
+		black_list.add_child(_lbl("　通缉度过高，黑市本周关闭", 500, Color(0.9, 0.5, 0.45)))
+		return
+	_yard_title_to(black_list, "销赃（合法价 60%）")
+	for cid in [&"grain", &"timber", &"rum", &"spice"]:
+		var have := int(GameState.cargo.get(cid, 0))
+		if have <= 0:
+			continue
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c == null:
+			continue
+		var legal := MarketModel.sell_price(int(c.base_price), 400, 400, 1.0)
+		var fprice := int(round(float(legal) * 0.60))
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 10)
+		black_list.add_child(hb)
+		hb.add_child(_lbl("%s × %d" % [String(c.display_name), have], 200))
+		hb.add_child(_lbl("销赃 %d/件" % fprice, 140, Color(0.9, 0.75, 0.5)))
+		var cidv: StringName = cid
+		var fb := Button.new()
+		fb.text = "销赃 10"
+		fb.custom_minimum_size = Vector2(90, 26)
+		fb.pressed.connect(func(): _black_fence(cidv, 10, legal))
+		hb.add_child(fb)
+
+	_yard_title_to(black_list, "违禁品")
+	for iid in GameState.CONTRABAND.keys():
+		var cdef: Dictionary = GameState.CONTRABAND[iid]
+		var ihb := HBoxContainer.new()
+		ihb.add_theme_constant_override("separation", 10)
+		black_list.add_child(ihb)
+		ihb.add_child(_lbl(String(cdef.get("name", "")), 160))
+		ihb.add_child(_lbl(String(cdef.get("desc", "")), 330, Color(0.78, 0.82, 0.72)))
+		ihb.add_child(_lbl("%d 金" % int(cdef.get("price", 0)), 100, Color(0.9, 0.82, 0.45)))
+		ihb.add_child(_lbl("持有 %d" % int(GameState.contraband.get(iid, 0)), 80, Color(0.7, 0.78, 0.7)))
+		var iidv: StringName = iid
+		var ib := Button.new()
+		ib.text = "购买"
+		ib.custom_minimum_size = Vector2(70, 26)
+		ib.disabled = GameState.gold < int(cdef.get("price", 0))
+		ib.pressed.connect(func(): _black_buy(iidv))
+		ihb.add_child(ib)
+
+func _black_fence(cid: StringName, amount: int, legal: int) -> void:
+	var r: Dictionary = GameState.fence_goods(cid, amount, legal)
+	if bool(r.get("ok", false)):
+		_log("销赃得 %d 金（通缉度 +2）" % int(r.get("gold", 0)))
+		_rebuild_black()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "销赃失败")))
+
+func _black_buy(iid: StringName) -> void:
+	var r: Dictionary = GameState.buy_contraband(iid)
+	if bool(r.get("ok", false)):
+		_log("购得违禁品（通缉度 +2）")
+		_rebuild_black()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "购买失败")))
+
 func _port_upgrade_label() -> String:
 	if GameState.home_upgrade_cost().is_empty():
 		return "港口已达最高级"

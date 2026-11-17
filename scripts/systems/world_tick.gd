@@ -28,6 +28,18 @@ func _on_week_advanced(week_index: int) -> void:
 		if GameState.notoriety() >= 80 and GameState.black_closed_week < week_index:
 			GameState.black_closed_week = week_index
 			EventBus.ticker.emit("通缉度过高，黑市本周关闭")
+		# 银行：存款计息 / 贷款还息 / 到期结算
+		var bevents: Array = GameState.bank_tick_week()
+		for be in bevents:
+			match String(be.get("type", "")):
+				"deposit_interest":
+					EventBus.ticker.emit("存款利息入账：+%d" % int(be.get("amount", 0)))
+				"loan_interest":
+					EventBus.ticker.emit("贷款付息：-%d" % int(be.get("amount", 0)))
+				"loan_repaid":
+					EventBus.ticker.emit("贷款到期已还清：-%d" % int(be.get("amount", 0)))
+				"bankrupt":
+					EventBus.ticker.emit("破产！存款与现金清零，海军声望归零")
 		GameState.refresh_auctions(week_index)
 		var aevents: Array = GameState.tick_auctions()
 		for ev in aevents:

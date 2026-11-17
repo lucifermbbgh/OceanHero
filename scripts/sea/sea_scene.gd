@@ -49,6 +49,7 @@ var outpost_pos := Vector2(3400, 5050)
 var cur_port_island := 0        # 当前停靠的岛屿索引
 var _port_tavern: Array = []    # 当前港口的招募候选
 var port_tab := "local"         # local = 本地市场，world = 世界市场
+var aggro_mult := 1.0           # 伪造旗帜：敌方索敌半径倍率
 var port_ui: CanvasLayer
 var port_panel: PanelContainer
 var port_list: VBoxContainer
@@ -107,6 +108,7 @@ func _ready() -> void:
 	var pd: Resource = DataRegistry.get_port(OUTPOST_ID)
 	if pd != null:
 		outpost_pos = _anchor_port_to_island(pd.position)
+	_apply_contraband_effects()
 	_spawn_map_contents()
 	_spawn_salvages()
 	_spawn_escort_if_needed()
@@ -132,6 +134,23 @@ func _on_islands_upgraded(keys: Array) -> void:
 		if port_panel.visible:
 			_rebuild_port()
 		queue_redraw()
+
+## 违禁品战斗效果：进海域时消耗对应物品
+func _apply_contraband_effects() -> void:
+	if int(GameState.contraband.get(&"forge_flag", 0)) > 0:
+		GameState.contraband[&"forge_flag"] = int(GameState.contraband[&"forge_flag"]) - 1
+		if int(GameState.contraband[&"forge_flag"]) <= 0:
+			GameState.contraband.erase(&"forge_flag")
+		aggro_mult = 0.5
+		hud.ticker("伪造旗帜生效：敌方索敌 −50%")
+	if int(GameState.contraband.get(&"stimulant", 0)) > 0:
+		GameState.contraband[&"stimulant"] = int(GameState.contraband[&"stimulant"]) - 1
+		if int(GameState.contraband[&"stimulant"]) <= 0:
+			GameState.contraband.erase(&"stimulant")
+		if player != null:
+			player.crew_max *= 1.2
+			player.crew_hp = player.crew_max
+		hud.ticker("违禁药物生效：船员上限 +20%")
 
 func _generate_islands() -> void:
 	islands.clear()
@@ -713,6 +732,50 @@ func _rebuild_port() -> void:
 				lb.pressed.connect(func(): _port_buy_license())
 				lhb2.add_child(lb)
 
+	# ---- 港口城市：银行 ----
+	if tier >= 3:
+		_p_title("银行（城市专属 · 全城通存通取）")
+		port_list.add_child(_p_lbl("　存款 %d（周息 0.1%%）· 现金 %d" % [
+			GameState.bank_deposited(), GameState.gold], 560, Color(0.8, 0.85, 0.7)))
+		var bkhb := HBoxContainer.new()
+		bkhb.add_theme_constant_override("separation", 8)
+		port_list.add_child(bkhb)
+		for amt in [1000, 10000]:
+			var db := Button.new()
+			db.text = "存 %d" % amt
+			db.custom_minimum_size = Vector2(90, 26)
+			db.disabled = GameState.gold < int(amt)
+			var av: int = int(amt)
+			db.pressed.connect(func(): _port_bank_deposit(av))
+			bkhb.add_child(db)
+		var wb := Button.new()
+		wb.text = "全取"
+		wb.custom_minimum_size = Vector2(70, 26)
+		wb.disabled = GameState.bank_deposited() <= 0
+		wb.pressed.connect(func(): _port_bank_withdraw())
+		bkhb.add_child(wb)
+		if GameState.loan_active():
+			port_list.add_child(_p_lbl("　贷款 %d · 剩 %d 周 · 下次付息 %d" % [
+				GameState.loan_principal, GameState.loan_weeks_left, GameState.loan_monthly_due()],
+				560, Color(0.9, 0.82, 0.45)))
+			var brb := Button.new()
+			brb.text = "提前还清"
+			brb.custom_minimum_size = Vector2(110, 26)
+			brb.pressed.connect(func(): _port_bank_repay())
+			port_list.add_child(brb)
+		else:
+			var lb2 := HBoxContainer.new()
+			lb2.add_theme_constant_override("separation", 8)
+			port_list.add_child(lb2)
+			for t in [[12, "一季 0.2%"], [26, "半年 0.3%"], [52, "一年 0.5%"]]:
+				var wk: int = int(t[0])
+				var bb2 := Button.new()
+				bb2.text = "借%s" % String(t[1])
+				bb2.custom_minimum_size = Vector2(120, 26)
+				bb2.disabled = GameState.bank_credit() <= 0
+				bb2.pressed.connect(func(): _port_bank_borrow(wk))
+				lb2.add_child(bb2)
+
 	# ---- 港口城市：交易所 / 声望 ----
 	if GameState.port_service_unlocked(tier, "exchange"):
 		_p_title("交易所（城市开放）")
@@ -893,6 +956,36 @@ func _random_npc_cargo() -> Dictionary:
 		var cid: StringName = pool[RngService.randi_range(0, pool.size() - 1)]
 		out[cid] = int(out.get(cid, 0)) + RngService.randi_range(3, 8 + map_index * 2)
 	return out
+
+## 银行操作
+func _port_bank_deposit(amount: int) -> void:
+	if GameState.bank_deposit_gold(amount):
+		hud.ticker("存入 %d 金" % amount)
+		_rebuild_port()
+	else:
+		hud.ticker("金币不足")
+
+func _port_bank_withdraw() -> void:
+	var amt := GameState.bank_deposited()
+	if GameState.bank_withdraw(amt):
+		hud.ticker("取出 %d 金" % amt)
+		_rebuild_port()
+
+func _port_bank_borrow(weeks: int) -> void:
+	var r: Dictionary = GameState.bank_borrow(GameState.bank_credit(), weeks)
+	if bool(r.get("ok", false)):
+		hud.ticker("贷款到账，到期利息 %d" % int(r.get("interest", 0)))
+		_rebuild_port()
+	else:
+		hud.ticker(String(r.get("reason", "贷款失败")))
+
+func _port_bank_repay() -> void:
+	var r: Dictionary = GameState.bank_repay()
+	if bool(r.get("ok", false)):
+		hud.ticker("已还清 %d 金" % int(r.get("paid", 0)))
+		_rebuild_port()
+	else:
+		hud.ticker(String(r.get("reason", "还款失败")))
 
 ## 黑市销赃
 func _port_fence(cid: StringName, amount: int, legal_sell: int) -> void:
@@ -1312,6 +1405,14 @@ func _update_bounty_hunters(delta: float) -> void:
 	hunter_timer -= delta
 	if hunter_timer > 0.0:
 		return
+	# 伪造通行证：本次免检，消耗一个
+	if int(GameState.contraband.get(&"forge_pass", 0)) > 0:
+		GameState.contraband[&"forge_pass"] = int(GameState.contraband[&"forge_pass"]) - 1
+		if int(GameState.contraband[&"forge_pass"]) <= 0:
+			GameState.contraband.erase(&"forge_pass")
+		hunter_timer = 45.0
+		hud.ticker("伪造通行证生效：本次免于海军盘查")
+		return
 	hunter_timer = 45.0
 	if not GameState.bounty_active():
 		return
@@ -1576,7 +1677,7 @@ func _faction_ai(delta: float) -> void:
 		if fac == "merchant":
 			continue
 		var best = null
-		var best_d := 1100.0
+		var best_d := 1100.0 * aggro_mult
 		for o in units:
 			if o == e:
 				continue
