@@ -38,6 +38,8 @@ func _ready() -> void:
 	_build_scenery()
 	_build_camera()
 	_build_ui()
+	_build_close_button()
+	_apply_fullscreen_layout()
 	_sync_ship_state()
 	if not EventBus.gold_changed.is_connected(_on_gold_changed):
 		EventBus.gold_changed.connect(_on_gold_changed)
@@ -406,8 +408,8 @@ func _do_repair() -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE and market_root != null and market_root.visible:
-			market_root.visible = false
+		if event.keycode == KEY_ESCAPE and _any_panel_open():
+			_close_all_panels()
 			get_viewport().set_input_as_handled()
 
 func _toggle_market() -> void:
@@ -920,15 +922,10 @@ func _toggle_yard() -> void:
 # ---------------- 声望 / 战功 / 帮助 / 通关 ----------------
 
 func _close_all_panels() -> void:
-	market_root.visible = false
-	yard_root.visible = false
-	tavern_root.visible = false
-	build_root.visible = false
-	ex_root.visible = false
-	quest_root.visible = false
-	save_root.visible = false
-	rep_root.visible = false
-	help_root.visible = false
+	for pname in FULL_PANELS:
+		var p: Node = get(pname)
+		if p != null and p is PanelContainer:
+			p.visible = false
 
 func _toggle_rep() -> void:
 	if rep_root.visible:
@@ -1609,55 +1606,125 @@ func _toggle_overview() -> void:
 func _rebuild_overview() -> void:
 	for c in overview_list.get_children():
 		c.queue_free()
-	var fleet_v := 0
-	for sh in GameState.ships_owned:
-		if sh is Resource and sh.get("price") != null:
-			fleet_v += int(sh.get("price"))
 	var cargo_v := 0
 	for cid in GameState.cargo.keys():
 		var c: Resource = DataRegistry.get_commodity(cid)
 		if c != null:
 			cargo_v += int(c.base_price) * int(GameState.cargo[cid])
-	var assets := GameState.gold + GameState.bank_deposited() + fleet_v + cargo_v
+	var wh_v := 0
+	for cid2 in GameState.warehouse.keys():
+		var c2: Resource = DataRegistry.get_commodity(cid2)
+		if c2 != null:
+			wh_v += int(c2.base_price) * int(GameState.warehouse[cid2])
+	var gear_v := 0
+	for g in GameState.gear_owned:
+		var gd: Resource = DataRegistry.get_gear(g)
+		if gd != null:
+			gear_v += int(gd.price)
+	var ship_v := 0
+	for sh in GameState.ships_owned:
+		if sh is Resource and sh.get("price") != null:
+			ship_v += int(sh.get("price"))
+	var stock_total := cargo_v + wh_v + gear_v + ship_v
 	var debt := GameState.loan_exposure()
-	_yard_title_to(overview_list, "经济总览")
-	overview_list.add_child(_lbl("　现金 %d ｜ 存款 %d ｜ 未还贷款 %d" % [
-		GameState.gold, GameState.bank_deposited(), debt], 700, Color(0.8, 0.85, 0.8)))
-	overview_list.add_child(_lbl("　船队 %d ｜ 库存 %d ｜ 资产 %d ｜ 净资产 %d" % [
-		fleet_v, cargo_v, assets, assets - debt], 700, Color(0.8, 0.85, 0.8)))
+	var net_worth := GameState.gold + GameState.bank_deposited() + stock_total - debt
+	_yard_title_to(overview_list, "一、年度经济信息")
+	overview_list.add_child(_lbl("　现金 %d ｜ 存款 %d ｜ 库存 %d ｜ 贷款 %d" % [
+		GameState.gold, GameState.bank_deposited(), stock_total, debt], 780, Color(0.8, 0.86, 0.82)))
+	overview_list.add_child(_lbl("　净资产 %d（现金 + 存款 + 库存 − 贷款）" % net_worth,
+		780, Color(0.95, 0.9, 0.5)))
+	overview_list.add_child(_lbl("　　构成：船舱 %d ＋ 仓库 %d ＋ 装备 %d ＋ 船只 %d（船员不计入）" % [
+		cargo_v, wh_v, gear_v, ship_v], 780, Color(0.66, 0.72, 0.7)))
 
 	var s: Dictionary = GameState.finance_summary()
-	_yard_title_to(overview_list, "本年度收支")
-	var inc_parts: Array = []
-	for k in s["income"].keys():
-		inc_parts.append("%s %d" % [String(k), int(s["income"][k])])
-	var exp_parts: Array = []
-	for k in s["expense"].keys():
-		exp_parts.append("%s %d" % [String(k), int(s["expense"][k])])
-	overview_list.add_child(_lbl("　收入 %d（%s）" % [int(s["income_total"]),
-		" / ".join(inc_parts) if not inc_parts.is_empty() else "无"], 700, Color(0.55, 0.85, 0.6)))
-	overview_list.add_child(_lbl("　支出 %d（%s）" % [int(s["expense_total"]),
-		" / ".join(exp_parts) if not exp_parts.is_empty() else "无"], 700, Color(0.9, 0.6, 0.55)))
-	var net := int(s["net"])
-	overview_list.add_child(_lbl("　净利 %+d" % net, 700,
-		Color(0.92, 0.45, 0.42) if net >= 0 else Color(0.45, 0.85, 0.55)))
-
-	_yard_title_to(overview_list, "各港投资")
-	var inv_parts: Array = []
+	_yard_title_to(overview_list, "二、营收信息（年资产负债表）")
+	overview_list.add_child(_lbl("　年收入 %d ｜ 年支出 %d ｜ 年利润 %+d" % [
+		int(s["income_total"]), int(s["expense_total"]), int(s["net"])], 780,
+		Color(0.92, 0.45, 0.42) if int(s["net"]) >= 0 else Color(0.45, 0.85, 0.55)))
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	overview_list.add_child(head)
+	for spec in [["港口", 200], ["位置", 120], ["投资额", 120], ["分红额", 120]]:
+		head.add_child(_cell(String(spec[0]), int(spec[1]), Color(0.62, 0.72, 0.78)))
+	var any_inv := false
 	for k in GameState.island_investment.keys():
 		var v := int(GameState.island_investment[k])
-		if v > 0:
-			inv_parts.append("%s %d" % [String(k), v])
-	overview_list.add_child(_lbl("　" + ("　｜　".join(inv_parts) if not inv_parts.is_empty() else "尚无投资"),
-		700, Color(0.78, 0.84, 0.8)))
+		if v <= 0:
+			continue
+		any_inv = true
+		var meta: Dictionary = GameState.port_registry.get(String(k), {})
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		overview_list.add_child(row)
+		row.add_child(_cell(String(meta.get("name", String(k))), 200))
+		row.add_child(_cell("第 %d 图" % int(meta.get("map", 0)), 120))
+		row.add_child(_cell(str(v), 120))
+		row.add_child(_cell("0", 120, Color(0.7, 0.75, 0.7)))
+	if not any_inv:
+		overview_list.add_child(_lbl("　（尚无港口投资）", 400, Color(0.55, 0.6, 0.6)))
 
-	_yard_title_to(overview_list, "历史财报（最近 5 年）")
+	var up: Dictionary = GameState.weekly_upkeep()
+	_yard_title_to(overview_list, "三、本周财务状况（周利润表）")
+	overview_list.add_child(_lbl("　本周支出 %d：船体 %d ｜ 停泊 %d ｜ 船员 %d ｜ 火炮 %d" % [
+		int(up.get("total", 0)), int(up.get("hull", 0)), int(up.get("berth", 0)),
+		int(up.get("crew", 0)), int(up.get("cannon", 0))], 780, Color(0.9, 0.62, 0.55)))
+	var inc_parts: Array = []
+	for k2 in s["income"].keys():
+		inc_parts.append("%s %d" % [String(k2), int(s["income"][k2])])
+	var exp_parts: Array = []
+	for k3 in s["expense"].keys():
+		exp_parts.append("%s %d" % [String(k3), int(s["expense"][k3])])
+	overview_list.add_child(_lbl("　本年收入：%s" % ("　".join(inc_parts) if not inc_parts.is_empty() else "无"),
+		780, Color(0.6, 0.85, 0.65)))
+	overview_list.add_child(_lbl("　本年支出：%s" % ("　".join(exp_parts) if not exp_parts.is_empty() else "无"),
+		780, Color(0.88, 0.62, 0.55)))
+
+	_yard_title_to(overview_list, "四、历史财报（仅上一年）")
 	if GameState.reports.is_empty():
 		overview_list.add_child(_lbl("　（还没有跨年，暂无财报）", 500, Color(0.55, 0.6, 0.6)))
-	for r in GameState.reports:
-		overview_list.add_child(_lbl("　第 %d 年：收入 %d · 支出 %d · 净利 %+d · 净资产 %d" % [
-			int(r.get("year", 0)), int(r.get("income_total", 0)), int(r.get("expense_total", 0)),
-			int(r.get("net", 0)), int(r.get("net_worth", 0))], 700, Color(0.8, 0.85, 0.8)))
+	else:
+		var r0: Dictionary = GameState.reports[GameState.reports.size() - 1]
+		overview_list.add_child(_lbl("　第 %d 年：收入 %d ｜ 支出 %d ｜ 利润 %+d ｜ 净资产 %d" % [
+			int(r0.get("year", 0)), int(r0.get("income_total", 0)), int(r0.get("expense_total", 0)),
+			int(r0.get("net", 0)), int(r0.get("net_worth", 0))], 780, Color(0.82, 0.86, 0.8)))
+
+# ---------------- 面板统一规范（0.19） ----------------
+
+const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root", "ex_root",
+	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
+	"save_root", "rep_root", "help_root", "victory_root"]
+
+var close_btn: Button = null
+
+func _apply_fullscreen_layout() -> void:
+	for pname in FULL_PANELS:
+		var p: Node = get(pname)
+		if p == null or not (p is PanelContainer):
+			continue
+		p.position = Vector2(16, 72)
+		p.custom_minimum_size = Vector2(1568, 812)
+		p.size = Vector2(1568, 812)
+
+func _any_panel_open() -> bool:
+	for pname in FULL_PANELS:
+		var p: Node = get(pname)
+		if p != null and p is PanelContainer and p.visible:
+			return true
+	return false
+
+func _sync_close_btn() -> void:
+	if close_btn == null:
+		return
+	close_btn.visible = _any_panel_open()
+
+func _build_close_button() -> void:
+	close_btn = Button.new()
+	close_btn.text = "✕"
+	close_btn.custom_minimum_size = Vector2(40, 34)
+	close_btn.position = Vector2(1540, 78)
+	close_btn.visible = false
+	close_btn.pressed.connect(_close_all_panels)
+	add_child(close_btn)
 
 # ---------------- 财政（0.15） ----------------
 
@@ -2340,6 +2407,7 @@ func _load_slot(slot: int) -> void:
 	_log("已读取存档位 %d" % slot)
 
 func _process(delta: float) -> void:
+	_sync_close_btn()
 	if _log_timer > 0.0:
 		_log_timer -= delta
 		if _log_timer <= 0.0:

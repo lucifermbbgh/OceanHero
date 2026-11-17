@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_ui_panels_v019()
 	await _test_finance_v018()
 	await _test_cost_scale_v015()
 	await _test_decision_aid_v014()
@@ -635,6 +636,34 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 面板规范（0.19.0） ----------------
+func _test_ui_panels_v019() -> void:
+	print("\n[面板规范]")
+	GameState.reset_new_game()
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	_ok(s.close_btn != null, "存在统一关闭按钮")
+	_ok(not s._any_panel_open(), "初始没有面板打开")
+	_ok(not s.close_btn.visible, "无面板时关闭按钮隐藏")
+	var p = s.get("overview_root")
+	_ok(p != null and p.size.x >= 1400.0, "经济总览已全屏", str(p.size) if p != null else "null")
+	p.visible = true
+	await _frames(2)
+	_ok(s._any_panel_open(), "面板打开被识别")
+	_ok(s.close_btn.visible, "面板打开时关闭按钮出现")
+	s._close_all_panels()
+	await _frames(2)
+	_ok(not s.close_btn.visible, "关闭后按钮隐藏")
+	# 财报只保留一年
+	GameState.reports.clear()
+	GameState.make_annual_report(1)
+	GameState.make_annual_report(2)
+	_ok(GameState.reports.size() == 1, "历史财报只保留 1 年", str(GameState.reports.size()))
+	_ok(int(GameState.reports[0].get("year", 0)) == 2, "保留的是最新年份")
+	s.queue_free()
+	await _frames(2)
+
 # ---------------- 差别定价 / 生产 / 财务（0.16~0.18） ----------------
 func _test_finance_v018() -> void:
 	print("\n[差别定价与财务]")
@@ -678,7 +707,7 @@ func _test_finance_v018() -> void:
 	# 最多保留 5 年
 	for y in range(2, 9):
 		GameState.make_annual_report(y)
-	_ok(GameState.reports.size() == 5, "只保留最近 5 年", str(GameState.reports.size()))
+	_ok(GameState.reports.size() == 1, "历史财报只保留上一年", str(GameState.reports.size()))
 
 # ---------------- 成本与规模（0.15.0） ----------------
 func _test_cost_scale_v015() -> void:

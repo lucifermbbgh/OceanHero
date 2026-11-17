@@ -873,9 +873,8 @@ func make_annual_report(year: int) -> Dictionary:
 		"assets": assets + fleet_value + cargo_value,
 		"net_worth": assets + fleet_value + cargo_value - debt,
 	}
+	reports.clear()
 	reports.append(rep_dict)
-	while reports.size() > 5:
-		reports.pop_front()
 	report_year = year
 	_fin_year_reset()
 	return rep_dict
@@ -1672,6 +1671,11 @@ func to_dict() -> Dictionary:
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
 		"market": {"drift": price_drift.duplicate(), "events": market_events.duplicate(true),
 			"history": price_history.duplicate(true)},
+		"fin": {"reports": reports.duplicate(true), "year": report_year,
+			"purchases": finance.get("purchases", {}).duplicate(true),
+			"sales": finance.get("sales", {}).duplicate(true),
+			"income": finance.get("income", {}).duplicate(true),
+			"expense": finance.get("expense", {}).duplicate(true)},
 		"license": {"has": has_privateer_license, "legal": license_is_legal},
 		"black_closed_week": black_closed_week,
 		"auctions": auctions.duplicate(true),
@@ -1761,6 +1765,15 @@ func from_dict(d: Dictionary) -> void:
 	market_events.clear()
 	for e0 in mk.get("events", []):
 		market_events.append(e0)
+	reports.clear()
+	var fin: Dictionary = d.get("fin", {})
+	for r0 in fin.get("reports", []):
+		reports.append(r0)
+	report_year = int(fin.get("year", 0))
+	finance = {"purchases": fin.get("purchases", {}).duplicate(true),
+		"sales": fin.get("sales", {}).duplicate(true),
+		"income": fin.get("income", {}).duplicate(true),
+		"expense": fin.get("expense", {}).duplicate(true)}
 	price_history.clear()
 	var hist_d: Dictionary = mk.get("history", {})
 	for k in hist_d.keys():
