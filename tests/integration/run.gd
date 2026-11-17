@@ -671,8 +671,17 @@ func _test_ui_panels_v019() -> void:
 	s._close_goods()
 	await _frames(2)
 	_ok(not s.goods_root.visible, "商品弹窗可关闭")
+	# ESC 优先关闭商品弹窗
+	s._open_goods(&"grain")
+	await _frames(2)
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_ESCAPE
+	ev.pressed = true
+	s._input(ev)
+	await _frames(2)
+	_ok(not s.goods_root.visible, "ESC 先关闭商品弹窗")
 	var cd: Dictionary = s._chart_data(&"grain", 10, 200, 400)
-	_ok(cd.has("history") and cd.has("mc") and cd.has("supply") and cd.has("perf") == false,
+	_ok(cd.has("history") and cd.has("mc") and cd.has("price_by_stock") and cd.has("curve"),
 		"图表数据齐全", str(cd.keys()))
 	_ok(int(GameState.reports[0].get("year", 0)) == 2, "保留的是最新年份")
 	s.queue_free()

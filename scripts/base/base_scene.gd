@@ -124,7 +124,7 @@ func _build_ui() -> void:
 		_action_button(vb, "交易所", _toggle_exchange)
 	if GameState.home_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
-	_action_button(vb, "财政", _toggle_finance)
+
 	_action_button(vb, "经济总览", _toggle_overview)
 	if GameState.home_port_tier >= 3:
 		_action_button(vb, "银行", _toggle_bank)
@@ -424,9 +424,14 @@ func _do_repair() -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE and _any_panel_open():
-			_close_all_panels()
-			get_viewport().set_input_as_handled()
+		if event.keycode == KEY_ESCAPE:
+			if goods_root != null and goods_root.visible:
+				goods_root.visible = false
+				get_viewport().set_input_as_handled()
+				return
+			if _any_panel_open():
+				_close_all_panels()
+				get_viewport().set_input_as_handled()
 
 func _toggle_market() -> void:
 	if market_root.visible:
@@ -515,15 +520,9 @@ func _rebuild_market() -> void:
 	var head_row := HBoxContainer.new()
 	head_row.add_theme_constant_override("separation", 8)
 	market_list.add_child(head_row)
-	for spec in [["商品", 100], ["买价", 80], ["卖价", 80], ["周涨跌", 100], ["8 周走势", 120],
-			["库存", 90], ["船上", 70], ["仓库", 70], ["操作", 140]]:
-		var hl := Label.new()
-		hl.text = String(spec[0])
-		hl.custom_minimum_size = Vector2(int(spec[1]), 0)
-		hl.add_theme_font_size_override("font_size", 13)
-		hl.add_theme_color_override("font_color", Color(0.62, 0.72, 0.78))
-		head_row.add_child(hl)
-	market_list.add_child(HSeparator.new())
+	for spec in [["商品", 150], ["买价", 120], ["卖价", 120], ["周涨跌", 160],
+			["库存", 130], ["船上", 120], ["仓库", 120], ["操作", 220]]:
+		head_row.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
 
 	for id in [&"grain", &"timber", &"rum", &"spice"]:
 		var c: Resource = DataRegistry.get_commodity(id)
@@ -552,9 +551,9 @@ func _rebuild_market() -> void:
 		market_list.add_child(row)
 		var have := int(GameState.cargo.get(id, 0))
 		var in_wh := int(GameState.warehouse.get(id, 0))
-		row.add_child(_cell(c.display_name, 90))
-		row.add_child(_cell(str(bp), 70))
-		row.add_child(_cell(str(sp), 70))
+		row.add_child(_cell_box(c.display_name, 150))
+		row.add_child(_cell_box(str(bp), 120))
+		row.add_child(_cell_box(str(sp), 120))
 		var chg_text := "—"
 		var chg_col := Color(0.55, 0.6, 0.6)
 		if GameState.has_price_history(String(PORT_ID), id):
@@ -568,20 +567,31 @@ func _rebuild_market() -> void:
 				# 下跌用绿色
 				chg_text = "↓%d%%" % int(round(chg * 100.0))
 				chg_col = Color(0.45, 0.85, 0.55)
-		row.add_child(_cell(chg_text, 90, chg_col))
-		var spark: Control = load("res://scripts/ui/sparkline.gd").new()
-		var hist: Array = GameState.price_history_of(String(PORT_ID), id)
-		spark.set_values(hist, Color(0.92, 0.45, 0.42) if chg > 0.0 else Color(0.45, 0.85, 0.55))
-		row.add_child(spark)
-		row.add_child(_cell(str(stock), 80))
-		row.add_child(_cell(str(have), 60))
-		row.add_child(_cell(str(in_wh), 60))
+		row.add_child(_cell_box(chg_text, 160, chg_col))
+		row.add_child(_cell_box(str(stock), 130))
+		row.add_child(_cell_box(str(have), 120))
+		row.add_child(_cell_box(str(in_wh), 120))
+		var trade_box := PanelContainer.new()
+		var tsb := StyleBoxFlat.new()
+		tsb.bg_color = Color(0.09, 0.12, 0.13)
+		tsb.border_width_left = 1
+		tsb.border_width_right = 1
+		tsb.border_width_top = 1
+		tsb.border_width_bottom = 1
+		tsb.border_color = Color(0.28, 0.36, 0.38)
+		tsb.content_margin_left = 10
+		tsb.content_margin_right = 10
+		tsb.content_margin_top = 3
+		tsb.content_margin_bottom = 3
+		trade_box.add_theme_stylebox_override("panel", tsb)
+		trade_box.custom_minimum_size = Vector2(220, 30)
 		var b_trade := Button.new()
 		b_trade.text = "交易"
-		b_trade.custom_minimum_size = Vector2(90, 32)
+		b_trade.custom_minimum_size = Vector2(120, 26)
 		var cid_t: StringName = id
 		b_trade.pressed.connect(func(): _open_goods(cid_t))
-		row.add_child(b_trade)
+		trade_box.add_child(b_trade)
+		row.add_child(trade_box)
 	_add_market_metrics(String(PORT_ID))
 
 	# 船上货舱汇总：买的东西到底装在哪儿
@@ -716,6 +726,30 @@ func _rebuild_events_tab() -> void:
 		hb.add_child(_cell("全部" if tgt == "" else tgt, 110))
 		hb.add_child(_cell(String(e.get("desc", "")), 260, Color(0.8, 0.85, 0.7)))
 		hb.add_child(_cell("剩 %d 周" % int(e.get("weeks", 0)), 100))
+
+## 带边框的表格单元格
+func _cell_box(text: String, width: int, col: Color = Color(0.86, 0.88, 0.86),
+		header: bool = false) -> PanelContainer:
+	var pc := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.14, 0.18, 0.19) if header else Color(0.09, 0.12, 0.13)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.border_color = Color(0.28, 0.36, 0.38)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 6
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	pc.add_theme_stylebox_override("panel", sb)
+	pc.custom_minimum_size = Vector2(width, 30)
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 14)
+	l.add_theme_color_override("font_color", col)
+	pc.add_child(l)
+	return pc
 
 ## 表格单元格
 func _cell(text: String, width: int, col: Color = Color(0.86, 0.88, 0.86)) -> Label:
@@ -898,8 +932,16 @@ func _sell(cid: StringName, amount: int, price: int) -> void:
 	else:
 		GameState.remove_cargo(cid, amount)
 	GameState.set_stock(PORT_ID, cid, stock + amount)
-	GameState.add_gold(price * amount)
-	var margin := maxi(0, price * amount - int(c.base_price) * amount)
+	# 关税：在非母港卖出按 5% 扣除
+	var gross := price * amount
+	var tax := 0
+	if String(PORT_ID) != "jadehaven":
+		tax = int(round(float(gross) * 0.05))
+		GameState.record_expense("关税", tax)
+	GameState.add_gold(gross - tax)
+	if tax > 0:
+		_log("关税 %d（5%%）" % tax)
+	var margin := maxi(0, gross - int(c.base_price) * amount)
 	GameState.on_trade_profit(margin)
 	_log("卖出 %d %s，得到 %d 金（利润 %d）" % [amount, c.display_name, price * amount, margin])
 	_rebuild_market()
@@ -1696,7 +1738,7 @@ var goods_qty := 1
 var goods_chart_index := 0
 var goods_chart: Control = null
 var goods_qty_edit: LineEdit = null
-const CHART_NAMES := ["价格走势", "边际分析", "均衡价格", "价格弹性", "港口规模"]
+const CHART_NAMES := ["价格走势", "边际分析", "价格与库存", "弹性价格", "规模经济"]
 
 func _open_goods(cid: StringName) -> void:
 	goods_cid = cid
@@ -1746,25 +1788,49 @@ func _rebuild_goods() -> void:
 	goods_list.add_child(goods_chart)
 	goods_chart.setup(goods_chart_index, _chart_data(goods_cid, int(c.base_price), stock, max_stock), "")
 
-	# 指标明细
-	_yard_title_to(goods_list, "指标明细")
-	var hist: Array = GameState.price_history_of(String(PORT_ID), goods_cid)
+	# 指标明细表（大指标 → 明细，每项一行并带计算式）
 	var em0 = load("res://scripts/systems/econ_math.gd")
-	var e: float = float(em0.piecewise_elasticity(float(stock) / float(max_stock)))
-	var eq: float = float(c.base_price) * (1.0 + e * (1.0 - float(stock) / float(max_stock)))
-	var cur: float = float(bp)
+	var ratio: float = clampf(float(stock) / maxf(1.0, float(max_stock)), 0.0, 1.0)
+	var e: float = float(em0.piecewise_elasticity(ratio))
+	var eq: float = float(c.base_price) * (1.0 + e * (1.0 - ratio))
+	var cur: float = eq * GameState.price_drift_of(String(PORT_ID), goods_cid)
 	var dev: float = (cur - eq) / maxf(0.01, eq)
 	var step_v: float = (eq - cur) * 0.25
+	var opp: int = int(round(float(bp * goods_qty) * 0.001 * 8.0))
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	goods_list.add_child(head)
+	head.add_child(_cell_box("指标", 190, Color(0.62, 0.78, 0.85), true))
+	head.add_child(_cell_box("计算结果", 240, Color(0.62, 0.78, 0.85), true))
+	head.add_child(_cell_box("计算过程 / 说明", 900, Color(0.62, 0.78, 0.85), true))
 	var etype := "富有弹性" if e >= 0.70 else ("单位弹性附近" if e >= 0.40 else "缺乏弹性")
-	goods_list.add_child(_lbl("　供给弹性 %.2f（%s）　库存 %d/%d" % [e, etype, stock, max_stock],
-		700, Color(0.78, 0.85, 0.8)))
-	goods_list.add_child(_lbl("　均衡价 %.1f　当前 %.1f　偏离 %+.1f%%　本周回归步长 %+.2f" % [
-		eq, cur, dev * 100.0, step_v], 700, Color(0.78, 0.85, 0.8)))
-	goods_list.add_child(_lbl("　声望折扣 %d%%（%s）　关税 5%%（跨海域贸易）" % [
-		int(GameState.rep_discount() * 100.0), GameState.rep_discount_name()], 700, Color(0.78, 0.85, 0.8)))
-	var opp := int(round(float(bp * goods_qty) * 0.001 * 8.0))
-	goods_list.add_child(_lbl("　本次成本：采购 %d　机会成本 %d　合计 %d" % [
-		bp * goods_qty, opp, bp * goods_qty + opp], 700, Color(0.9, 0.75, 0.55)))
+	var rows: Array = [
+		["【弹性】供给弹性", "%.2f（%s）" % [e, etype],
+			"库存比例 %.2f → 分段函数(%s) = %.2f" % [ratio,
+				"高库存" if ratio > 0.7 else ("低库存" if ratio < 0.3 else "中库存"), e]],
+		["【均衡】均衡价", "%.1f" % eq,
+			"基础价 %d × (1 + %.2f × (1 − %.2f)) = %.1f" % [int(c.base_price), e, ratio, eq]],
+		["【均衡】当前价", "%.1f" % cur, "均衡价 %.1f × 漂移 %.3f = %.1f" % [
+			eq, GameState.price_drift_of(String(PORT_ID), goods_cid), cur]],
+		["【均衡】偏离度", "%+.1f%%" % (dev * 100.0), "(当前价 − 均衡价) ÷ 均衡价"],
+		["【均衡】本周回归步长", "%+.2f" % step_v, "(均衡价 − 当前价) × 25%"],
+		["【边际】买价 MC", "%d" % bp, "第 1 件买价（含声望折扣 %d%%）" % int(GameState.rep_discount() * 100.0)],
+		["【边际】卖出价 MR", "%d" % sp, "本港卖出价（含卖出加成）"],
+		["【边际】单件边际利润", "%+d" % (sp - bp), "MR − MC"],
+		["【成本】本次采购", "%d" % (bp * goods_qty), "%d 件 × %d" % [goods_qty, bp]],
+		["【成本】机会成本", "%d" % opp, "采购额 × 0.1%%/周 × 8 周"],
+		["【成本】合计", "%d" % (bp * goods_qty + opp), "采购 + 机会成本"],
+		["【定价】声望折扣", "%d%%（%s）" % [int(GameState.rep_discount() * 100.0), GameState.rep_discount_name()],
+			"按最高阵营声望分档，只作用于买价"],
+		["【税收】关税", "5%%（跨海域）", "卖出所得扣除，同海域不扣"],
+	]
+	for rw in rows:
+		var hr := HBoxContainer.new()
+		hr.add_theme_constant_override("separation", 0)
+		goods_list.add_child(hr)
+		hr.add_child(_cell_box(String(rw[0]), 190))
+		hr.add_child(_cell_box(String(rw[1]), 240, Color(0.95, 0.9, 0.55)))
+		hr.add_child(_cell_box(String(rw[2]), 900, Color(0.7, 0.78, 0.72)))
 
 	# 数量控件
 	var qrow := HBoxContainer.new()
@@ -1851,15 +1917,16 @@ func _chart_data(cid: StringName, base_price: int, stock: int, max_stock: int) -
 		var r := clampf(float(s) / float(max_stock), 0.0, 1.0)
 		mc.append(float(base_price) * (1.0 + em.piecewise_elasticity(r) * (1.0 - r)))
 	d["mc"] = mc
-	d["mr"] = float(base_price) * 1.6
-	var supply: Array = []
-	var demand: Array = []
+	d["mr"] = float(MarketModel.sell_price(base_price, stock, max_stock, 1.0))
+	# 价格-库存曲线：横轴库存量，纵轴买价
+	var price_by_stock: Array = []
 	for i in range(0, 41):
-		var q := float(i) / 40.0
-		supply.append(float(base_price) * (1.0 + 0.55 * (1.0 - q)))
-		demand.append(float(base_price) * 1.5 / (1.0 + 0.55 * q))
-	d["supply"] = supply
-	d["demand"] = demand
+		var st2 := int(float(max_stock) * float(i) / 40.0)
+		price_by_stock.append(float(base_price) * (1.0 + 0.55 * (1.0 - float(i) / 40.0)))
+	d["price_by_stock"] = price_by_stock
+	d["cur_stock"] = stock
+	d["max_stock"] = max_stock
+	d["eq_price"] = float(base_price) * (1.0 + 0.55 * (1.0 - clampf(float(stock) / float(max_stock), 0.0, 1.0)))
 	var curve: Array = []
 	for i in range(0, 41):
 		var qq := 0.05 + float(i) / 40.0 * 2.0
