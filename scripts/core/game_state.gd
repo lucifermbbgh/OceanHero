@@ -761,6 +761,32 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 成本结构（0.15） ----------------
+
+## 每周维护费明细：{hull, berth, crew, cannon, total, fixed, variable}
+func weekly_upkeep() -> Dictionary:
+	var hull := 0
+	for s in ships_owned:
+		var p := 5000.0
+		if s is Resource and s.get("price") != null:
+			p = float(s.get("price"))
+		hull += int(round(p * 0.02))
+	var berth := 0
+	match home_port_tier:
+		1: berth = 5
+		2: berth = 15
+		3: berth = 40
+	var crew := assigned_wages()
+	var cannon := 0
+	for g in gear_owned:
+		var gd: Resource = DataRegistry.get_gear(g)
+		if gd != null and String(gd.get("slot")) == "cannon":
+			cannon += 8
+	var fixed := hull + berth
+	var variable := crew + cannon
+	return {"hull": hull, "berth": berth, "crew": crew, "cannon": cannon,
+		"fixed": fixed, "variable": variable, "total": fixed + variable}
+
 # ---------------- 价格漂移与市场事件（0.13） ----------------
 
 const EconMath = preload("res://scripts/systems/econ_math.gd")
@@ -1251,8 +1277,19 @@ func island_level(key: String) -> int:
 			lv = i + 1
 	return clampi(lv, 1, 5)
 
+## 投资折扣：连续曲线，150,000 处达到上限 50%
+const INVEST_CAP := 150000.0
+const INVEST_K := 1.6
+const INVEST_MAX_DISCOUNT := 50.0
+
 func island_discount(key: String) -> int:
-	return int(ISLAND_DISCOUNTS[island_level(key) - 1])
+	var invested := float(int(island_investment.get(key, 0)))
+	return int(round(EconMath.diminishing_discount(invested, INVEST_CAP, INVEST_MAX_DISCOUNT, INVEST_K)))
+
+## 边际回报（百分比/千金）
+func island_marginal_discount(key: String) -> float:
+	var invested := float(int(island_investment.get(key, 0)))
+	return EconMath.marginal_discount(invested, INVEST_CAP, INVEST_MAX_DISCOUNT, INVEST_K, 1000.0)
 
 func island_next_threshold(key: String) -> int:
 	var lv := island_level(key)

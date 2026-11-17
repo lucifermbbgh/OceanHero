@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_cost_scale_v015()
 	await _test_decision_aid_v014()
 	await _test_market_ui_v0131()
 	await _test_price_engine_v013()
@@ -633,6 +634,45 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 成本与规模（0.15.0） ----------------
+func _test_cost_scale_v015() -> void:
+	print("\n[成本与规模]")
+	var em = load("res://scripts/systems/econ_math.gd")
+	# 规模报酬
+	_ok(is_equal_approx(em.scale_return(2.0, 1.0), 2.0), "指数 1 为不变")
+	_ok(em.scale_return(2.0, 1.15) > 2.0, "指数 >1 为递增")
+	_ok(em.scale_return(2.0, 0.90) < 2.0, "指数 <1 为递减")
+
+	# 投资曲线：150,000 处达到 50%
+	var d0: float = em.diminishing_discount(0.0, 150000.0, 50.0, 1.6)
+	var d_full: float = em.diminishing_discount(150000.0, 150000.0, 50.0, 1.6)
+	var d_mid: float = em.diminishing_discount(60000.0, 150000.0, 50.0, 1.6)
+	_ok(is_equal_approx(d0, 0.0), "未投资无折扣")
+	_ok(absf(d_full - 50.0) < 0.01, "15 万达到上限 50%", "%.2f" % d_full)
+	_ok(d_mid > 10.0 and d_mid < 40.0, "6 万处于中段", "%.1f" % d_mid)
+	_ok(d_full > d_mid, "投得越多折扣越高")
+	# 边际递减
+	var m1: float = em.marginal_discount(5000.0, 150000.0, 50.0, 1.6, 1000.0)
+	var m2: float = em.marginal_discount(100000.0, 150000.0, 50.0, 1.6, 1000.0)
+	_ok(m1 > m2, "边际回报递减", "%.3f > %.3f" % [m1, m2])
+
+	# 成本结构
+	GameState.reset_new_game()
+	var up: Dictionary = GameState.weekly_upkeep()
+	_ok(int(up.get("total", -1)) >= 0, "有维护费")
+	_ok(int(up.get("fixed", 0)) + int(up.get("variable", 0)) == int(up.get("total", 0)),
+		"固定 + 可变 = 合计")
+	_ok(int(up.get("berth", 0)) == 5, "村落停泊费 5", str(up.get("berth", 0)))
+	GameState.home_port_tier = 3
+	var up3: Dictionary = GameState.weekly_upkeep()
+	_ok(int(up3.get("berth", 0)) == 40, "城市停泊费 40", str(up3.get("berth", 0)))
+
+	# 投资折扣接入 GameState
+	GameState.reset_new_game()
+	GameState.island_investment["t_island"] = 150000
+	_ok(GameState.island_discount("t_island") == 50, "满投资折扣 50",
+		str(GameState.island_discount("t_island")))
+
 # ---------------- 决策辅助（0.14.0） ----------------
 func _test_decision_aid_v014() -> void:
 	print("\n[决策辅助]")
@@ -965,7 +1005,8 @@ func _test_economy_v09() -> void:
 	_ok(GameState.island_discount(key) == 0, "Lv1 无折扣")
 	_ok(GameState.invest_island(key, 5000), "可以注资")
 	_ok(GameState.island_level(key) == 2, "注资 5000 升到 Lv2")
-	_ok(GameState.island_discount(key) == 10, "Lv2 折扣 10%")
+	var d2 := GameState.island_discount(key)
+	_ok(d2 > 0 and d2 < 10, "Lv2 折扣按曲线（0~10%）", str(d2))
 	GameState.invest_island(key, 15000)
 	_ok(GameState.island_level(key) == 3, "累计 20000 到 Lv3")
 	GameState.invest_island(key, 130000)

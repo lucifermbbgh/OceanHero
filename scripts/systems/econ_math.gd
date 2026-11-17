@@ -48,6 +48,25 @@ static func marginal_trade(buy_price: int, sell_price: int, capacity_left: float
 		return {"count": 0, "total": 0, "reason": "unprofitable"}
 	return {"count": can, "total": per * can, "reason": "ok"}
 
+## 规模报酬：投入 volume 后的产出倍率
+static func scale_return(volume: float, exponent: float) -> float:
+	return pow(maxf(0.0, volume), exponent)
+
+## 投资折扣曲线：在 cap 投资额处达到 max_discount，之后不再增加
+static func diminishing_discount(invested: float, cap: float, max_discount: float, k: float) -> float:
+	if invested <= 0.0:
+		return 0.0
+	var x := clampf(invested / maxf(1.0, cap), 0.0, 1.0)
+	var denom := 1.0 - exp(-k)
+	if denom <= 0.0:
+		return 0.0
+	return max_discount * (1.0 - exp(-k * x)) / denom
+
+## 边际回报：再多投 step 金带来的折扣增量（百分点）
+static func marginal_discount(invested: float, cap: float, max_discount: float, k: float,
+		step: float = 1000.0) -> float:
+	return diminishing_discount(invested + step, cap, max_discount, k) - diminishing_discount(invested, cap, max_discount, k)
+
 ## 涨价幅度（正数=涨）
 static func change_pct(old_value: float, new_value: float) -> float:
 	if is_zero_approx(old_value):

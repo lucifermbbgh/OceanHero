@@ -122,6 +122,7 @@ func _build_ui() -> void:
 		_action_button(vb, "交易所", _toggle_exchange)
 	if GameState.home_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
+	_action_button(vb, "财政", _toggle_finance)
 	if GameState.home_port_tier >= 3:
 		_action_button(vb, "银行", _toggle_bank)
 		_action_button(vb, "黑市", _toggle_black)
@@ -229,6 +230,22 @@ func _build_ui() -> void:
 	quest_list.add_theme_constant_override("separation", 5)
 	quest_list.custom_minimum_size = Vector2(710, 0)
 	qscroll.add_child(quest_list)
+
+	# 财政面板
+	finance_root = PanelContainer.new()
+	finance_root.position = Vector2(300, 100)
+	finance_root.custom_minimum_size = Vector2(700, 420)
+	finance_root.add_theme_stylebox_override("panel", _panel_style())
+	finance_root.visible = false
+	root.add_child(finance_root)
+	var fscroll := ScrollContainer.new()
+	fscroll.custom_minimum_size = Vector2(670, 390)
+	fscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	finance_root.add_child(fscroll)
+	finance_list = VBoxContainer.new()
+	finance_list.add_theme_constant_override("separation", 6)
+	finance_list.custom_minimum_size = Vector2(650, 0)
+	fscroll.add_child(finance_list)
 
 	# 银行面板
 	bank_root = PanelContainer.new()
@@ -1554,6 +1571,50 @@ func _dismiss_crew(cid: StringName) -> void:
 	_rebuild_tavern()
 
 ## 升级按钮文案：满级显示当前等级，否则显示所需资源
+# ---------------- 财政（0.15） ----------------
+
+var finance_root: PanelContainer = null
+var finance_list: VBoxContainer = null
+
+func _toggle_finance() -> void:
+	if finance_root.visible:
+		finance_root.visible = false
+		return
+	_rebuild_finance()
+	finance_root.visible = true
+
+func _rebuild_finance() -> void:
+	for c in finance_list.get_children():
+		c.queue_free()
+	var up: Dictionary = GameState.weekly_upkeep()
+	_yard_title_to(finance_list, "财政 —— 现金 %d · 本周维护 %d" % [GameState.gold, int(up.get("total", 0))])
+	_yard_title_to(finance_list, "本周成本明细")
+	for row in [["船体维护", int(up.get("hull", 0)), "固定 · 按船队估值 2%"],
+			["停泊费", int(up.get("berth", 0)), "固定 · 按母港等级"],
+			["船员薪酬", int(up.get("crew", 0)), "可变 · 按在岗船员"],
+			["火炮维护", int(up.get("cannon", 0)), "可变 · 按装备火炮"]]:
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 12)
+		finance_list.add_child(hb)
+		hb.add_child(_lbl(String(row[0]), 140))
+		hb.add_child(_lbl("%d 金" % int(row[1]), 110, Color(0.9, 0.82, 0.45)))
+		hb.add_child(_lbl(String(row[2]), 260, Color(0.7, 0.76, 0.72)))
+	var tot := HBoxContainer.new()
+	tot.add_theme_constant_override("separation", 12)
+	finance_list.add_child(tot)
+	tot.add_child(_lbl("合计", 140, Color(0.8, 0.9, 0.7)))
+	tot.add_child(_lbl("%d 金" % int(up.get("total", 0)), 110, Color(0.95, 0.9, 0.5)))
+	tot.add_child(_lbl("固定 %d + 可变 %d" % [int(up.get("fixed", 0)), int(up.get("variable", 0))],
+		260, Color(0.7, 0.76, 0.72)))
+
+	_yard_title_to(finance_list, "资产与负债")
+	var assets := GameState.gold + GameState.bank_deposited()
+	finance_list.add_child(_lbl("　现金+存款 %d　｜　未还贷款本息 %d　｜　净额 %d" % [
+		assets, GameState.loan_exposure(), assets - GameState.loan_exposure()],
+		700, Color(0.78, 0.85, 0.8)))
+	finance_list.add_child(_lbl("　沉没成本：已花费的修理与建造费用不再计入决策，仅作记录",
+		700, Color(0.62, 0.68, 0.66)))
+
 # ---------------- 银行（0.12） ----------------
 
 func _toggle_bank() -> void:

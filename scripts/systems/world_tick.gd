@@ -102,6 +102,9 @@ func _regen_markets() -> void:
 			GameState.set_stock(pid, cid, MRes.weekly_regen(stock, max_stock))
 
 func _tick_crew_wages() -> void:
+	var upkeep: Dictionary = GameState.weekly_upkeep()
+	EventBus.ticker.emit("本周维护 %d 金（固定 %d / 可变 %d）" % [
+		int(upkeep.get("total", 0)), int(upkeep.get("fixed", 0)), int(upkeep.get("variable", 0))])
 	var due: int = GameState.assigned_wages()
 	if due <= 0:
 		return

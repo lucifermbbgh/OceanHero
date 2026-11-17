@@ -511,12 +511,19 @@ func _rebuild_port() -> void:
 	var invested := GameState.island_invested(ikey)
 	var next_need := GameState.island_next_threshold(ikey)
 	var prog = GameState.island_upgrade_progress(ikey)
-	var inv_line := "投资 Lv%d · %d / %d · 买入折扣 %d%%" % [lv, invested, next_need, disc]
+	var marg_d: float = GameState.island_marginal_discount(ikey)
+	var inv_line := "投资 %d / %d · 买入折扣 %d%%（边际 +%.2f%%/千金）" % [
+		invested, next_need, disc, marg_d]
 	if prog != null:
 		inv_line += "　｜　升格进度：还差 %d 周 / 共 %d 周" % [int(prog.total) - int(prog.elapsed), int(prog.total)]
 	elif tier >= 3:
 		inv_line += "　｜　已为最高等级（分红中）"
-	port_list.add_child(_p_lbl("　" + inv_line, 640, Color(0.85, 0.8, 0.55)))
+	port_list.add_child(_p_lbl("　" + inv_line, 700, Color(0.85, 0.8, 0.55)))
+	var exp_by_tier := {1: 0.90, 2: 1.00, 3: 1.15}
+	var exp_v := float(exp_by_tier.get(tier, 1.0))
+	var scale_txt := "递增" if exp_v > 1.001 else ("递减" if exp_v < 0.999 else "不变")
+	port_list.add_child(_p_lbl("　规模报酬：%s（指数 %.2f）" % [scale_txt, exp_v], 700,
+		Color(0.72, 0.82, 0.78)))
 	var inv_hb := HBoxContainer.new()
 	inv_hb.add_theme_constant_override("separation", 8)
 	port_list.add_child(inv_hb)

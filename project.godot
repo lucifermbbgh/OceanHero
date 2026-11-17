@@ -15,7 +15,7 @@ config/description="2D 单机航海 RPG：航行、自动炮战、贸易、舰�
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
-config/version="0.14.0-alpha"
+config/version="0.15.0-alpha"
 [autoload]
 
 EventBus="*res://scripts/core/event_bus.gd"
