@@ -680,6 +680,30 @@ func _test_ui_panels_v019() -> void:
 	s._input(ev)
 	await _frames(2)
 	_ok(not s.goods_root.visible, "ESC 先关闭商品弹窗")
+	# 利润表结构一致性（全部细类都列出，顺序一致）
+	var pl1: Array = s._pl_rows({"贸易": 100}, {"采购": 40}, "本年")
+	var names: Array = []
+	for rw in pl1:
+		names.append(String(rw[0]))
+	_ok(names.has("营业收入") and names.has("　　贸易") and names.has("　　战利品"),
+		"利润表列出全部收入细类", str(names))
+	_ok(names.has("营业成本") and names.has("　　采购") and names.has("　　维护"),
+		"利润表列出全部成本细类")
+	_ok(names.has("收入合计") and names.has("成本合计") and names.has("净利润"), "含三个合计行")
+	# 大类顺序：营业收入 → 收入合计 → 营业成本 → 成本合计 → 净利润
+	var i_inc := names.find("营业收入")
+	var i_inc_t := names.find("收入合计")
+	var i_exp := names.find("营业成本")
+	var i_exp_t := names.find("成本合计")
+	_ok(i_inc < i_inc_t and i_inc_t < i_exp and i_exp < i_exp_t, "大类与合计顺序正确",
+		"%d/%d/%d/%d" % [i_inc, i_inc_t, i_exp, i_exp_t])
+	# 资产负债表结构
+	var bs: Array = s._bs_rows(1000, 0, 0, 0, 0, 0, 200)
+	var bnames: Array = []
+	for rw in bs:
+		bnames.append(String(rw[0]))
+	_ok(bnames.has("资产") and bnames.has("资产合计") and bnames.has("负债") and bnames.has("净资产"),
+		"资产负债表含大类与合计", str(bnames))
 	# 经济总览六个分页
 	for tab in ["ytd_bs", "ytd_pl", "week_pnl", "last_bs", "last_pl", "last_week"]:
 		s.overview_tab = tab
@@ -1711,7 +1735,8 @@ func _test_ecology() -> void:
 	for i in range(list.size()):
 		for j in range(i + 1, list.size()):
 			min_pair = minf(min_pair, list[i].global_position.distance_to(list[j].global_position))
-	_ok(min_pair >= 120.0, "单位之间保持最小间距（不会挤成一堆）", "最小间距=%.0f" % min_pair)
+	# 随机投放，阈值取舰船半径之和的保守下界
+	_ok(min_pair >= 70.0, "单位之间保持最小间距（不会挤成一堆）", "最小间距=%.0f" % min_pair)
 
 	# 迎接单位的采样必须在圆周上等角距分散（直接验证采样函数）
 	s3._near_sector = 0

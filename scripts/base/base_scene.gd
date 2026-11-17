@@ -1626,7 +1626,7 @@ const OVERVIEW_TABS := [
 	["week_pnl", "周利润表"],
 	["last_bs", "上年资产负债表"],
 	["last_pl", "上年利润表"],
-	["last_week", "上周利润"],
+	["last_week", "上周利润表"],
 ]
 
 func _stock_value() -> Dictionary:
@@ -1683,6 +1683,58 @@ func _toggle_overview() -> void:
 	_rebuild_overview()
 	overview_root.visible = true
 
+const INC_KINDS := ["贸易", "战利品", "任务", "利息"]
+const EXP_KINDS := ["采购", "维护", "关税", "利息", "建造"]
+
+func _pl_rows(income: Dictionary, expense: Dictionary, note: String) -> Array:
+	var rows: Array = []
+	var inc_total := 0
+	rows.append(["营业收入", "", "大类"])
+	for k in INC_KINDS:
+		var v := int(income.get(k, 0))
+		inc_total += v
+		rows.append(["　　" + k, str(v), note])
+	for k2 in income.keys():
+		if INC_KINDS.has(String(k2)):
+			continue
+		var v2 := int(income[k2])
+		inc_total += v2
+		rows.append(["　　" + String(k2), str(v2), note])
+	rows.append(["收入合计", str(inc_total), "全部收入细类之和"])
+	var exp_total := 0
+	rows.append(["营业成本", "", "大类"])
+	for k3 in EXP_KINDS:
+		var v3 := int(expense.get(k3, 0))
+		exp_total += v3
+		rows.append(["　　" + k3, str(v3), note])
+	for k4 in expense.keys():
+		if EXP_KINDS.has(String(k4)):
+			continue
+		var v4 := int(expense[k4])
+		exp_total += v4
+		rows.append(["　　" + String(k4), str(v4), note])
+	rows.append(["成本合计", str(exp_total), "全部成本细类之和"])
+	var net := inc_total - exp_total
+	rows.append(["净利润", ("+%d" % net) if net >= 0 else str(net), "收入合计 − 成本合计"])
+	return rows
+
+func _bs_rows(cash: int, deposit: int, cargo: int, wh: int, gear: int, ship: int, debt: int) -> Array:
+	var assets := cash + deposit + cargo + wh + gear + ship
+	var rows: Array = []
+	rows.append(["资产", "", "大类"])
+	rows.append(["　　现金", str(cash), "身上持有"])
+	rows.append(["　　银行存款", str(deposit), "全城通存通取"])
+	rows.append(["　　船舱货物", str(cargo), "按商品基础价"])
+	rows.append(["　　港口仓库", str(wh), "按商品基础价"])
+	rows.append(["　　装备", str(gear), "按装备基础价"])
+	rows.append(["　　船只", str(ship), "按购入价（船员不计入）"])
+	rows.append(["资产合计", str(assets), "全部资产细类之和"])
+	rows.append(["负债", "", "大类"])
+	rows.append(["　　未还贷款", str(debt), "本息合计"])
+	rows.append(["负债合计", str(debt), "全部负债细类之和"])
+	rows.append(["净资产", str(assets - debt), "资产合计 − 负债合计"])
+	return rows
+
 func _rebuild_overview() -> void:
 	for c in overview_list.get_children():
 		c.queue_free()
@@ -1702,108 +1754,43 @@ func _rebuild_overview() -> void:
 	var sv: Dictionary = _stock_value()
 	match overview_tab:
 		"ytd_bs":
-			var assets := GameState.gold + GameState.bank_deposited() + int(sv["total"])
-			var debt := GameState.loan_exposure()
 			_yard_title_to(overview_list, "年资产负债表")
-			_overview_table(["项目", "金额", "说明"], [280, 220, 640], [
-				["现金", str(GameState.gold), "身上持有的金币"],
-				["银行存款", str(GameState.bank_deposited()), "全城通存通取"],
-				["船舱货物", str(sv["cargo"]), "按商品基础价计"],
-				["港口仓库", str(sv["wh"]), "按商品基础价计"],
-				["装备", str(sv["gear"]), "按装备基础价计"],
-				["船只", str(sv["ship"]), "按购入价计（船员不计入）"],
-				["资产合计", str(assets), "现金 + 存款 + 库存"],
-				["负债：未还贷款", str(debt), "本息合计"],
-				["净资产", str(assets - debt), "资产 − 负债"],
-			])
+			_overview_table(["项目", "金额", "说明"], [300, 220, 620], _bs_rows(
+				GameState.gold, GameState.bank_deposited(),
+				int(sv["cargo"]), int(sv["wh"]), int(sv["gear"]), int(sv["ship"]),
+				GameState.loan_exposure()))
 		"ytd_pl":
-			var inc: Dictionary = s["income"]
-			var exp: Dictionary = s["expense"]
-			var rows: Array = []
-			for k in inc.keys():
-				rows.append(["收入：" + String(k), str(int(inc[k])), "本年累计"])
-			if inc.is_empty():
-				rows.append(["收入：（暂无）", "0", ""])
-			rows.append(["收入合计", str(int(s["income_total"])), ""])
-			for k2 in exp.keys():
-				rows.append(["成本：" + String(k2), str(int(exp[k2])), "本年累计"])
-			if exp.is_empty():
-				rows.append(["成本：（暂无）", "0", ""])
-			rows.append(["成本合计", str(int(s["expense_total"])), ""])
-			rows.append(["净利润", ("+" if int(s["net"]) >= 0 else "") + str(int(s["net"])), "收入 − 成本"])
 			_yard_title_to(overview_list, "年利润表")
-			_overview_table(["项目", "金额", "说明"], [280, 220, 640], rows)
+			_overview_table(["项目", "金额", "说明"], [300, 220, 620],
+				_pl_rows(s["income"], s["expense"], "本年累计"))
 		"week_pnl":
-			var rows2: Array = [
-				["成本：船体维护", str(int(up.get("hull", 0))), "按船队估值 2%（固定）"],
-				["成本：停泊费", str(int(up.get("berth", 0))), "按母港等级（固定）"],
-				["成本：船员薪酬", str(int(up.get("crew", 0))), "按在岗船员（增量）"],
-				["成本：火炮维护", str(int(up.get("cannon", 0))), "按装备火炮（增量）"],
-			]
-			var w_inc := 0
-			for k3 in GameState.week_income.keys():
-				rows2.append(["收入：" + String(k3), str(int(GameState.week_income[k3])), "本周"])
-				w_inc += int(GameState.week_income[k3])
-			var w_exp := int(up.get("total", 0))
-			for k4 in GameState.week_expense.keys():
-				rows2.append(["成本：" + String(k4), str(int(GameState.week_expense[k4])), "本周"])
-				w_exp += int(GameState.week_expense[k4])
-			rows2.append(["本周收入合计", str(w_inc), ""])
-			rows2.append(["本周成本合计", str(w_exp), ""])
-			rows2.append(["本周净利", ("+" if w_inc - w_exp >= 0 else "") + str(w_inc - w_exp), "收入 − 成本"])
+			var week_exp: Dictionary = GameState.week_expense.duplicate()
+			week_exp["维护"] = int(week_exp.get("维护", 0)) + int(up.get("total", 0))
 			_yard_title_to(overview_list, "周利润表（本周）")
-			_overview_table(["项目", "金额", "说明"], [280, 220, 640], rows2)
+			_overview_table(["项目", "金额", "说明"], [300, 220, 620],
+				_pl_rows(GameState.week_income, week_exp, "本周"))
 		"last_bs":
 			_yard_title_to(overview_list, "上年资产负债表")
 			if GameState.reports.is_empty():
 				overview_list.add_child(_lbl("　（还没有跨年，暂无上年数据）", 500, Color(0.55, 0.6, 0.6)))
 			else:
 				var r0: Dictionary = GameState.reports[GameState.reports.size() - 1]
-				_overview_table(["项目", "金额", "说明"], [280, 220, 640], [
-					["年份", str(int(r0.get("year", 0))), "上一自然年"],
-					["现金", str(int(r0.get("cash", 0))), "年末"],
-					["银行存款", str(int(r0.get("deposit", 0))), "年末"],
-					["库存（货物）", str(int(r0.get("cargo", 0))), "年末估值"],
-					["船只", str(int(r0.get("fleet", 0))), "年末估值"],
-					["资产合计", str(int(r0.get("assets", 0))), "现金 + 存款 + 库存"],
-					["负债：未还贷款", str(int(r0.get("debt", 0))), "年末本息"],
-					["净资产", str(int(r0.get("net_worth", 0))), "资产 − 负债"],
-				])
+				_overview_table(["项目", "金额", "说明"], [300, 220, 620], _bs_rows(
+					int(r0.get("cash", 0)), int(r0.get("deposit", 0)),
+					int(r0.get("cargo", 0)), 0, 0, int(r0.get("fleet", 0)),
+					int(r0.get("debt", 0))))
 		"last_pl":
 			_yard_title_to(overview_list, "上年利润表")
 			if GameState.reports.is_empty():
 				overview_list.add_child(_lbl("　（还没有跨年，暂无上年数据）", 500, Color(0.55, 0.6, 0.6)))
 			else:
 				var r1: Dictionary = GameState.reports[GameState.reports.size() - 1]
-				var rows3: Array = []
-				var inc1: Dictionary = r1.get("income", {})
-				for k5 in inc1.keys():
-					rows3.append(["收入：" + String(k5), str(int(inc1[k5])), "上年累计"])
-				var exp1: Dictionary = r1.get("expense", {})
-				for k6 in exp1.keys():
-					rows3.append(["成本：" + String(k6), str(int(exp1[k6])), "上年累计"])
-				rows3.append(["收入合计", str(int(r1.get("income_total", 0))), ""])
-				rows3.append(["成本合计", str(int(r1.get("expense_total", 0))), ""])
-				rows3.append(["净利润", ("+" if int(r1.get("net", 0)) >= 0 else "") + str(int(r1.get("net", 0))), "收入 − 成本"])
-				_overview_table(["项目", "金额", "说明"], [280, 220, 640], rows3)
+				_overview_table(["项目", "金额", "说明"], [300, 220, 620],
+					_pl_rows(r1.get("income", {}), r1.get("expense", {}), "上年累计"))
 		"last_week":
-			_yard_title_to(overview_list, "上周利润")
-			var rows4: Array = []
-			var lw_inc := 0
-			for k7 in GameState.last_week_income.keys():
-				rows4.append(["收入：" + String(k7), str(int(GameState.last_week_income[k7])), "上周"])
-				lw_inc += int(GameState.last_week_income[k7])
-			var lw_exp := 0
-			for k8 in GameState.last_week_expense.keys():
-				rows4.append(["成本：" + String(k8), str(int(GameState.last_week_expense[k8])), "上周"])
-				lw_exp += int(GameState.last_week_expense[k8])
-			if rows4.is_empty():
-				overview_list.add_child(_lbl("　（上周没有交易记录）", 500, Color(0.55, 0.6, 0.6)))
-			else:
-				rows4.append(["收入合计", str(lw_inc), ""])
-				rows4.append(["成本合计", str(lw_exp), ""])
-				rows4.append(["净利", ("+" if lw_inc - lw_exp >= 0 else "") + str(lw_inc - lw_exp), "收入 − 成本"])
-				_overview_table(["项目", "金额", "说明"], [280, 220, 640], rows4)
+			_yard_title_to(overview_list, "上周利润表")
+			_overview_table(["项目", "金额", "说明"], [300, 220, 620],
+				_pl_rows(GameState.last_week_income, GameState.last_week_expense, "上周"))
 
 # ---------------- 商品详情弹窗（0.19.1） ----------------
 
