@@ -115,7 +115,7 @@ func _generate_islands() -> void:
 	islands.clear()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(map_def.island_seed) * 7919 + map_index * 131
-	var n := 4 + (map_index % 3)
+	var n := mini(8, 4 + (map_index % 3))
 	var safe_center := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5 + 300)
 	for i in range(n):
 		var pos := Vector2(rng.randf_range(1500.0, 6500.0), rng.randf_range(1500.0, 6500.0))
@@ -126,10 +126,14 @@ func _generate_islands() -> void:
 			tier = 3
 		elif i == 1:
 			tier = 2
+		var key := GameState.island_key(map_index, i)
+		tier = GameState.island_tier_of(key, tier)
 		var rr: Vector2 = ISLAND_RADIUS[tier]
 		var specialty: StringName = SPECIALTIES[i % SPECIALTIES.size()]
+		var nm := _island_name(i, tier)
+		GameState.register_port(key, nm, map_index, tier)
 		# [位置, 半径, 等级, 名称, 特产]
-		islands.append([pos, rng.randf_range(rr.x, rr.y), tier, _island_name(i, tier), specialty])
+		islands.append([pos, rng.randf_range(rr.x, rr.y), tier, nm, specialty])
 
 ## 把港口贴到最近岛屿的岸边，而不是漂在海面
 func _anchor_port_to_island(want: Vector2) -> Vector2:
@@ -408,6 +412,31 @@ func _rebuild_port() -> void:
 		GameState.cargo_used(), float(GameState.cargo_capacity())])
 
 	_p_title("市场 · 本岛特产：谷物 / 木材 / %s" % (sp_res.display_name if sp_res != null else "—"))
+	# 投资状态
+	var ikey := _island_key()
+	var lv := GameState.island_level(ikey)
+	var disc := GameState.island_discount(ikey)
+	var invested := GameState.island_invested(ikey)
+	var next_need := GameState.island_next_threshold(ikey)
+	var prog = GameState.island_upgrade_progress(ikey)
+	var inv_line := "投资 Lv%d · %d / %d · 买入折扣 %d%%" % [lv, invested, next_need, disc]
+	if prog != null:
+		inv_line += "　｜　升格进度：还差 %d 周 / 共 %d 周" % [int(prog.total) - int(prog.elapsed), int(prog.total)]
+	elif tier >= 3:
+		inv_line += "　｜　已为最高等级（分红中）"
+	port_list.add_child(_p_lbl("　" + inv_line, 640, Color(0.85, 0.8, 0.55)))
+	var inv_hb := HBoxContainer.new()
+	inv_hb.add_theme_constant_override("separation", 8)
+	port_list.add_child(inv_hb)
+	for amt in [1000, 5000, 20000]:
+		var ab := Button.new()
+		ab.text = "注资 %d" % amt
+		ab.custom_minimum_size = Vector2(110, 26)
+		ab.disabled = GameState.gold < amt
+		var amt_v: int = int(amt)
+		ab.pressed.connect(func(): _port_invest(amt_v))
+		inv_hb.add_child(ab)
+
 	var max_stock := int(TIER_STOCK.get(tier, 40))
 	var goods: Array = [&"grain", &"timber"]
 	if sp_res != null:
@@ -424,6 +453,12 @@ func _rebuild_port() -> void:
 			var mult: float = float(SPECIALTY_PRICE_MULT.get(tier, 1.0))
 			bp = int(round(float(bp) * float(mult)))
 			sp = int(round(float(sp) * float(mult)))
+		# 投资折扣（只作用于买入）
+		var buy_disc := GameState.island_discount(_island_key())
+		if buy_disc > 0:
+			bp = maxi(1, int(round(float(bp) * (1.0 - float(buy_disc) / 100.0))))
+		# 阶梯溢价（只作用于卖出）：目标地图不产出才有跨度溢价
+		sp = int(round(float(sp) * GameState.sale_multiplier_at(cid, map_index)))
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 10)
 		port_list.add_child(hb)
@@ -679,8 +714,29 @@ func _port_hire_crew(crew: Resource) -> void:
 	hud.ticker("雇佣了 %s" % String(crew.display_name))
 	_rebuild_port()
 
+## NPC 随机载货（1~2 种商品，数量按地图等级放大）
+func _random_npc_cargo() -> Dictionary:
+	var out: Dictionary = {}
+	var pool: Array = [&"grain", &"timber", &"rum", &"spice"]
+	var n := RngService.randi_range(1, 2)
+	for i in range(n):
+		var cid: StringName = pool[RngService.randi_range(0, pool.size() - 1)]
+		out[cid] = int(out.get(cid, 0)) + RngService.randi_range(3, 8 + map_index * 2)
+	return out
+
+func _island_key() -> String:
+	return GameState.island_key(map_index, cur_port_island)
+
 func _port_max_stock() -> int:
 	return int(TIER_STOCK.get(int(islands[cur_port_island][2]), 40))
+
+## 对当前岛注资
+func _port_invest(amount: int) -> void:
+	if GameState.invest_island(_island_key(), amount):
+		hud.ticker("已注资 %d 金，投资 Lv%d" % [amount, GameState.island_level(_island_key())])
+		_rebuild_port()
+	else:
+		hud.ticker("金币不足")
 
 func _port_buy(cid: StringName, amount: int, price: int) -> void:
 	var pid := _island_port_id(cur_port_island)
@@ -698,6 +754,7 @@ func _port_buy(cid: StringName, amount: int, price: int) -> void:
 	GameState.add_gold(-price * amount)
 	GameState.add_cargo(cid, amount)
 	GameState.set_stock(pid, cid, stock - amount)
+	GameState.credit_island_trade(_island_key(), price * amount)
 	hud.ticker("买入 %d %s" % [amount, c.display_name])
 	_rebuild_port()
 
@@ -710,6 +767,7 @@ func _port_sell(cid: StringName, amount: int, price: int) -> void:
 	var stock := GameState.ensure_stock(pid, cid, _port_max_stock())
 	GameState.set_stock(pid, cid, stock + amount)
 	GameState.add_gold(price * amount)
+	GameState.credit_island_trade(_island_key(), price * amount)
 	hud.ticker("卖出 %d 件，得 %d 金" % [amount, price * amount])
 	_rebuild_port()
 
@@ -822,6 +880,7 @@ func _spawn_pirate() -> void:
 	var e = ShipScene.instantiate()
 	e.setup_enemy(DataRegistry.get_enemy(&"pirate_scout"), _map_scale())
 	e.loot_mult = _loot_mult()
+	e.cargo_hold = _random_npc_cargo()
 	e.position = _random_spawn_pos(enemies.size() < NEAR_UNITS)
 	e.died.connect(_on_enemy_died)
 	e.disengaged.connect(_on_enemy_disengaged)
@@ -870,6 +929,7 @@ func _spawn_merchant() -> void:
 	e.faction = "merchant"
 	e.display_name = "中立商船"
 	e.loot_mult = _loot_mult()
+	e.cargo_hold = _random_npc_cargo()
 	e.position = _random_spawn_pos()
 	e.died.connect(_on_enemy_died)
 	e.disengaged.connect(_on_enemy_disengaged)

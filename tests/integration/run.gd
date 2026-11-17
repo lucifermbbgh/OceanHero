@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_economy_v09()
 	await _test_port_tiers()
 	await _test_island_ports()
 	await _test_warehouse()
@@ -625,6 +626,83 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 经济系统（0.9.0） ----------------
+func _test_economy_v09() -> void:
+	print("\n[经济 0.9]")
+	GameState.reset_new_game()
+
+	# 阶梯溢价
+	_ok(is_equal_approx(MarketModel.span_premium(0), 1.0), "无跨度无溢价")
+	_ok(is_equal_approx(MarketModel.span_premium(8), 4.0), "跨度 8 达到 4.0 倍（+300%）")
+	_ok(is_equal_approx(MarketModel.sale_multiplier(true, 8), 1.0), "目标地也产出时无溢价")
+	_ok(is_equal_approx(MarketModel.sale_multiplier(false, 8), 4.0), "目标地不产出时有溢价")
+
+	# 商品产地
+	_ok(GameState.commodity_produced_in(&"grain", 9), "谷物全图产出")
+	_ok(not GameState.commodity_produced_in(&"rum", 9), "朗姆酒 9 图不产出")
+	_ok(GameState.commodity_produced_in(&"rum", 3), "朗姆酒 3 图产出")
+	_ok(is_equal_approx(GameState.sale_multiplier_at(&"rum", 9), 4.0), "朗姆酒运到 9 图 4 倍")
+	_ok(is_equal_approx(GameState.sale_multiplier_at(&"grain", 9), 1.0), "谷物无溢价")
+
+	# 投资
+	var key := GameState.island_key(1, 0)
+	GameState.add_gold(200000)
+	_ok(GameState.island_level(key) == 1, "新岛投资为 Lv1")
+	_ok(GameState.island_discount(key) == 0, "Lv1 无折扣")
+	_ok(GameState.invest_island(key, 5000), "可以注资")
+	_ok(GameState.island_level(key) == 2, "注资 5000 升到 Lv2")
+	_ok(GameState.island_discount(key) == 10, "Lv2 折扣 10%")
+	GameState.invest_island(key, 15000)
+	_ok(GameState.island_level(key) == 3, "累计 20000 到 Lv3")
+	GameState.invest_island(key, 130000)
+	_ok(GameState.island_level(key) == 5, "累计 150000 到 Lv5")
+	_ok(GameState.island_discount(key) == 50, "Lv5 折扣 50%")
+
+	# 成交额转投资（10%）
+	var key2 := GameState.island_key(1, 1)
+	var before := GameState.island_invested(key2)
+	GameState.credit_island_trade(key2, 1000)
+	_ok(GameState.island_invested(key2) == before + 100, "成交 1000 转 100 投资额")
+
+	# 52 周升格
+	GameState.island_set_tier(key, 1)
+	GameState.invest_island(key, 1)
+	_ok(GameState.island_upgrade_progress(key) != null, "满额后开始升格计时")
+	var start_week := int(GameState.island_upgrade_start[key])
+	TimeService.total_days = (start_week + 51) * 7
+	GameState.tick_island_upgrades()
+	_ok(GameState.island_tier_of(key, 1) == 1, "不满 52 周不升格")
+	TimeService.total_days = (start_week + 52) * 7
+	var ups: Array = GameState.tick_island_upgrades()
+	_ok(ups.has(key), "满 52 周触发升格")
+	_ok(GameState.island_tier_of(key, 1) == 2, "村落升为乡镇")
+	_ok(GameState.island_invested(key) == 0, "升格后投资额清零")
+
+	# NPC 货流（跨周改库存）
+	GameState.reset_new_game()
+	GameState.ensure_stock(&"jadehaven", &"grain", 400)
+	var s0: int = int(GameState.port_stock.get(&"jadehaven", {}).get(&"grain", 0))
+	for i in range(30):
+		WorldTick._npc_trade_flow()
+	var s1: int = int(GameState.port_stock.get(&"jadehaven", {}).get(&"grain", 0))
+	_ok(int(GameState.port_stock.size()) > 0, "港口库存表存在")
+
+	# NPC 载货 30%
+	GameState.reset_new_game()
+	GameState.cargo.clear()
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	var e2 = s.enemies[0]
+	e2.cargo_hold = {&"grain": 100}
+	e2.last_attacker = s.player
+	var loot_sc = load("res://scripts/systems/loot_system.gd")
+	var r: Dictionary = loot_sc.apply(s.player, e2, {"sunk": false, "captured": false})
+	_ok(int(r.get("cargo_hold", {}).get(&"grain", 0)) == 30, "载货 100 缴获 30",
+		"got=%d" % int(r.get("cargo_hold", {}).get(&"grain", 0)))
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 港口分级（0.8.0） ----------------
 func _test_port_tiers() -> void:

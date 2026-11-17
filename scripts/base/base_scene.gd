@@ -347,6 +347,7 @@ func _toggle_market() -> void:
 	market_root.visible = true
 
 var market_target := "ship"   # ship = 装船，warehouse = 存仓
+var market_tab := "local"     # local = 本地市场，world = 世界市场
 
 func _toggle_market_target(t: String) -> void:
 	market_target = t
@@ -361,6 +362,27 @@ func _rebuild_market() -> void:
 	head.text = "市场行情（每周库存会向满值回归）"
 	head.add_theme_font_size_override("font_size", 18)
 	market_list.add_child(head)
+
+	# 本地市场 / 世界市场 页签
+	var mtabs := HBoxContainer.new()
+	mtabs.add_theme_constant_override("separation", 8)
+	market_list.add_child(mtabs)
+	var m_local := Button.new()
+	m_local.text = "本地市场"
+	m_local.custom_minimum_size = Vector2(120, 32)
+	m_local.modulate = Color(1.0, 0.92, 0.6) if market_tab == "local" else Color(1, 1, 1)
+	m_local.pressed.connect(func(): market_tab = "local"; _rebuild_market())
+	mtabs.add_child(m_local)
+	var m_world := Button.new()
+	m_world.text = "世界市场"
+	m_world.custom_minimum_size = Vector2(120, 32)
+	m_world.modulate = Color(1.0, 0.92, 0.6) if market_tab == "world" else Color(1, 1, 1)
+	m_world.pressed.connect(func(): market_tab = "world"; _rebuild_market())
+	mtabs.add_child(m_world)
+
+	if market_tab == "world":
+		_rebuild_world_market()
+		return
 
 	# 交易目标页签：买入存到哪 / 卖出从哪拿
 	var tab_row := HBoxContainer.new()
@@ -524,6 +546,45 @@ func _move_to_ship(cid: StringName) -> void:
 	_log("已装上船：%s × %d" % [c.display_name, n])
 	_rebuild_market()
 	_refresh()
+
+## 世界市场：跨港情报页（不参与交易）
+func _rebuild_world_market() -> void:
+	var note := Label.new()
+	note.text = "跨港情报：港口 / 海域 / 距离 / 商品买价。世界市场不成交，请回本地市场买卖。"
+	note.add_theme_font_size_override("font_size", 13)
+	note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
+	market_list.add_child(note)
+	var cur_map := GameState.current_map
+	var keys: Array = GameState.port_registry.keys()
+	if keys.is_empty():
+		market_list.add_child(_lbl("　（还没有探索过其他港口）", 400, Color(0.55, 0.6, 0.6)))
+		return
+	for k in keys:
+		var meta: Dictionary = GameState.port_registry[k]
+		var pname := String(meta.get("name", k))
+		var pmap := int(meta.get("map", 1))
+		var ptier := int(meta.get("tier", 1))
+		var dist := absi(pmap - cur_map)
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 10)
+		market_list.add_child(hb)
+		hb.add_child(_lbl("%s · %s" % [pname, GameState.port_name(ptier)], 220))
+		hb.add_child(_lbl("第 %d 图 · 距 %d" % [pmap, dist], 130, Color(0.8, 0.85, 0.9)))
+		var stock_cap := int(TIER_STOCK_REF.get(ptier, 40))
+		var parts: Array = []
+		for cid in [&"grain", &"timber", &"rum", &"spice"]:
+			var c: Resource = DataRegistry.get_commodity(cid)
+			if c == null:
+				continue
+			var st := GameState.ensure_stock(StringName(k), cid, stock_cap)
+			if st <= 0:
+				continue
+			var bp := MarketModel.buy_price(int(c.base_price), st, stock_cap, 1.0)
+			parts.append("%s %d" % [String(c.display_name), bp])
+		hb.add_child(_lbl(" / ".join(parts) if not parts.is_empty() else "（无货）", 380,
+			Color(0.82, 0.86, 0.7)))
+
+const TIER_STOCK_REF := {1: 40, 2: 90, 3: 160}
 
 func _buy(cid: StringName, amount: int, price: int) -> void:
 	var c: Resource = DataRegistry.get_commodity(cid)

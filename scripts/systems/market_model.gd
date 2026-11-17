@@ -19,6 +19,7 @@ static func reset_defaults() -> void:
 	cfg = {
 		"price_elasticity": 0.55, "buy_markup": 1.05, "sell_markdown": 0.90,
 		"bulk_ratio": 0.30, "bulk_penalty": 0.10, "weekly_regen_rate": 0.02,
+		"max_weekly_price_swing": 0.15,
 	}
 
 static func generic_price(base_price: int, stock: int, max_stock: int) -> float:
@@ -42,3 +43,16 @@ static func weekly_regen(stock: int, max_stock: int, rate: float = -1.0) -> int:
 
 static func is_bulk(amount: int, stock: int) -> bool:
 	return float(amount) > float(stock) * float(cfg.bulk_ratio)
+
+## 阶梯溢价：目标地图不产出该商品时的售价倍率
+## gap = 目标地图编号 - 商品产地地图编号（取正）
+## 最高 +300%（倍率 4.0）
+static func span_premium(gap: int) -> float:
+	var g := clampi(gap, 0, 8)
+	return 1.0 + 3.0 * (float(g) / 8.0)
+
+## 综合售价倍率：目标地图不产出才有跨度溢价，否则按普通距离差价
+static func sale_multiplier(produced_here: bool, gap: int) -> float:
+	if produced_here:
+		return 1.0
+	return span_premium(gap)

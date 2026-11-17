@@ -18,6 +18,17 @@ static func apply(player_ship, enemy_ship, info: Dictionary) -> Dictionary:
 	result.gold = int(round(float(g * mult) * loot_mult))
 	GameState.add_gold(result.gold)
 
+	# NPC 载货：击沉可获其 30%（与市场结算无关，纯战斗收益）
+	var hold: Dictionary = {}
+	var hold_raw: Variant = enemy_ship.get("cargo_hold")
+	if hold_raw != null and hold_raw is Dictionary:
+		for cid in hold_raw.keys():
+			var carried := int(hold_raw[cid])
+			var take := int(floor(float(carried) * 0.3))
+			if take > 0:
+				hold[cid] = take
+	result["cargo_hold"] = hold
+
 	var amount := int(round(float(int(enemy_ship.loot_amount) * mult) * loot_mult))
 	result["overflow"] = 0
 	if amount > 0 and String(enemy_ship.loot_commodity) != "":
@@ -25,6 +36,12 @@ static func apply(player_ship, enemy_ship, info: Dictionary) -> Dictionary:
 		if got > 0:
 			result.cargo[String(enemy_ship.loot_commodity)] = got
 		result["overflow"] = amount - got
+
+	# 载货战利品入舱（受载重限制）
+	for cid2 in hold.keys():
+		var got2: int = GameState.add_cargo(cid2, int(hold[cid2]))
+		if got2 > 0:
+			result.cargo[String(cid2)] = got2
 
 	# 战功：硬通货，只有 Boss / 精英会掉
 	result["commendation"] = 0
@@ -49,6 +66,8 @@ static func describe(result: Dictionary) -> String:
 		parts.append("+%d 金币" % result.gold)
 	for k in result.cargo.keys():
 		parts.append("+%d %s" % [result.cargo[k], k])
+	if not result.get("cargo_hold", {}).is_empty():
+		parts.append("（含缴获载货）")
 	if result.xp > 0:
 		parts.append("+%d 经验" % result.xp)
 	if result.leveled:

@@ -757,6 +757,127 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 岛屿投资与商品产地 ----------------
+
+## 商品产地：origin = 最早出现的地图编号；range = 产出地图区间（含）
+const COMMODITY_ORIGIN := {
+	&"grain": {"origin": 1, "range": [1, 9]},
+	&"timber": {"origin": 1, "range": [1, 9]},
+	&"rum": {"origin": 1, "range": [1, 4]},
+	&"spice": {"origin": 5, "range": [5, 9]},
+}
+
+const ISLAND_INVEST_TIERS := [0, 5000, 20000, 60000, 150000]
+const ISLAND_DISCOUNTS := [0, 10, 20, 35, 50]
+const ISLAND_UPGRADE_WEEKS := 52
+
+var island_investment: Dictionary = {}     # key -> 累计投资额
+var island_upgrade_start: Dictionary = {}  # key -> 满额时的周序号
+var island_tier: Dictionary = {}           # key -> 当前聚落等级（1/2/3）
+var port_registry: Dictionary = {}         # key -> {"name","map","tier"} 供世界市场使用
+
+func commodity_origin_tier(cid: StringName) -> int:
+	var d: Dictionary = COMMODITY_ORIGIN.get(cid, {})
+	return int(d.get("origin", 1))
+
+func commodity_produced_in(cid: StringName, map_index: int) -> bool:
+	var d: Dictionary = COMMODITY_ORIGIN.get(cid, {})
+	if d.is_empty():
+		return true
+	var rng: Array = d.get("range", [1, 9])
+	return map_index >= int(rng[0]) and map_index <= int(rng[1])
+
+## 售出倍率：目标地图不产出才有跨度溢价
+func sale_multiplier_at(cid: StringName, map_index: int) -> float:
+	var produced := commodity_produced_in(cid, map_index)
+	var gap: int = maxi(0, map_index - commodity_origin_tier(cid))
+	return MarketModel.sale_multiplier(produced, gap)
+
+func island_key(map_index: int, idx: int) -> String:
+	return "m%d_%d" % [map_index, idx]
+
+## 海域生成时登记港口元信息（世界市场靠它显示名称与位置）
+func register_port(key: String, name: String, map_index: int, tier: int) -> void:
+	port_registry[key] = {"name": name, "map": map_index, "tier": tier}
+
+func island_tier_of(key: String, fallback: int) -> int:
+	return clampi(int(island_tier.get(key, fallback)), 1, 3)
+
+func island_set_tier(key: String, tier: int) -> void:
+	island_tier[key] = clampi(tier, 1, 3)
+
+func island_invested(key: String) -> int:
+	return int(island_investment.get(key, 0))
+
+## 投资等级 1~5
+func island_level(key: String) -> int:
+	var v := island_invested(key)
+	var lv := 1
+	for i in range(ISLAND_INVEST_TIERS.size()):
+		if v >= int(ISLAND_INVEST_TIERS[i]):
+			lv = i + 1
+	return clampi(lv, 1, 5)
+
+func island_discount(key: String) -> int:
+	return int(ISLAND_DISCOUNTS[island_level(key) - 1])
+
+func island_next_threshold(key: String) -> int:
+	var lv := island_level(key)
+	if lv >= 5:
+		return int(ISLAND_INVEST_TIERS[4])
+	return int(ISLAND_INVEST_TIERS[lv])
+
+## 注资
+func invest_island(key: String, gold: int) -> bool:
+	if gold <= 0 or self.gold < gold:
+		return false
+	add_gold(-gold)
+	island_investment[key] = island_invested(key) + gold
+	_maybe_start_island_upgrade(key)
+	return true
+
+## 市场成交额按 10% 转化为投资额（不扣钱）
+func credit_island_trade(key: String, turnover: int) -> void:
+	if turnover <= 0:
+		return
+	var inc := int(turnover * 0.10)
+	if inc <= 0:
+		return
+	island_investment[key] = island_invested(key) + inc
+	_maybe_start_island_upgrade(key)
+
+## 投资满额（Lv5）且聚落未到城市 → 开始 52 周升格计时
+func _maybe_start_island_upgrade(key: String) -> void:
+	if island_upgrade_start.has(key):
+		return
+	if island_level(key) < 5:
+		return
+	var tier := int(island_tier.get(key, 1))
+	if tier >= 3:
+		return
+	island_upgrade_start[key] = TimeService.total_weeks()
+
+## 周推进：满了 52 周就升格并清零
+func tick_island_upgrades() -> Array:
+	var done: Array = []
+	for key in island_upgrade_start.keys():
+		var start := int(island_upgrade_start[key])
+		if TimeService.total_weeks() - start < ISLAND_UPGRADE_WEEKS:
+			continue
+		var tier := clampi(int(island_tier.get(key, 1)) + 1, 1, 3)
+		island_tier[key] = tier
+		island_investment[key] = 0
+		island_upgrade_start.erase(key)
+		done.append(key)
+	return done
+
+## 升格进度（周）；没有在计时返回 null
+func island_upgrade_progress(key: String):
+	if not island_upgrade_start.has(key):
+		return null
+	var elapsed: int = TimeService.total_weeks() - int(island_upgrade_start[key])
+	return {"elapsed": clampi(elapsed, 0, ISLAND_UPGRADE_WEEKS), "total": ISLAND_UPGRADE_WEEKS}
+
 # ---------------- 港口服务分级 ----------------
 
 const PORT_NAMES := {1: "渔港村落", 2: "乡镇", 3: "港口城市"}
@@ -954,6 +1075,10 @@ func to_dict() -> Dictionary:
 		"cargo": _cargo_to_dict(),
 		"warehouse": _cargo_to_dict_of(warehouse),
 		"island_stock": island_stock.duplicate(),
+		"island_investment": island_investment.duplicate(),
+		"island_upgrade_start": island_upgrade_start.duplicate(),
+		"island_tier": island_tier.duplicate(),
+		"port_registry": port_registry.duplicate(true),
 		"world": {
 			"current_map": current_map, "pos_x": sea_position.x, "pos_y": sea_position.y,
 			"cleared": cleared_maps.duplicate(), "boss": boss_defeated.duplicate(),
@@ -1022,6 +1147,22 @@ func from_dict(d: Dictionary) -> void:
 	sail_pct = float(s.get("sail_pct", 1.0))
 	rudder_pct = float(s.get("rudder_pct", 1.0))
 	crew_pct = float(s.get("crew_pct", 1.0))
+	island_investment.clear()
+	var inv_d: Dictionary = d.get("island_investment", {})
+	for k in inv_d.keys():
+		island_investment[String(k)] = int(inv_d[k])
+	island_upgrade_start.clear()
+	var ups_d: Dictionary = d.get("island_upgrade_start", {})
+	for k in ups_d.keys():
+		island_upgrade_start[String(k)] = int(ups_d[k])
+	port_registry.clear()
+	var pr: Dictionary = d.get("port_registry", {})
+	for k in pr.keys():
+		port_registry[String(k)] = pr[k]
+	island_tier.clear()
+	var tier_d: Dictionary = d.get("island_tier", {})
+	for k in tier_d.keys():
+		island_tier[String(k)] = int(tier_d[k])
 	island_stock.clear()
 	var isl_d: Dictionary = d.get("island_stock", {})
 	for k in isl_d.keys():
@@ -1180,6 +1321,10 @@ func reset_new_game() -> void:
 	cargo.clear()
 	warehouse.clear()
 	island_stock.clear()
+	island_investment.clear()
+	island_upgrade_start.clear()
+	island_tier.clear()
+	port_registry.clear()
 	home_port_tier = 1
 	current_map = 1
 	sea_position = Vector2.ZERO

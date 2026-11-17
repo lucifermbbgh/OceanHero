@@ -38,6 +38,10 @@ func _process(delta: float) -> void:
 
 # ---------------- 日期查询 ----------------
 
+## 从开局起的累计周数（投资升格计时用）
+func total_weeks() -> int:
+	return total_days / DAYS_PER_WEEK
+
 func year() -> int:
 	return total_days / DAYS_PER_YEAR + 1
 

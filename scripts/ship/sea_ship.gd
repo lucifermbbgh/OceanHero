@@ -55,6 +55,7 @@ var world_bounds := Rect2(0, 0, 8000, 8000)   # 场景注入：航行边界
 var auto_fire := false         # 玩家：锁定后是否持续自动开火（按「开火」切换）
 var _avoiding := false         # 是否正在绕障（带滞回）
 var _avoid_side := 1.0         # 锁定的绕行侧，进入时决定，离开前不变
+var cargo_hold: Dictionary = {}   # NPC 携带的货物（击沉后掉 30%）
 var last_attacker = null
 var dodging := false           # 玩家按下撤离后的一段时间内处于"主动脱离"
 var dodge_timer := 0.0

@@ -19,10 +19,36 @@ func _on_week_advanced(week_index: int) -> void:
 		GameState.refresh_tavern()
 		GameState.tick_exchange()
 		GameState.regen_islands(30, 10)
+		_npc_trade_flow()
+		var ups: Array = GameState.tick_island_upgrades()
+		for k in ups:
+			EventBus.ticker.emit("岛屿升格完成：%s" % String(k))
 		GameState.refresh_quests()
 		GameState.reset_donations()
 		GameState.decay_notoriety()
 	EventBus.ticker.emit("%s · 周结算：产出 / 建造 / 薪酬 / 市场" % TimeService.date_text())
+
+## NPC 货流：按周聚合，直接增减港口库存（不做逐船模拟）
+func _npc_trade_flow() -> void:
+	var keys: Array = GameState.port_stock.keys()
+	if keys.is_empty():
+		return
+	for i in range(8):
+		var from_id: StringName = keys[RngService.randi_range(0, keys.size() - 1)]
+		var to_id: StringName = keys[RngService.randi_range(0, keys.size() - 1)]
+		if from_id == to_id:
+			continue
+		var src: Dictionary = GameState.port_stock.get(from_id, {})
+		if src.is_empty():
+			continue
+		var cids: Array = src.keys()
+		var cid: StringName = cids[RngService.randi_range(0, cids.size() - 1)]
+		var move := mini(int(src.get(cid, 0)), RngService.randi_range(4, 16))
+		if move <= 0:
+			continue
+		GameState.set_stock(from_id, cid, int(src.get(cid, 0)) - move)
+		var dst: Dictionary = GameState.port_stock.get(to_id, {})
+		GameState.set_stock(to_id, cid, int(dst.get(cid, 0)) + move)
 
 func _produce() -> void:
 	var p: Dictionary = GameState.total_production()
