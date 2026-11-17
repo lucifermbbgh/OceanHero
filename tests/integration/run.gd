@@ -646,48 +646,53 @@ func _test_bank_v012() -> void:
 	_ok(not bool(GameState.bank_borrow(1000, 12).get("ok", true)), "无存款不能贷款")
 	GameState.bank_deposit_gold(10000)
 
-	# 超额度被拒
-	_ok(not bool(GameState.bank_borrow(20000, 12).get("ok", true)), "超过存款额被拒")
+	# 金额与期限分级
+	_ok(not bool(GameState.bank_borrow(3000, 12).get("ok", true)), "非分级金额被拒")
+	_ok(not bool(GameState.bank_borrow(100000, 12).get("ok", true)), "L5 不支持一季期限")
+	_ok(not bool(GameState.bank_borrow(200000, 52).get("ok", true)), "超出分级上限被拒")
 
-	# 三档利率
-	var r12: Dictionary = GameState.bank_borrow(10000, 12)
-	_ok(bool(r12.get("ok", false)), "一季期贷款成功")
-	_ok(is_equal_approx(GameState.loan_rate, 0.002), "一季期利率 0.2%", str(GameState.loan_rate))
-	_ok(int(r12.get("interest", 0)) == 240, "一季期利息 240", str(r12.get("interest", 0)))
-	_ok(not bool(GameState.bank_borrow(10000, 12).get("ok", true)), "已有贷款时不能再借")
+	# 利息计算
+	_ok(GameState.loan_interest_for(1000, 12) == 24, "L1 一季利息 24")
+	_ok(GameState.loan_interest_for(5000, 26) == 390, "L2 半年利息 390")
+	_ok(GameState.loan_interest_for(20000, 52) == 5200, "L3 一年利息 5200")
+	_ok(GameState.loan_interest_for(50000, 52) == 13000, "L4 一年利息 13000")
+	_ok(GameState.loan_interest_for(100000, 52) == 26000, "L5 一年利息 26000")
 
-	# 提前还款
-	GameState.gold = 100000
-	var rep: Dictionary = GameState.bank_repay()
-	_ok(bool(rep.get("ok", false)), "可以提前还清")
-	_ok(not GameState.loan_active(), "还清后无贷款")
+	# 多笔并发
+	GameState.reset_new_game()
+	GameState.add_gold(500000)
+	GameState.bank_deposit_gold(100000)
+	_ok(bool(GameState.bank_borrow(20000, 52).get("ok", false)), "第一笔贷款成功")
+	_ok(bool(GameState.bank_borrow(5000, 26).get("ok", false)), "第二笔贷款成功")
+	_ok(GameState.loan_count() == 2, "可同时持有两笔", str(GameState.loan_count()))
+	var exp1 := GameState.loan_exposure()
+	_ok(exp1 == 20000 + 5200 + 5000 + 390, "本息总额 = 本金 + 未付利息", str(exp1))
+	# 超本息总额被拒
+	_ok(not bool(GameState.bank_borrow(100000, 52).get("ok", true)), "本息总额超存款被拒")
+	# 笔数上限
+	while GameState.loan_count() < 6 and bool(GameState.bank_borrow(1000, 12).get("ok", false)):
+		pass
+	_ok(GameState.loan_count() <= 6, "贷款笔数不超过 6")
+	_ok(not bool(GameState.bank_borrow(1000, 12).get("ok", true)), "达到 6 笔后拒绝新借")
 
-	# 半年 / 一年 利率
-	GameState.bank_deposit_gold(10000)
-	var r26: Dictionary = GameState.bank_borrow(10000, 26)
-	_ok(is_equal_approx(GameState.loan_rate, 0.003) and int(r26.get("interest", 0)) == 780,
-		"半年期 0.3% / 利息 780", "%s / %d" % [str(GameState.loan_rate), int(r26.get("interest", 0))])
-	GameState.gold = 100000
-	GameState.bank_repay()
-	GameState.bank_deposit_gold(10000)
-	var r52: Dictionary = GameState.bank_borrow(10000, 52)
-	_ok(is_equal_approx(GameState.loan_rate, 0.005) and int(r52.get("interest", 0)) == 2600,
-		"一年期 0.5% / 利息 2600", "%s / %d" % [str(GameState.loan_rate), int(r52.get("interest", 0))])
+	# 逐笔还清
+	GameState.gold = 500000
+	_ok(bool(GameState.bank_repay_one(0).get("ok", false)), "可以单笔还清")
+	_ok(GameState.loan_count() == 5, "单笔还清后数量减一")
 
-	# 破产：到期现金不足
-	GameState.gold = 10
-	GameState.loan_weeks_left = 1
+	# 破产
+	GameState.reset_new_game()
+	GameState.add_gold(50000)
+	GameState.bank_deposit_gold(5000)
+	GameState.bank_borrow(1000, 12)
+	GameState.loans[0]["left"] = 1
+	GameState.gold = 1
 	var ev: Array = GameState.bank_tick_week()
 	var bankrupt := false
 	for e in ev:
 		if String(e.get("type", "")) == "bankrupt":
 			bankrupt = true
-	GameState.gold = 10
-	var ev2: Array = GameState.bank_tick_week()
-	for e in ev2:
-		if String(e.get("type", "")) == "bankrupt":
-			bankrupt = true
-	_ok(bankrupt or not GameState.loan_active(), "到期现金不足会触发结算")
+	_ok(bankrupt or GameState.loans.is_empty(), "到期现金不足触发破产或已结清")
 
 	# 全城互通：存款是全局唯一的
 	GameState.reset_new_game()

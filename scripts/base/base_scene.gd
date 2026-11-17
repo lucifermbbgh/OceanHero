@@ -1398,29 +1398,49 @@ func _rebuild_bank_rows() -> void:
 	wb.pressed.connect(func(): _bank_withdraw_all())
 	hb.add_child(wb)
 
-	_yard_title_to(bank_list, "贷款（额度 = 存款额，当前可贷 %d）" % GameState.bank_credit())
-	if GameState.loan_active():
-		bank_list.add_child(_lbl("　已借 %d · 剩余 %d 周 · 下次付息 %d 金" % [
-			GameState.loan_principal, GameState.loan_weeks_left, GameState.loan_monthly_due()],
-			600, Color(0.9, 0.82, 0.45)))
-		var rb := Button.new()
-		rb.text = "提前还清"
-		rb.custom_minimum_size = Vector2(120, 30)
-		rb.pressed.connect(func(): _bank_repay())
-		bank_list.add_child(rb)
-	else:
-		var lb := HBoxContainer.new()
-		lb.add_theme_constant_override("separation", 8)
-		bank_list.add_child(lb)
-		var tiers := [[12, "一季 0.2%/周"], [26, "半年 0.3%/周"], [52, "一年 0.5%/周"]]
-		for t in tiers:
-			var weeks: int = int(t[0])
+	_yard_title_to(bank_list, "未还贷款 %d / %d 笔 · 未还本息 %d" % [
+		GameState.loan_count(), int(GameState.MAX_LOANS), GameState.loan_exposure()])
+	if GameState.loans.is_empty():
+		bank_list.add_child(_lbl("　（没有未还贷款）", 400, Color(0.5, 0.55, 0.55)))
+	for i in range(GameState.loans.size()):
+		var l: Dictionary = GameState.loans[i]
+		var lhb := HBoxContainer.new()
+		lhb.add_theme_constant_override("separation", 10)
+		bank_list.add_child(lhb)
+		lhb.add_child(_lbl("贷款 %d：%d 金" % [i + 1, int(l.get("amount", 0))], 200))
+		lhb.add_child(_lbl("剩 %d 周 · 下次付息 %d" % [int(l.get("left", 0)),
+			GameState.loan_monthly_due(l)], 220, Color(0.9, 0.82, 0.45)))
+		var li := i
+		var rbtn := Button.new()
+		rbtn.text = "还清"
+		rbtn.custom_minimum_size = Vector2(80, 26)
+		rbtn.pressed.connect(func(): _bank_repay_one(li))
+		lhb.add_child(rbtn)
+	if GameState.loan_count() > 1:
+		var ab := Button.new()
+		ab.text = "全部还清"
+		ab.custom_minimum_size = Vector2(120, 30)
+		ab.pressed.connect(func(): _bank_repay())
+		bank_list.add_child(ab)
+
+	_yard_title_to(bank_list, "新增贷款（本息总额不得超过存款 %d）" % GameState.bank_deposited())
+	var term_names := {12: "一季", 26: "半年", 52: "一年"}
+	for amount in GameState.LOAN_TIERS:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		bank_list.add_child(row)
+		row.add_child(_lbl("%d 金" % int(amount), 110))
+		for weeks in GameState.LOAN_TERMS[amount]:
+			var wk := int(weeks)
+			var chk: Dictionary = GameState.can_take_loan(int(amount), wk)
 			var bb := Button.new()
-			bb.text = "借 %s" % String(t[1])
-			bb.custom_minimum_size = Vector2(150, 30)
-			bb.disabled = GameState.bank_credit() <= 0
-			bb.pressed.connect(func(): _bank_borrow(weeks))
-			lb.add_child(bb)
+			bb.text = "借 %s（%d 息）" % [String(term_names.get(wk, "%d 周" % wk)),
+				GameState.loan_interest_for(int(amount), wk)]
+			bb.custom_minimum_size = Vector2(170, 28)
+			bb.disabled = not bool(chk.get("ok", false))
+			var amt_v: int = int(amount)
+			bb.pressed.connect(func(): _bank_borrow_tier(amt_v, wk))
+			row.add_child(bb)
 
 func _bank_deposit(amount: int) -> void:
 	if GameState.bank_deposit_gold(amount):
@@ -1435,14 +1455,23 @@ func _bank_withdraw_all() -> void:
 		_rebuild_bank_rows()
 		_refresh()
 
-func _bank_borrow(weeks: int) -> void:
-	var r: Dictionary = GameState.bank_borrow(GameState.bank_credit(), weeks)
+func _bank_borrow_tier(amount: int, weeks: int) -> void:
+	var r: Dictionary = GameState.bank_borrow(amount, weeks)
 	if bool(r.get("ok", false)):
-		_log("贷款到账，到期利息 %d" % int(r.get("interest", 0)))
+		_log("贷款到账 %d 金，到期利息 %d" % [amount, int(r.get("interest", 0))])
 		_rebuild_bank_rows()
 		_refresh()
 	else:
 		_log(String(r.get("reason", "贷款失败")))
+
+func _bank_repay_one(index: int) -> void:
+	var r: Dictionary = GameState.bank_repay_one(index)
+	if bool(r.get("ok", false)):
+		_log("已还清该笔 %d 金" % int(r.get("paid", 0)))
+		_rebuild_bank_rows()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "还款失败")))
 
 func _bank_repay() -> void:
 	var r: Dictionary = GameState.bank_repay()
