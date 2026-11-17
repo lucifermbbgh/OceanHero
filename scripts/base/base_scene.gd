@@ -507,11 +507,13 @@ func _rebuild_market() -> void:
 			if absf(chg) < 0.005:
 				chg_text = "持平"
 			elif chg > 0.0:
+				# 上涨用红色（与中式行情一致）
 				chg_text = "↑%d%%" % int(round(chg * 100.0))
-				chg_col = Color(0.55, 0.9, 0.6)
+				chg_col = Color(0.92, 0.45, 0.42)
 			else:
+				# 下跌用绿色
 				chg_text = "↓%d%%" % int(round(chg * 100.0))
-				chg_col = Color(0.9, 0.6, 0.55)
+				chg_col = Color(0.45, 0.85, 0.55)
 		row.add_child(_cell(chg_text, 100, chg_col))
 		row.add_child(_cell(str(stock), 90))
 		row.add_child(_cell(str(have), 70))
