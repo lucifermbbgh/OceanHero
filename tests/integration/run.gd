@@ -680,6 +680,20 @@ func _test_ui_panels_v019() -> void:
 	s._input(ev)
 	await _frames(2)
 	_ok(not s.goods_root.visible, "ESC 先关闭商品弹窗")
+	# 经济总览六个分页
+	for tab in ["ytd_bs", "ytd_pl", "week_pnl", "last_bs", "last_pl", "last_week"]:
+		s.overview_tab = tab
+		s._rebuild_overview()
+		await _frames(1)
+		_ok(s.overview_list.get_child_count() > 1, "总览分页 %s 有内容" % tab,
+			str(s.overview_list.get_child_count()))
+	s.overview_tab = "week_pnl"
+	# 周收支滚动
+	GameState.record_income("贸易", 500)
+	_ok(int(GameState.week_income.get("贸易", 0)) == 500, "本周收入被记录")
+	GameState.week_roll()
+	_ok(int(GameState.last_week_income.get("贸易", 0)) == 500, "上周收入已滚动")
+	_ok(GameState.week_income.is_empty(), "本周收入已清零")
 	# 边际曲线应随真实库存变化（不是一条水平线）
 	var cd0: Dictionary = s._chart_data(&"grain", 10, 400, 800)
 	var mc0: Array = cd0.get("mc", [])

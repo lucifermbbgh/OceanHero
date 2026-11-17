@@ -55,6 +55,7 @@ func _on_week_advanced(week_index: int) -> void:
 		var new_events: Array = GameState.tick_market(week_index)
 		for ev in new_events:
 			EventBus.ticker.emit("市场事件：%s · %s" % [String(ev.get("name", "")), String(ev.get("desc", ""))])
+		GameState.week_roll()
 		GameState.refresh_auctions(week_index)
 		var aevents: Array = GameState.tick_auctions()
 		for ev in aevents:

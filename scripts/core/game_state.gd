@@ -796,6 +796,17 @@ func rep_discount_name() -> String:
 # ---- 财务记账（按自然年） ----
 
 var finance: Dictionary = {}      # {purchases:{cid:{qty,cost}}, sales:{cid:{qty,revenue}}, income:{}, expense:{}}
+var week_income: Dictionary = {}
+var week_expense: Dictionary = {}
+var last_week_income: Dictionary = {}
+var last_week_expense: Dictionary = {}
+
+## 周结算结束时滚动本周账目
+func week_roll() -> void:
+	last_week_income = week_income.duplicate(true)
+	last_week_expense = week_expense.duplicate(true)
+	week_income = {}
+	week_expense = {}
 var reports: Array = []           # 历年财报
 var report_year := 0              # 已出过财报的年份
 
@@ -829,11 +840,13 @@ func record_income(kind: String, amount: int) -> void:
 	if not finance.has("income"):
 		_fin_year_reset()
 	finance["income"][kind] = int(finance["income"].get(kind, 0)) + maxi(0, amount)
+	week_income[kind] = int(week_income.get(kind, 0)) + maxi(0, amount)
 
 func record_expense(kind: String, amount: int) -> void:
 	if not finance.has("expense"):
 		_fin_year_reset()
 	finance["expense"][kind] = int(finance["expense"].get(kind, 0)) + maxi(0, amount)
+	week_expense[kind] = int(week_expense.get(kind, 0)) + maxi(0, amount)
 
 ## 汇总：{income_total, expense_total, net, income:{}, expense:{}}
 func finance_summary() -> Dictionary:
