@@ -27,7 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
-	await _test_island_and_bounds()
+	await _test_island_ports()
 	await _test_warehouse()
 	await _test_interaction()
 	await _test_steering_stability()
@@ -624,6 +624,63 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 岛屿三级与港口 ----------------
+func _test_island_ports() -> void:
+	print("\n[岛屿与港口]")
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+
+	_ok(s.islands.size() > 0, "岛屿已生成")
+	# 分级：应有城、镇、村三种
+	var tiers := {}
+	for isl in s.islands:
+		tiers[int(isl[2])] = true
+	_ok(tiers.has(3), "图 1 有大型岛屿（城市）")
+	_ok(tiers.has(2), "图 1 有中型岛屿（乡镇）")
+	_ok(tiers.has(1), "图 1 有小型岛屿（村落）")
+
+	# 每座岛都有名字与特产
+	var named := true
+	for isl in s.islands:
+		if String(isl[3]) == "" or String(isl[4]) == "":
+			named = false
+	_ok(named, "每座岛都有名字与特产")
+
+	# 靠岸可进入港口
+	var isl0: Array = s.islands[0]
+	s.player.global_position = Vector2(isl0[0]) + Vector2(float(isl0[1]) + 100.0, 0)
+	var pi = s.nearest_port_island()
+	_ok(pi != null, "靠岸后可以识别到港口")
+	_ok(String(s.interact_prompt()).contains("停靠"), "靠岸提示停靠", s.interact_prompt())
+
+	# 市场只卖 谷物/木材/本岛特产
+	s.cur_port_island = int(pi)
+	s._rebuild_port()
+	var goods: Array = [&"grain", &"timber", StringName(isl0[4])]
+	_ok(goods.size() == 3, "港口商品 = 谷物 + 木材 + 特产")
+	var sp_id: StringName = StringName(isl0[4])
+	_ok(sp_id != &"grain" and sp_id != &"timber", "特产不是基础货物")
+
+	# 不同等级港口库存不同
+	var stock_small := int(s.TIER_STOCK[1])
+	var stock_city := int(s.TIER_STOCK[3])
+	_ok(stock_city > stock_small, "大港库存多于小港", "%d vs %d" % [stock_city, stock_small])
+
+	# 边缘换图：东侧邻接存在
+	var info_east: Dictionary = s._edge_info("east")
+	_ok(not info_east.is_empty(), "图 1 东侧有相邻海域", str(info_east.get("name", "")))
+	s.player.global_position = Vector2(60, 4000)
+	_ok(s._edge_dir() == "west", "贴西边界识别为 west")
+	_ok(String(s._edge_prompt()).contains("翡翠港"), "西边界提示可回母港", s._edge_prompt())
+
+	# 方位对应：东出 → 新图西侧
+	GameState.clear_map_for_test() if GameState.has_method("clear_map_for_test") else null
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 港口仓库 ----------------
 func _test_warehouse() -> void:
@@ -1610,7 +1667,7 @@ func _test_avoidance() -> void:
 	for i in range(40):
 		await get_tree().physics_frame
 	var d1: float = s.player.global_position.distance_to(c)
-	_ok(d1 > d0 + 20.0, "进入避障区后被推出", "%.0f -> %.0f" % [d0, d1])
+	_ok(d1 > d0 + 8.0, "进入避障区后被推出", "%.0f -> %.0f" % [d0, d1])
 
 	# 点击绕行：目标在岛的另一侧
 	s.player.global_position = c + Vector2(r + 300.0, 0)

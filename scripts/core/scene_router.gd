@@ -15,6 +15,10 @@ func register_host(h: Node, fade: ColorRect) -> void:
 	host = h
 	_fade = fade
 
+## 测试环境下没有 host，需要能安全跳过场景切换
+func has_host() -> bool:
+	return host != null and is_instance_valid(host)
+
 func goto(screen: StringName) -> void:
 	if host == null:
 		push_error("[SceneRouter] 未注册 host")
