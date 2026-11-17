@@ -23,6 +23,7 @@ const MAP_NEIGHBORS := {
 	9: {"west": 8},
 }
 const EDGE_TRIGGER := 110.0     # 进入这个宽度的边带即触发换图
+const CrewFactory = preload("res://scripts/systems/crew_factory.gd")
 const OUTPOST_ID := &"map1_outpost"
 
 const SEA_SIZE := 8000.0
@@ -46,6 +47,7 @@ var enemies: Array = []
 var spawn_timer := 6.0
 var outpost_pos := Vector2(3400, 5050)
 var cur_port_island := 0        # 当前停靠的岛屿索引
+var _port_tavern: Array = []    # 当前港口的招募候选
 var port_ui: CanvasLayer
 var port_panel: PanelContainer
 var port_list: VBoxContainer
@@ -65,6 +67,8 @@ const ISLAND_RADIUS := {1: Vector2(240, 320), 2: Vector2(360, 450), 3: Vector2(5
 const TIER_STOCK := {1: 40, 2: 90, 3: 160}          # 市场存货按等级
 const SPECIALTIES := [&"iron", &"spice", &"rum"]    # 特产（谷物/木材永远有）
 const PORT_RANGE_EXTRA := 160.0                     # 靠岸判定：岛半径 + 这个
+## 特产价格随港口等级变化（小港贵、大城便宜）
+const SPECIALTY_PRICE_MULT := {1: 1.20, 2: 1.00, 3: 0.85}
 const SPAWN_MARGIN := 300.0
 const PLAYER_SAFE_RADIUS := 1150.0   # 玩家出生点周围不刷怪（略大于 1 倍射程，避免一进场就挨打）
 const NEAR_RING_MIN := 1150.0        # 视野边缘"迎接"单位的距离带
@@ -415,6 +419,11 @@ func _rebuild_port() -> void:
 		var production := 1.0
 		var bp := MarketModel.buy_price(int(c.base_price), stock, max_stock, demand)
 		var sp := MarketModel.sell_price(int(c.base_price), stock, max_stock, production)
+		# 特产价格随港口等级差异化：小港贵、大城便宜
+		if cid == sp_id:
+			var mult: float = float(SPECIALTY_PRICE_MULT.get(tier, 1.0))
+			bp = int(round(float(bp) * float(mult)))
+			sp = int(round(float(sp) * float(mult)))
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 10)
 		port_list.add_child(hb)
@@ -446,6 +455,69 @@ func _rebuild_port() -> void:
 	rb.custom_minimum_size = Vector2(80, 26)
 	rb.pressed.connect(func(): _port_repair(cost))
 	rhb.add_child(rb)
+
+	# ---- 乡镇及以上：船厂 ----
+	if GameState.port_service_unlocked(tier, "shipyard"):
+		_p_title("船厂（乡镇起开放）")
+		var shown := 0
+		for cid2 in DataRegistry.cannons.keys():
+			if shown >= 3:
+				break
+			var cd: Resource = DataRegistry.get_cannon(cid2)
+			if cd == null or int(cd.pound_class) > GameState.cannon_class_cap():
+				continue
+			if GameState.has_cannon(cid2):
+				continue
+			shown += 1
+			var chb := HBoxContainer.new()
+			chb.add_theme_constant_override("separation", 10)
+			port_list.add_child(chb)
+			chb.add_child(_p_lbl(String(cd.display_name), 140))
+			chb.add_child(_p_lbl("伤害 %d · 射程 %d" % [int(cd.damage), int(cd.shot_range)], 190))
+			var price_c := int(cd.get("price"))
+			chb.add_child(_p_lbl("%d 金" % price_c, 90, Color(0.9, 0.82, 0.45)))
+			var cid2v: StringName = cid2
+			var buy_c := Button.new()
+			buy_c.text = "购入并换装"
+			buy_c.custom_minimum_size = Vector2(110, 26)
+			buy_c.disabled = GameState.gold < price_c
+			buy_c.pressed.connect(func(): _port_buy_cannon(cid2v, price_c))
+			chb.add_child(buy_c)
+		if shown == 0:
+			port_list.add_child(_p_lbl("　（本级火炮都已拥有）", 400, Color(0.5, 0.55, 0.55)))
+
+	# ---- 乡镇及以上：酒馆 ----
+	if GameState.port_service_unlocked(tier, "tavern"):
+		_p_title("酒馆（乡镇起开放）")
+		if _port_tavern.is_empty():
+			_port_tavern = CrewFactory.generate(3, GameState.ship_variant)
+		for cw in _port_tavern:
+			var thb := HBoxContainer.new()
+			thb.add_theme_constant_override("separation", 10)
+			port_list.add_child(thb)
+			thb.add_child(_p_lbl(String(cw.display_name), 150))
+			thb.add_child(_p_lbl("%s · %s" % [
+				String(CrewFactory.ROLE_NAMES.get(StringName(cw.role), String(cw.role))),
+				Rarity.name_of(int(cw.rarity))], 170))
+			thb.add_child(_p_lbl("%d 金" % int(cw.hire_cost), 100, Color(0.9, 0.82, 0.45)))
+			var cwv: Resource = cw
+			var hb2 := Button.new()
+			hb2.text = "雇佣"
+			hb2.custom_minimum_size = Vector2(70, 26)
+			hb2.disabled = GameState.gold < int(cw.hire_cost)
+			hb2.pressed.connect(func(): _port_hire_crew(cwv))
+			thb.add_child(hb2)
+
+	# ---- 港口城市：交易所 / 声望 ----
+	if GameState.port_service_unlocked(tier, "exchange"):
+		_p_title("交易所（城市开放）")
+		port_list.add_child(_p_lbl("　本港行情：%s" % _port_price_line(pid, max_stock), 600,
+			Color(0.8, 0.85, 0.7)))
+	if GameState.port_service_unlocked(tier, "reputation"):
+		_p_title("声望与战功（城市开放）")
+		port_list.add_child(_p_lbl("　海军 %d · 商会 %d · 黑帆 %d · 战功 %d" % [
+			GameState.rep_of("royal_navy"), GameState.rep_of("merchant"),
+			GameState.rep_of("black_sail"), GameState.commendation], 600, Color(0.8, 0.85, 0.7)))
 
 	_p_title("任务（交付 / 进度）")
 	var any_q := false
@@ -562,6 +634,49 @@ func _port_deliver_quest(cid: StringName) -> void:
 		return
 	GameState.on_deliver(cid, need)
 	hud.ticker("任务货物已交付")
+	_rebuild_port()
+
+## 本港三件商品的价格摘要
+func _port_price_line(pid: StringName, max_stock: int) -> String:
+	var parts: Array = []
+	var isl: Array = islands[cur_port_island]
+	var goods: Array = [&"grain", &"timber", isl[4]]
+	for cid in goods:
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c == null:
+			continue
+		var stock := GameState.ensure_stock(pid, cid, max_stock)
+		var bp := MarketModel.buy_price(int(c.base_price), stock, max_stock, 1.0)
+		parts.append("%s %d" % [String(c.display_name), bp])
+	return " / ".join(parts)
+
+## 港口船厂：购入并换装火炮
+func _port_buy_cannon(cid: StringName, price: int) -> void:
+	if GameState.gold < price:
+		hud.ticker("金币不足")
+		return
+	if not GameState.can_mount_cannon(cid):
+		hud.ticker("当前船炮位承载不足")
+		return
+	var cd: Resource = DataRegistry.get_cannon(cid)
+	GameState.add_gold(-price)
+	if not GameState.has_cannon(cid):
+		GameState.cannons_owned.append(cid)
+	GameState.cannon_id = cid
+	hud.ticker("购入并换装 %s" % String(cd.display_name))
+	_rebuild_port()
+
+## 港口酒馆：雇佣船员
+func _port_hire_crew(crew: Resource) -> void:
+	if crew == null:
+		return
+	if GameState.gold < int(crew.hire_cost):
+		hud.ticker("金币不足")
+		return
+	GameState.add_gold(-int(crew.hire_cost))
+	GameState.hire_crew(crew)
+	_port_tavern.erase(crew)
+	hud.ticker("雇佣了 %s" % String(crew.display_name))
 	_rebuild_port()
 
 func _port_max_stock() -> int:

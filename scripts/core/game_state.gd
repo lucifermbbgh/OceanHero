@@ -71,7 +71,9 @@ var current_port: StringName = &"jadehaven"   # 当前船停靠/出发的港口
 # --- 货舱 ---
 var cargo: Dictionary = {}          # StringName -> int（船上货舱）
 var warehouse: Dictionary = {}      # StringName -> int（母港仓库）
-var island_stock: Dictionary = {}   # "m1_0" -> 剩余储量（岛屿采集）
+var island_stock: Dictionary = {}   # 兼容保留（岛屿采集已废弃）
+## 母港成长等级：1 渔港村落 / 2 乡镇 / 3 港口城市
+var home_port_tier := 1
 
 # --- 世界 ---
 var current_map: int = 1
@@ -755,6 +757,60 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 港口服务分级 ----------------
+
+const PORT_NAMES := {1: "渔港村落", 2: "乡镇", 3: "港口城市"}
+## 服务 → 解锁所需等级
+const PORT_SERVICES := {
+	"repair": 1, "market": 1, "tavern": 1, "quests": 1, "shiptrade": 1,
+	"shipyard": 2, "building": 2,
+	"exchange": 3, "reputation": 3,
+}
+## 母港升级条件
+const PORT_UPGRADE_COST := {
+	2: {"gold": 5000, "timber": 100, "iron": 50},
+	3: {"gold": 30000, "timber": 400, "iron": 200},
+}
+
+func port_name(tier: int) -> String:
+	return String(PORT_NAMES.get(clampi(tier, 1, 3), "港口"))
+
+func port_service_unlocked(tier: int, service: String) -> bool:
+	return clampi(tier, 1, 3) >= int(PORT_SERVICES.get(service, 1))
+
+func home_port_name() -> String:
+	return port_name(home_port_tier)
+
+## 当前港口的某项服务是否可用（母港用 home_port_tier）
+func home_has(service: String) -> bool:
+	return port_service_unlocked(home_port_tier, service)
+
+## 下一级升级条件；已满级返回空字典
+func home_upgrade_cost() -> Dictionary:
+	return PORT_UPGRADE_COST.get(home_port_tier + 1, {})
+
+func can_upgrade_home_port() -> bool:
+	var cost := home_upgrade_cost()
+	if cost.is_empty():
+		return false
+	if gold < int(cost.get("gold", 0)):
+		return false
+	if int(resources.get("timber", 0)) < int(cost.get("timber", 0)):
+		return false
+	if int(resources.get("iron", 0)) < int(cost.get("iron", 0)):
+		return false
+	return true
+
+func upgrade_home_port() -> bool:
+	if not can_upgrade_home_port():
+		return false
+	var cost := home_upgrade_cost()
+	add_gold(-int(cost.get("gold", 0)))
+	resources["timber"] = maxi(0, int(resources.get("timber", 0)) - int(cost.get("timber", 0)))
+	resources["iron"] = maxi(0, int(resources.get("iron", 0)) - int(cost.get("iron", 0)))
+	home_port_tier = clampi(home_port_tier + 1, 1, 3)
+	return true
+
 # ---------------- 岛屿采集 ----------------
 
 func island_stock_of(key: String, default_value: int) -> int:
@@ -885,6 +941,7 @@ func to_dict() -> Dictionary:
 			"crew": _crew_to_array(), "crew_assigned": _names_to_strings(crew_assigned),
 		},
 		"base": {
+			"port_tier": home_port_tier,
 			"buildings": _buildings_to_dict(), "resources": resources.duplicate(),
 			"queue": _queue_to_array(),
 		},
@@ -993,6 +1050,8 @@ func from_dict(d: Dictionary) -> void:
 	stat_bosses = int(st2.get("bosses", 0))
 	game_cleared = bool(st2.get("cleared", false))
 	var bs: Dictionary = d.get("base", {})
+	# 旧存档没有该字段 → 按 Lv3 兼容，避免老玩家被降级
+	home_port_tier = clampi(int(bs.get("port_tier", 3)), 1, 3)
 	buildings.clear()
 	var bld: Dictionary = bs.get("buildings", {})
 	for k in bld.keys():
@@ -1121,6 +1180,7 @@ func reset_new_game() -> void:
 	cargo.clear()
 	warehouse.clear()
 	island_stock.clear()
+	home_port_tier = 1
 	current_map = 1
 	sea_position = Vector2.ZERO
 	cleared_maps.clear()

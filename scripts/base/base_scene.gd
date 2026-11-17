@@ -109,14 +109,20 @@ func _build_ui() -> void:
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 8)
 	left.add_child(vb)
+	# 按母港等级显示入口（未解锁的服务不出现，而不是灰掉）
 	_action_button(vb, "修理船只", _do_repair)
 	_action_button(vb, "市场交易", _toggle_market)
-	_action_button(vb, "船厂与装备", _toggle_yard)
 	_action_button(vb, "酒馆招募", _toggle_tavern)
-	_action_button(vb, "基地建设", _toggle_build)
-	_action_button(vb, "交易所", _toggle_exchange)
 	_action_button(vb, "任务板", _toggle_quests)
-	_action_button(vb, "声望与战功", _toggle_rep)
+	if GameState.home_has("shipyard"):
+		_action_button(vb, "船厂与装备", _toggle_yard)
+	if GameState.home_has("building"):
+		_action_button(vb, "基地建设", _toggle_build)
+	if GameState.home_has("exchange"):
+		_action_button(vb, "交易所", _toggle_exchange)
+	if GameState.home_has("reputation"):
+		_action_button(vb, "声望与战功", _toggle_rep)
+	_action_button(vb, _port_upgrade_label(), _do_upgrade_port)
 	_action_button(vb, "出航", _set_sail)
 	_action_button(vb, "存档", _toggle_save)
 	_action_button(vb, "帮助", _toggle_help)
@@ -292,7 +298,8 @@ func _refresh() -> void:
 	var st: Dictionary = GameState.stats()
 	var hull_max := float(st.get("hull_max", 400.0))
 	var hull := GameState.hull_hp if GameState.hull_hp >= 0.0 else hull_max
-	status_label.text = "翡翠港 · %s·%s · 金币 %d · 战功 %d · 船体 %.0f/%.0f · 货舱 %.0f/%.0f · %s" % [
+	status_label.text = "翡翠港（%s）· %s·%s · 金币 %d · 战功 %d · 船体 %.0f/%.0f · 货舱 %.0f/%.0f · %s" % [
+		GameState.home_port_name(),
 		def.display_name, String(st.get("variant_name", "")), GameState.gold, GameState.commendation,
 		hull, hull_max, GameState.cargo_used(), float(GameState.cargo_capacity()), TimeService.date_text(),
 	]
@@ -1219,6 +1226,29 @@ func _dismiss_crew(cid: StringName) -> void:
 	GameState.dismiss_crew(cid)
 	_log("已解雇该船员")
 	_rebuild_tavern()
+
+## 升级按钮文案：满级显示当前等级，否则显示所需资源
+func _port_upgrade_label() -> String:
+	if GameState.home_upgrade_cost().is_empty():
+		return "港口已达最高级"
+	var c := GameState.home_upgrade_cost()
+	return "升级港口 → %s（%d 金 / %d 木 / %d 铁）" % [
+		GameState.port_name(GameState.home_port_tier + 1),
+		int(c.get("gold", 0)), int(c.get("timber", 0)), int(c.get("iron", 0))]
+
+func _do_upgrade_port() -> void:
+	if GameState.home_upgrade_cost().is_empty():
+		_log("母港已是最高等级")
+		return
+	if not GameState.can_upgrade_home_port():
+		_log("资源不足，无法升级母港")
+		return
+	var before := GameState.home_port_tier
+	if GameState.upgrade_home_port():
+		_log("母港升级：%s → %s" % [GameState.port_name(before), GameState.home_port_name()])
+		SceneRouter.goto(&"base")
+	else:
+		_log("升级失败")
 
 func _hire_crew(cid: StringName) -> void:
 	var crew: Resource = null

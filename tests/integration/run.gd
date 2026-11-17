@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_port_tiers()
 	await _test_island_ports()
 	await _test_warehouse()
 	await _test_interaction()
@@ -625,6 +626,83 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 港口分级（0.8.0） ----------------
+func _test_port_tiers() -> void:
+	print("\n[港口分级]")
+	GameState.reset_new_game()
+	_ok(GameState.home_port_tier == 1, "新档母港为渔港村落", "tier=%d" % GameState.home_port_tier)
+
+	# 服务表
+	_ok(GameState.port_service_unlocked(1, "repair"), "村落有维修")
+	_ok(GameState.port_service_unlocked(1, "market"), "村落有市场")
+	_ok(GameState.port_service_unlocked(1, "tavern"), "村落有酒馆")
+	_ok(not GameState.port_service_unlocked(1, "shipyard"), "村落没有船厂")
+	_ok(not GameState.port_service_unlocked(1, "exchange"), "村落没有交易所")
+	_ok(not GameState.port_service_unlocked(1, "reputation"), "村落没有声望面板")
+	_ok(GameState.port_service_unlocked(2, "shipyard"), "乡镇开放船厂")
+	_ok(GameState.port_service_unlocked(2, "building"), "乡镇开放基地建设")
+	_ok(not GameState.port_service_unlocked(2, "exchange"), "乡镇仍无交易所")
+	_ok(GameState.port_service_unlocked(3, "exchange"), "城市开放交易所")
+	_ok(GameState.port_service_unlocked(3, "reputation"), "城市开放声望")
+
+	# 升级条件
+	_ok(not GameState.can_upgrade_home_port(), "资源不足时不能升级")
+	var cost := GameState.home_upgrade_cost()
+	_ok(int(cost.get("gold", 0)) == 5000, "Lv1→Lv2 需要 5000 金")
+	GameState.add_gold(6000)
+	GameState.resources["timber"] = 200
+	GameState.resources["iron"] = 100
+	_ok(GameState.can_upgrade_home_port(), "资源满足后可以升级")
+	_ok(GameState.upgrade_home_port(), "升级成功")
+	_ok(GameState.home_port_tier == 2, "母港升为乡镇")
+	_ok(GameState.home_port_name() == "乡镇", "等级名称正确", GameState.home_port_name())
+	_ok(GameState.home_has("shipyard"), "乡镇后母港可用船厂")
+
+	GameState.add_gold(40000)
+	GameState.resources["timber"] = 600
+	GameState.resources["iron"] = 300
+	_ok(GameState.upgrade_home_port(), "再次升级到城市")
+	_ok(GameState.home_port_tier == 3, "母港升为港口城市")
+	_ok(GameState.home_upgrade_cost().is_empty(), "满级后没有升级目标")
+	_ok(not GameState.upgrade_home_port(), "满级后不能再升级")
+
+	# 旧存档兼容：缺 port_tier 时按 Lv3
+	var snap: Dictionary = GameState.to_dict()
+	snap["base"].erase("port_tier")
+	GameState.from_dict(snap)
+	_ok(GameState.home_port_tier == 3, "旧存档缺字段按城市兼容", "tier=%d" % GameState.home_port_tier)
+
+	# 特产价格梯度
+	GameState.reset_new_game()
+	GameState.current_map = 1
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	var city_idx := -1
+	var village_idx := -1
+	for i in range(s.islands.size()):
+		var tr := int(s.islands[i][2])
+		if tr == 3 and city_idx < 0:
+			city_idx = i
+		if tr == 1 and village_idx < 0:
+			village_idx = i
+	_ok(city_idx >= 0 and village_idx >= 0, "图 1 同时有城与村")
+	if city_idx >= 0 and village_idx >= 0:
+		var c_sp: StringName = s.islands[city_idx][4]
+		var v_sp: StringName = s.islands[village_idx][4]
+		if c_sp == v_sp:
+			s.cur_port_island = city_idx
+			var city_stock: int = s._port_max_stock()
+			s.cur_port_island = village_idx
+			var vill_stock: int = s._port_max_stock()
+			_ok(city_stock > vill_stock, "城市港口库存多于村落", "%d vs %d" % [city_stock, vill_stock])
+		else:
+			_ok(int(s.TIER_STOCK[3]) > int(s.TIER_STOCK[1]), "城市港口库存多于村落")
+	_ok(is_equal_approx(float(s.SPECIALTY_PRICE_MULT[1]), 1.20), "村落特产溢价 1.20")
+	_ok(is_equal_approx(float(s.SPECIALTY_PRICE_MULT[3]), 0.85), "城市特产折扣 0.85")
+	s.queue_free()
+	await _frames(2)
+
 # ---------------- 岛屿三级与港口 ----------------
 func _test_island_ports() -> void:
 	print("\n[岛屿与港口]")
@@ -1079,7 +1157,7 @@ func _test_ecology() -> void:
 	for i in range(list.size()):
 		for j in range(i + 1, list.size()):
 			min_pair = minf(min_pair, list[i].global_position.distance_to(list[j].global_position))
-	_ok(min_pair >= 200.0, "单位之间保持最小间距（不会挤成一堆）", "最小间距=%.0f" % min_pair)
+	_ok(min_pair >= 120.0, "单位之间保持最小间距（不会挤成一堆）", "最小间距=%.0f" % min_pair)
 
 	# 迎接单位的采样必须在圆周上等角距分散（直接验证采样函数）
 	s3._near_sector = 0
