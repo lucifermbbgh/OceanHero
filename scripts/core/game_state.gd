@@ -6,6 +6,7 @@ const CrewFactory = preload("res://scripts/systems/crew_factory.gd")
 const MarketModel = preload("res://scripts/systems/market_model.gd")
 const CRes = preload("res://scripts/systems/combat_resolver.gd")
 const CrewDefScript = preload("res://scripts/data/crew_def.gd")
+const AuctionFactory = preload("res://scripts/systems/auction_factory.gd")
 
 const START_GOLD := 500
 const START_SHIP := &"fishing_sloop"
@@ -756,6 +757,94 @@ func cargo_used() -> float:
 
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
+
+# ---------------- 拍卖行 ----------------
+
+var auctions: Array = []        # 当前挂单
+var auction_week := -1          # 上次刷新的周
+var auction_defects := 0        # 违约次数（拍下后资金不足）
+
+## 每周刷新：挂单清空后补 3~5 件
+func refresh_auctions(week: int) -> void:
+	if auction_week == week:
+		return
+	auction_week = week
+	if not auctions.is_empty():
+		return
+	var n := RngService.randi_range(3, 5)
+	auctions = AuctionFactory.generate(n, level)
+
+## 玩家出价：必须 ≥ 当前价 × 1.05
+func bid_auction(index: int, price: int) -> Dictionary:
+	if index < 0 or index >= auctions.size():
+		return {"ok": false, "reason": "无效货品"}
+	var lot: Dictionary = auctions[index]
+	var cur := int(lot.get("price", 0))
+	var need := int(ceil(float(cur) * 1.05))
+	if price < need:
+		return {"ok": false, "reason": "出价需至少 %d" % need}
+	if gold < price:
+		return {"ok": false, "reason": "金币不足"}
+	lot["price"] = price
+	lot["leader"] = "player"
+	return {"ok": true, "price": price}
+
+## 每周：NPC 加价 → 倒计时 → 到期结算
+func tick_auctions() -> Array:
+	var events: Array = []
+	var kept: Array = []
+	for lot in auctions:
+		var kind := String(lot.get("kind", ""))
+		if not lot.has("leader"):
+			lot["leader"] = ""
+		# NPC 加价（40% 概率，+8%~15%）
+		if lot.get("leader") != "player" or true:
+			if RngService.chance(0.4):
+				var old := int(lot.get("price", 0))
+				var bump := old + int(round(float(old) * RngService.randf_range(0.08, 0.15)))
+				lot["price"] = bump
+				lot["leader"] = "npc"
+				events.append({"type": "npc_bid", "name": String(lot.get("name", "")), "price": bump})
+		lot["weeks"] = int(lot.get("weeks", 2)) - 1
+		if int(lot["weeks"]) > 0:
+			kept.append(lot)
+			continue
+		# 到期结算
+		if String(lot.get("leader", "")) != "player":
+			events.append({"type": "lost", "name": String(lot.get("name", ""))})
+			continue
+		var price := int(lot.get("price", 0))
+		if gold < price:
+			auction_defects += 1
+			events.append({"type": "default", "name": String(lot.get("name", ""))})
+			continue
+		if kind == "ship" or kind == "magic":
+			if ships_owned.size() + 1 > storage_slots():
+				kept.append(lot)   # 船位不足，保留到下周
+				lot["weeks"] = 1
+				events.append({"type": "no_slot", "name": String(lot.get("name", ""))})
+				continue
+			add_gold(-price)
+			add_owned_ship(StringName(lot.get("def_id", String(START_SHIP))),
+				StringName(lot.get("variant", "standard")), price)
+			events.append({"type": "won", "name": String(lot.get("name", "")), "price": price})
+		elif kind == "gear":
+			add_gold(-price)
+			for g in lot.get("gear", []):
+				gear_owned.append(StringName(g))
+			events.append({"type": "won", "name": String(lot.get("name", "")), "price": price})
+		elif kind == "crew":
+			var cid := StringName(lot.get("crew_id", ""))
+			if cid != &"":
+				var roster: Array = CrewFactory.generate(1, ship_variant)
+				if not roster.is_empty():
+					var c: Resource = roster[0]
+					c.rarity = 3
+					add_gold(-price)
+					hire_crew(c)
+					events.append({"type": "won", "name": String(c.display_name), "price": price})
+	auctions = kept
+	return events
 
 # ---------------- 岛屿投资与商品产地 ----------------
 

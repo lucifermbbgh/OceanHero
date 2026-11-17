@@ -48,6 +48,7 @@ var spawn_timer := 6.0
 var outpost_pos := Vector2(3400, 5050)
 var cur_port_island := 0        # 当前停靠的岛屿索引
 var _port_tavern: Array = []    # 当前港口的招募候选
+var port_tab := "local"         # local = 本地市场，world = 世界市场
 var port_ui: CanvasLayer
 var port_panel: PanelContainer
 var port_list: VBoxContainer
@@ -101,6 +102,7 @@ func _ready() -> void:
 	_spawn_player()
 	_build_camera()
 	_build_hud()
+	EventBus.islands_upgraded.connect(_on_islands_upgraded)
 	_build_port_ui()
 	var pd: Resource = DataRegistry.get_port(OUTPOST_ID)
 	if pd != null:
@@ -110,6 +112,26 @@ func _ready() -> void:
 	_spawn_escort_if_needed()
 	var map_name := String(map_def.display_name) if map_def != null else "未知海域"
 	hud.ticker("%s · 用 A/D 转舵，点击敌船锁定后自动开火" % map_name)
+
+## 升格实时生效：把场景里的岛屿换成新等级，并播报
+func _on_islands_upgraded(keys: Array) -> void:
+	var changed := 0
+	for i in range(islands.size()):
+		var key := GameState.island_key(map_index, i)
+		if not keys.has(key):
+			continue
+		var new_tier := GameState.island_tier_of(key, int(islands[i][2]))
+		if new_tier == int(islands[i][2]):
+			continue
+		islands[i][2] = new_tier
+		islands[i][3] = _island_name(i, new_tier)
+		GameState.register_port(key, String(islands[i][3]), map_index, new_tier)
+		hud.ticker("聚落升格：%s（%s）" % [String(islands[i][3]), String(ISLAND_TIERS.get(new_tier, "港口"))])
+		changed += 1
+	if changed > 0:
+		if port_panel.visible:
+			_rebuild_port()
+		queue_redraw()
 
 func _generate_islands() -> void:
 	islands.clear()
@@ -412,6 +434,57 @@ func _rebuild_port() -> void:
 		GameState.cargo_used(), float(GameState.cargo_capacity())])
 
 	_p_title("市场 · 本岛特产：谷物 / 木材 / %s" % (sp_res.display_name if sp_res != null else "—"))
+	# 市场页签
+	var mtabs := HBoxContainer.new()
+	mtabs.add_theme_constant_override("separation", 8)
+	port_list.add_child(mtabs)
+	var tb_local := Button.new()
+	tb_local.text = "本地市场"
+	tb_local.custom_minimum_size = Vector2(120, 30)
+	tb_local.modulate = Color(1.0, 0.92, 0.6) if port_tab == "local" else Color(1, 1, 1)
+	tb_local.pressed.connect(func(): port_tab = "local"; _rebuild_port())
+	mtabs.add_child(tb_local)
+	var tb_world := Button.new()
+	tb_world.text = "世界市场"
+	tb_world.custom_minimum_size = Vector2(120, 30)
+	tb_world.modulate = Color(1.0, 0.92, 0.6) if port_tab == "world" else Color(1, 1, 1)
+	tb_world.pressed.connect(func(): port_tab = "world"; _rebuild_port())
+	mtabs.add_child(tb_world)
+
+	if port_tab == "world":
+		_p_title("世界市场（情报页，不成交）")
+		var keys2: Array = GameState.port_registry.keys()
+		if keys2.is_empty():
+			port_list.add_child(_p_lbl("　（还没有探索过其他港口）", 400, Color(0.55, 0.6, 0.6)))
+		for k2 in keys2:
+			var meta: Dictionary = GameState.port_registry[k2]
+			var row2 := HBoxContainer.new()
+			row2.add_theme_constant_override("separation", 10)
+			port_list.add_child(row2)
+			row2.add_child(_p_lbl("%s · %s" % [String(meta.get("name", k2)),
+				GameState.port_name(int(meta.get("tier", 1)))], 230))
+			row2.add_child(_p_lbl("第 %d 图 · 距 %d" % [int(meta.get("map", 1)),
+				absi(int(meta.get("map", 1)) - map_index)], 150, Color(0.8, 0.85, 0.9)))
+			var cap2 := int(TIER_STOCK.get(int(meta.get("tier", 1)), 40))
+			var parts2: Array = []
+			for cid2 in [&"grain", &"timber", &"rum", &"spice"]:
+				var c2: Resource = DataRegistry.get_commodity(cid2)
+				if c2 == null:
+					continue
+				var st2 := GameState.ensure_stock(StringName(k2), cid2, cap2)
+				if st2 <= 0:
+					continue
+				var bp2 := MarketModel.buy_price(int(c2.base_price), st2, cap2, 1.0)
+				parts2.append("%s %d" % [String(c2.display_name), bp2])
+			row2.add_child(_p_lbl(" / ".join(parts2) if not parts2.is_empty() else "（无货）", 360,
+				Color(0.82, 0.86, 0.7)))
+		var back_btn := Button.new()
+		back_btn.text = "返回本地市场"
+		back_btn.custom_minimum_size = Vector2(140, 26)
+		back_btn.pressed.connect(func(): port_tab = "local"; _rebuild_port())
+		port_list.add_child(back_btn)
+		return
+
 	# 投资状态
 	var ikey := _island_key()
 	var lv := GameState.island_level(ikey)
@@ -542,6 +615,34 @@ func _rebuild_port() -> void:
 			hb2.disabled = GameState.gold < int(cw.hire_cost)
 			hb2.pressed.connect(func(): _port_hire_crew(cwv))
 			thb.add_child(hb2)
+
+	# ---- 港口城市：拍卖行 ----
+	if tier >= 3:
+		_p_title("拍卖行（城市专属 · 一张图一座）")
+		GameState.refresh_auctions(TimeService.total_weeks())
+		if GameState.auctions.is_empty():
+			port_list.add_child(_p_lbl("　（本周没有挂单，下周刷新）", 400, Color(0.55, 0.6, 0.6)))
+		for i in range(GameState.auctions.size()):
+			var lot: Dictionary = GameState.auctions[i]
+			var lhb := HBoxContainer.new()
+			lhb.add_theme_constant_override("separation", 10)
+			port_list.add_child(lhb)
+			var lead_txt := {"player": "你领先", "npc": "NPC 领先", "": "无人出价"}
+			lhb.add_child(_p_lbl(String(lot.get("name", "货品")), 240))
+			lhb.add_child(_p_lbl(String(lot.get("desc", "")), 260, Color(0.75, 0.8, 0.7)))
+			lhb.add_child(_p_lbl("%d 金" % int(lot.get("price", 0)), 110, Color(0.9, 0.82, 0.45)))
+			lhb.add_child(_p_lbl(String(lead_txt.get(String(lot.get("leader", "")), "—")), 90,
+				Color(0.7, 0.9, 0.7) if String(lot.get("leader", "")) == "player" else Color(0.85, 0.7, 0.6)))
+			lhb.add_child(_p_lbl("剩 %d 周" % int(lot.get("weeks", 0)), 90))
+			var bid_amt := int(ceil(float(lot.get("price", 0)) * 1.05))
+			var bb := Button.new()
+			bb.text = "出价 %d" % bid_amt
+			bb.custom_minimum_size = Vector2(120, 26)
+			bb.disabled = GameState.gold < bid_amt
+			var idx_v: int = i
+			var amt_v2: int = bid_amt
+			bb.pressed.connect(func(): _port_bid_auction(idx_v, amt_v2))
+			lhb.add_child(bb)
 
 	# ---- 港口城市：交易所 / 声望 ----
 	if GameState.port_service_unlocked(tier, "exchange"):
@@ -723,6 +824,15 @@ func _random_npc_cargo() -> Dictionary:
 		var cid: StringName = pool[RngService.randi_range(0, pool.size() - 1)]
 		out[cid] = int(out.get(cid, 0)) + RngService.randi_range(3, 8 + map_index * 2)
 	return out
+
+## 拍卖行出价
+func _port_bid_auction(index: int, price: int) -> void:
+	var res: Dictionary = GameState.bid_auction(index, price)
+	if bool(res.get("ok", false)):
+		hud.ticker("出价 %d 金，暂时领先" % price)
+		_rebuild_port()
+	else:
+		hud.ticker(String(res.get("reason", "出价失败")))
 
 func _island_key() -> String:
 	return GameState.island_key(map_index, cur_port_island)

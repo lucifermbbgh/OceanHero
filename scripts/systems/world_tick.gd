@@ -21,8 +21,21 @@ func _on_week_advanced(week_index: int) -> void:
 		GameState.regen_islands(30, 10)
 		_npc_trade_flow()
 		var ups: Array = GameState.tick_island_upgrades()
-		for k in ups:
-			EventBus.ticker.emit("岛屿升格完成：%s" % String(k))
+		if not ups.is_empty():
+			EventBus.islands_upgraded.emit(ups)
+		# 拍卖行：刷新 + 每周竞价推进
+		GameState.refresh_auctions(week_index)
+		var aevents: Array = GameState.tick_auctions()
+		for ev in aevents:
+			match String(ev.get("type", "")):
+				"won":
+					EventBus.ticker.emit("拍卖成交：%s（%d 金）" % [String(ev.get("name", "")), int(ev.get("price", 0))])
+				"lost":
+					EventBus.ticker.emit("拍卖失手：%s 被他人拍走" % String(ev.get("name", "")))
+				"default":
+					EventBus.ticker.emit("资金不足，%s 流拍（违约 +1）" % String(ev.get("name", "")))
+				"no_slot":
+					EventBus.ticker.emit("船位不足，%s 保留到下周" % String(ev.get("name", "")))
 		GameState.refresh_quests()
 		GameState.reset_donations()
 		GameState.decay_notoriety()

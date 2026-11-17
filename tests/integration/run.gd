@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_auction_v010()
 	await _test_economy_v09()
 	await _test_port_tiers()
 	await _test_island_ports()
@@ -626,6 +627,75 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 拍卖行（0.10.0） ----------------
+func _test_auction_v010() -> void:
+	print("\n[拍卖行]")
+	GameState.reset_new_game()
+	GameState.auctions.clear()
+	GameState.auction_week = -1
+	GameState.auction_defects = 0
+
+	GameState.refresh_auctions(1)
+	_ok(GameState.auctions.size() >= 3 and GameState.auctions.size() <= 5, "刷新生成 3~5 件",
+		"count=%d" % GameState.auctions.size())
+	var lot: Dictionary = GameState.auctions[0]
+	_ok(String(lot.get("name", "")) != "", "货品有名称", String(lot.get("name", "")))
+	_ok(int(lot.get("price", 0)) > 0, "货品有起拍价")
+	_ok(int(lot.get("weeks", 0)) == 2, "挂单 2 周")
+	_ok(not GameState.auctions.is_empty(), "重复刷新不叠加")
+	var before_n := GameState.auctions.size()
+	GameState.auction_week = -1
+	GameState.refresh_auctions(1)
+	_ok(GameState.auctions.size() == before_n, "同周不重复刷新")
+
+	# 出价规则
+	GameState.add_gold(500000)
+	var cur := int(GameState.auctions[0].get("price", 0))
+	var low: Dictionary = GameState.bid_auction(0, int(float(cur) * 1.01))
+	_ok(not bool(low.get("ok", true)), "低于 1.05 倍被拒绝", String(low.get("reason", "")))
+	var ok_bid: Dictionary = GameState.bid_auction(0, int(ceil(float(cur) * 1.05)))
+	_ok(bool(ok_bid.get("ok", false)), "合规出价成功")
+	_ok(String(GameState.auctions[0].get("leader", "")) == "player", "出价后玩家领先")
+
+	# 倒计时与到期（把 weeks 压到 1，跑两次 tick）
+	GameState.auctions[0]["weeks"] = 1
+	var ev1: Array = GameState.tick_auctions()
+	var still := false
+	for l in GameState.auctions:
+		if int(l.get("weeks", 0)) > 0:
+			still = true
+	_ok(still or GameState.auctions.is_empty(), "tick 后周数递减")
+	GameState.auctions.clear()
+
+	# 资金不足 → 违约
+	GameState.auctions.clear()
+	GameState.auctions.append({"id": "t_lot", "kind": "gear", "name": "测试装备",
+		"price": 999999, "start": 1000, "leader": "player", "weeks": 1, "gear": []})
+	GameState.gold = 10
+	var ev2: Array = GameState.tick_auctions()
+	var had_default := false
+	for e in ev2:
+		if String(e.get("type", "")) == "default":
+			had_default = true
+	_ok(had_default, "资金不足时流拍并计违约")
+	_ok(GameState.auction_defects == 1, "违约次数 +1", str(GameState.auction_defects))
+
+	# 升格信号
+	GameState.reset_new_game()
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	var idx0 := 0
+	var key0 := GameState.island_key(s.map_index, idx0)
+	GameState.island_set_tier(key0, 2)
+	var list: Array = [key0]
+	s._on_islands_upgraded(list)
+	_ok(int(s.islands[idx0][2]) == 2, "升格信号会刷新场景内岛屿等级",
+		"tier=%d" % int(s.islands[idx0][2]))
+	_ok(String(s.islands[idx0][3]).contains("港镇"), "升格后名称跟着变", String(s.islands[idx0][3]))
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 经济系统（0.9.0） ----------------
 func _test_economy_v09() -> void:
