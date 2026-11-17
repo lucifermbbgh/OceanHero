@@ -602,6 +602,17 @@ func _move_to_ship(cid: StringName) -> void:
 	_rebuild_market()
 	_refresh()
 
+## 港口 id → 显示名
+func _port_display(key: String) -> String:
+	if key == String(PORT_ID):
+		return "翡翠港"
+	var pd: Resource = DataRegistry.get_port(StringName(key))
+	if pd != null:
+		return String(pd.display_name)
+	if GameState.port_registry.has(key):
+		return String(GameState.port_registry[key].get("name", key))
+	return key
+
 ## 市场事件页签
 func _rebuild_events_tab() -> void:
 	var tip := Label.new()
@@ -616,7 +627,7 @@ func _rebuild_events_tab() -> void:
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 12)
 		market_list.add_child(hb)
-		hb.add_child(_lbl(String(e.get("port", "")), 180))
+		hb.add_child(_lbl(_port_display(String(e.get("port", ""))), 180))
 		hb.add_child(_lbl(String(e.get("name", "")), 120, Color(0.9, 0.82, 0.45)))
 		hb.add_child(_lbl(String(e.get("desc", "")), 260, Color(0.8, 0.85, 0.7)))
 		hb.add_child(_lbl("剩 %d 周" % int(e.get("weeks", 0)), 100))
