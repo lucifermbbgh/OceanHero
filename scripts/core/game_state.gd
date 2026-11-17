@@ -761,6 +761,125 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 差别定价与财务（0.16~0.18） ----------------
+
+## 声望折扣：按最高阵营声望给买价优惠
+const REP_DISCOUNTS := [0.0, 0.02, 0.04, 0.06]
+const REP_THRESHOLDS := [0, 1000, 3000, 6000]
+
+func best_rep() -> int:
+	var best := 0
+	for f in FACTIONS:
+		best = maxi(best, rep_of(f))
+	return best
+
+func rep_discount() -> float:
+	var r := best_rep()
+	if r >= REP_THRESHOLDS[3]:
+		return REP_DISCOUNTS[3]
+	if r >= REP_THRESHOLDS[2]:
+		return REP_DISCOUNTS[2]
+	if r >= REP_THRESHOLDS[1]:
+		return REP_DISCOUNTS[1]
+	return REP_DISCOUNTS[0]
+
+func rep_discount_name() -> String:
+	var r := best_rep()
+	if r >= REP_THRESHOLDS[3]:
+		return "自家人"
+	if r >= REP_THRESHOLDS[2]:
+		return "老主顾"
+	if r >= REP_THRESHOLDS[1]:
+		return "熟客"
+	return "陌生人"
+
+# ---- 财务记账（按自然年） ----
+
+var finance: Dictionary = {}      # {purchases:{cid:{qty,cost}}, sales:{cid:{qty,revenue}}, income:{}, expense:{}}
+var reports: Array = []           # 历年财报
+var report_year := 0              # 已出过财报的年份
+
+func _fin_year_reset() -> void:
+	finance = {"purchases": {}, "sales": {}, "income": {}, "expense": {}}
+
+func finance_reset() -> void:
+	_fin_year_reset()
+	reports.clear()
+	report_year = 0
+
+func record_purchase(cid: StringName, qty: int, cost: int) -> void:
+	if not finance.has("purchases"):
+		_fin_year_reset()
+	var e: Dictionary = finance["purchases"].get(String(cid), {"qty": 0, "cost": 0})
+	e["qty"] = int(e["qty"]) + qty
+	e["cost"] = int(e["cost"]) + cost
+	finance["purchases"][String(cid)] = e
+	record_expense("采购", cost)
+
+func record_sale(cid: StringName, qty: int, revenue: int) -> void:
+	if not finance.has("sales"):
+		_fin_year_reset()
+	var e: Dictionary = finance["sales"].get(String(cid), {"qty": 0, "revenue": 0})
+	e["qty"] = int(e["qty"]) + qty
+	e["revenue"] = int(e["revenue"]) + revenue
+	finance["sales"][String(cid)] = e
+	record_income("贸易", revenue)
+
+func record_income(kind: String, amount: int) -> void:
+	if not finance.has("income"):
+		_fin_year_reset()
+	finance["income"][kind] = int(finance["income"].get(kind, 0)) + maxi(0, amount)
+
+func record_expense(kind: String, amount: int) -> void:
+	if not finance.has("expense"):
+		_fin_year_reset()
+	finance["expense"][kind] = int(finance["expense"].get(kind, 0)) + maxi(0, amount)
+
+## 汇总：{income_total, expense_total, net, income:{}, expense:{}}
+func finance_summary() -> Dictionary:
+	if not finance.has("income"):
+		_fin_year_reset()
+	var inc := 0
+	for k in finance.get("income", {}).keys():
+		inc += int(finance["income"][k])
+	var exp := 0
+	for k in finance.get("expense", {}).keys():
+		exp += int(finance["expense"][k])
+	return {"income_total": inc, "expense_total": exp, "net": inc - exp,
+		"income": finance.get("income", {}).duplicate(),
+		"expense": finance.get("expense", {}).duplicate()}
+
+## 生成年度财报（跨年时调用）
+func make_annual_report(year: int) -> Dictionary:
+	var s := finance_summary()
+	var assets := gold + bank_deposited()
+	var fleet_value := 0
+	for sh in ships_owned:
+		if sh is Resource and sh.get("price") != null:
+			fleet_value += int(sh.get("price"))
+	var cargo_value := 0
+	for cid in cargo.keys():
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c != null:
+			cargo_value += int(c.base_price) * int(cargo[cid])
+	var debt := loan_exposure()
+	var rep_dict := {
+		"year": year, "income": s["income"], "expense": s["expense"],
+		"income_total": s["income_total"], "expense_total": s["expense_total"],
+		"net": s["net"], "purchases": finance.get("purchases", {}).duplicate(),
+		"sales": finance.get("sales", {}).duplicate(),
+		"cash": gold, "deposit": bank_deposited(), "fleet": fleet_value,
+		"cargo": cargo_value, "debt": debt,
+		"assets": assets + fleet_value + cargo_value,
+		"net_worth": assets + fleet_value + cargo_value - debt,
+	}
+	reports.append(rep_dict)
+	while reports.size() > 5:
+		reports.pop_front()
+	report_year = year
+	_fin_year_reset()
+	return rep_dict
+
 # ---------------- 成本结构（0.15） ----------------
 
 ## 每周维护费明细：{hull, berth, crew, cannon, total, fixed, variable}

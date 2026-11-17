@@ -40,6 +40,17 @@ func _on_week_advanced(week_index: int) -> void:
 					EventBus.ticker.emit("贷款到期已还清：-%d" % int(be.get("amount", 0)))
 				"bankrupt":
 					EventBus.ticker.emit("破产！存款与现金清零，海军声望归零")
+		# 年度财报：跨年后第一次周结算生成
+		var cur_year: int = TimeService.year()
+		if cur_year > GameState.report_year and GameState.report_year > 0:
+			var rep: Dictionary = GameState.make_annual_report(GameState.report_year)
+			EventBus.ticker.emit("第 %d 年财报：收入 %d · 支出 %d · 净利 %+d" % [
+				int(rep.get("year", 0)), int(rep.get("income_total", 0)),
+				int(rep.get("expense_total", 0)), int(rep.get("net", 0))])
+		elif GameState.report_year == 0:
+			GameState.report_year = cur_year
+		# 维护费计入财务支出
+		GameState.record_expense("维护", int(GameState.weekly_upkeep().get("total", 0)))
 		# 市场：事件推进与价格漂移
 		var new_events: Array = GameState.tick_market(week_index)
 		for ev in new_events:

@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_finance_v018()
 	await _test_cost_scale_v015()
 	await _test_decision_aid_v014()
 	await _test_market_ui_v0131()
@@ -633,6 +634,51 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 差别定价 / 生产 / 财务（0.16~0.18） ----------------
+func _test_finance_v018() -> void:
+	print("\n[差别定价与财务]")
+	var em = load("res://scripts/systems/econ_math.gd")
+	# 生产函数
+	_ok(is_equal_approx(em.production_curve(100.0, 1, 1.0), 100.0), "Lv1 产出 = 基础")
+	_ok(em.production_curve(100.0, 2, 1.0) > 150.0, "Lv2 线性增长")
+	_ok(em.marginal_output(100.0, 1, 1.0) > 0.0, "边际产量为正")
+
+	# 声望折扣
+	GameState.reset_new_game()
+	_ok(is_equal_approx(GameState.rep_discount(), 0.0), "无声望无折扣", str(GameState.rep_discount()))
+	_ok(GameState.rep_discount_name() == "陌生人", "档位名：陌生人")
+	GameState.reputation["royal_navy"] = 3000
+	_ok(is_equal_approx(GameState.rep_discount(), 0.04), "声望 3000 → 4%", str(GameState.rep_discount()))
+	_ok(GameState.rep_discount_name() == "老主顾", "档位名：老主顾")
+	GameState.reputation["royal_navy"] = 8000
+	_ok(is_equal_approx(GameState.rep_discount(), 0.06), "声望 8000 → 6%（上限）")
+
+	# 财务记账
+	GameState.reset_new_game()
+	GameState.finance_reset()
+	GameState.record_purchase(&"grain", 100, 1000)
+	GameState.record_sale(&"grain", 100, 1500)
+	GameState.record_income("战利品", 300)
+	GameState.record_expense("维护", 200)
+	var s: Dictionary = GameState.finance_summary()
+	_ok(int(s["income_total"]) == 1800, "收入 = 销售 1500 + 战利品 300", str(s["income_total"]))
+	_ok(int(s["expense_total"]) == 1200, "支出 = 采购 1000 + 维护 200", str(s["expense_total"]))
+	_ok(int(s["net"]) == 600, "净利 = 600", str(s["net"]))
+
+	# 年度财报
+	GameState.add_gold(5000)
+	var rep: Dictionary = GameState.make_annual_report(1)
+	_ok(int(rep.get("year", 0)) == 1, "财报年份正确")
+	_ok(int(rep.get("net", 0)) == 600, "财报净利与汇总一致")
+	_ok(int(rep.get("net_worth", 0)) > 0, "净资产为正")
+	_ok(GameState.reports.size() == 1, "财报已存档")
+	_ok(GameState.finance_summary()["income_total"] == 0, "出报表后本年账目清零")
+
+	# 最多保留 5 年
+	for y in range(2, 9):
+		GameState.make_annual_report(y)
+	_ok(GameState.reports.size() == 5, "只保留最近 5 年", str(GameState.reports.size()))
 
 # ---------------- 成本与规模（0.15.0） ----------------
 func _test_cost_scale_v015() -> void:

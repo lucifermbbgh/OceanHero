@@ -67,6 +67,14 @@ static func marginal_discount(invested: float, cap: float, max_discount: float, 
 		step: float = 1000.0) -> float:
 	return diminishing_discount(invested + step, cap, max_discount, k) - diminishing_discount(invested, cap, max_discount, k)
 
+## 生产函数：产出 = base × level^exponent
+static func production_curve(base_output: float, level: int, exponent: float) -> float:
+	return base_output * pow(float(maxi(1, level)), exponent)
+
+## 边际产量：升级一级多出的产出
+static func marginal_output(base_output: float, level: int, exponent: float) -> float:
+	return production_curve(base_output, level + 1, exponent) - production_curve(base_output, level, exponent)
+
 ## 涨价幅度（正数=涨）
 static func change_pct(old_value: float, new_value: float) -> float:
 	if is_zero_approx(old_value):

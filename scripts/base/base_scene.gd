@@ -123,6 +123,7 @@ func _build_ui() -> void:
 	if GameState.home_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
 	_action_button(vb, "财政", _toggle_finance)
+	_action_button(vb, "经济总览", _toggle_overview)
 	if GameState.home_port_tier >= 3:
 		_action_button(vb, "银行", _toggle_bank)
 		_action_button(vb, "黑市", _toggle_black)
@@ -230,6 +231,22 @@ func _build_ui() -> void:
 	quest_list.add_theme_constant_override("separation", 5)
 	quest_list.custom_minimum_size = Vector2(710, 0)
 	qscroll.add_child(quest_list)
+
+	# 经济总览面板
+	overview_root = PanelContainer.new()
+	overview_root.position = Vector2(300, 90)
+	overview_root.custom_minimum_size = Vector2(720, 500)
+	overview_root.add_theme_stylebox_override("panel", _panel_style())
+	overview_root.visible = false
+	root.add_child(overview_root)
+	var oscroll := ScrollContainer.new()
+	oscroll.custom_minimum_size = Vector2(690, 470)
+	oscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	overview_root.add_child(oscroll)
+	overview_list = VBoxContainer.new()
+	overview_list.add_theme_constant_override("separation", 6)
+	overview_list.custom_minimum_size = Vector2(670, 0)
+	oscroll.add_child(overview_list)
 
 	# 财政面板
 	finance_root = PanelContainer.new()
@@ -501,7 +518,9 @@ func _rebuild_market() -> void:
 			demand = float(port.demand.get(String(id), 1.0))
 			production = float(port.production.get(String(id), 1.0))
 		var mod := GameState.price_modifier(String(PORT_ID), id)
-		var bp := int(round(float(MarketModel.buy_price(c.base_price, stock, max_stock, demand)) * mod))
+		var rep_disc := GameState.rep_discount()
+		var bp := int(round(float(MarketModel.buy_price(c.base_price, stock, max_stock, demand))
+			* mod * (1.0 - rep_disc)))
 		var sp := int(round(float(MarketModel.sell_price(c.base_price, stock, max_stock, production))
 			* (1.0 + GameState.sell_bonus()) * mod))
 		var chg := GameState.price_change_pct(String(PORT_ID), id)
@@ -763,6 +782,8 @@ func _add_market_metrics(pk: String) -> void:
 	var line3 := "　　交叉弹性传导阈值 ±%d%%：涨跌幅超过该值才会影响关联商品（上限 ±%d%%）" % [
 		int(GameState.CROSS_THRESHOLD * 100.0), int(GameState.CROSS_CAP * 100.0)]
 	market_list.add_child(_cell(line3, 1400, Color(0.62, 0.7, 0.66)))
+	market_list.add_child(_cell("　　声望折扣：%d%%（%s）" % [int(GameState.rep_discount() * 100.0),
+		GameState.rep_discount_name()], 1400, Color(0.62, 0.7, 0.66)))
 	market_list.add_child(_cell("　　关联：朗姆酒↔香料（互补 0.4）　｜　谷物→朗姆酒（替代 -0.3）　｜　木材↔铁矿（互补 0.2）",
 		1400, Color(0.62, 0.7, 0.66)))
 
@@ -834,6 +855,7 @@ func _rebuild_world_market() -> void:
 const TIER_STOCK_REF := {1: 40, 2: 90, 3: 160}
 
 func _buy(cid: StringName, amount: int, price: int) -> void:
+	GameState.record_purchase(cid, amount, price * amount)
 	var c: Resource = DataRegistry.get_commodity(cid)
 	var total := price * amount
 	if GameState.gold < total:
@@ -861,6 +883,7 @@ func _buy(cid: StringName, amount: int, price: int) -> void:
 	_refresh()
 
 func _sell(cid: StringName, amount: int, price: int) -> void:
+	GameState.record_sale(cid, amount, price * amount)
 	var from_wh := market_target == "warehouse"
 	var have := int(GameState.warehouse.get(cid, 0)) if from_wh else int(GameState.cargo.get(cid, 0))
 	if have < amount:
@@ -1571,6 +1594,71 @@ func _dismiss_crew(cid: StringName) -> void:
 	_rebuild_tavern()
 
 ## 升级按钮文案：满级显示当前等级，否则显示所需资源
+# ---------------- 经济总览与财报（0.17 / 0.18） ----------------
+
+var overview_root: PanelContainer = null
+var overview_list: VBoxContainer = null
+
+func _toggle_overview() -> void:
+	if overview_root.visible:
+		overview_root.visible = false
+		return
+	_rebuild_overview()
+	overview_root.visible = true
+
+func _rebuild_overview() -> void:
+	for c in overview_list.get_children():
+		c.queue_free()
+	var fleet_v := 0
+	for sh in GameState.ships_owned:
+		if sh is Resource and sh.get("price") != null:
+			fleet_v += int(sh.get("price"))
+	var cargo_v := 0
+	for cid in GameState.cargo.keys():
+		var c: Resource = DataRegistry.get_commodity(cid)
+		if c != null:
+			cargo_v += int(c.base_price) * int(GameState.cargo[cid])
+	var assets := GameState.gold + GameState.bank_deposited() + fleet_v + cargo_v
+	var debt := GameState.loan_exposure()
+	_yard_title_to(overview_list, "经济总览")
+	overview_list.add_child(_lbl("　现金 %d ｜ 存款 %d ｜ 未还贷款 %d" % [
+		GameState.gold, GameState.bank_deposited(), debt], 700, Color(0.8, 0.85, 0.8)))
+	overview_list.add_child(_lbl("　船队 %d ｜ 库存 %d ｜ 资产 %d ｜ 净资产 %d" % [
+		fleet_v, cargo_v, assets, assets - debt], 700, Color(0.8, 0.85, 0.8)))
+
+	var s: Dictionary = GameState.finance_summary()
+	_yard_title_to(overview_list, "本年度收支")
+	var inc_parts: Array = []
+	for k in s["income"].keys():
+		inc_parts.append("%s %d" % [String(k), int(s["income"][k])])
+	var exp_parts: Array = []
+	for k in s["expense"].keys():
+		exp_parts.append("%s %d" % [String(k), int(s["expense"][k])])
+	overview_list.add_child(_lbl("　收入 %d（%s）" % [int(s["income_total"]),
+		" / ".join(inc_parts) if not inc_parts.is_empty() else "无"], 700, Color(0.55, 0.85, 0.6)))
+	overview_list.add_child(_lbl("　支出 %d（%s）" % [int(s["expense_total"]),
+		" / ".join(exp_parts) if not exp_parts.is_empty() else "无"], 700, Color(0.9, 0.6, 0.55)))
+	var net := int(s["net"])
+	overview_list.add_child(_lbl("　净利 %+d" % net, 700,
+		Color(0.92, 0.45, 0.42) if net >= 0 else Color(0.45, 0.85, 0.55)))
+
+	_yard_title_to(overview_list, "各港投资")
+	var inv_parts: Array = []
+	for k in GameState.island_investment.keys():
+		var v := int(GameState.island_investment[k])
+		if v > 0:
+			inv_parts.append("%s %d" % [String(k), v])
+	overview_list.add_child(_lbl("　" + ("　｜　".join(inv_parts) if not inv_parts.is_empty() else "尚无投资"),
+		700, Color(0.78, 0.84, 0.8)))
+
+	_yard_title_to(overview_list, "历史财报（最近 5 年）")
+	if GameState.reports.is_empty():
+		overview_list.add_child(_lbl("　（还没有跨年，暂无财报）", 500, Color(0.55, 0.6, 0.6)))
+	for r in GameState.reports:
+		overview_list.add_child(_lbl("　第 %d 年：收入 %d · 支出 %d · 净利 %+d · 净资产 %d" % [
+			int(r.get("year", 0)), int(r.get("income_total", 0)), int(r.get("expense_total", 0)),
+			int(r.get("net", 0)), int(r.get("net_worth", 0))], 700, Color(0.8, 0.85, 0.8)))
+
 # ---------------- 财政（0.15） ----------------
 
 var finance_root: PanelContainer = null
@@ -1582,6 +1670,13 @@ func _toggle_finance() -> void:
 		return
 	_rebuild_finance()
 	finance_root.visible = true
+
+## 建筑产出（生产函数）
+func _building_output_line(name: String, level: int, exponent: float) -> String:
+	var em = load("res://scripts/systems/econ_math.gd")
+	var out: float = em.production_curve(100.0, level, exponent)
+	var marg: float = em.marginal_output(100.0, level, exponent)
+	return "%s Lv%d · 产出 %.0f · 升级 +%.0f" % [name, level, out, marg]
 
 func _rebuild_finance() -> void:
 	for c in finance_list.get_children():
