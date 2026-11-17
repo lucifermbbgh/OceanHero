@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_price_engine_v013()
 	await _test_bank_v012()
 	await _test_black_market_v011()
 	await _test_auction_v010()
@@ -629,6 +630,53 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 价格引擎（0.13.0） ----------------
+func _test_price_engine_v013() -> void:
+	print("\n[价格引擎]")
+	var em = load("res://scripts/systems/econ_math.gd")
+	# 分段弹性
+	_ok(is_equal_approx(em.piecewise_elasticity(0.9), 0.35), "高库存弹性 0.35")
+	_ok(is_equal_approx(em.piecewise_elasticity(0.5), 0.55), "中库存弹性 0.55")
+	_ok(is_equal_approx(em.piecewise_elasticity(0.1), 0.90), "低库存弹性 0.90")
+	# 均值回归
+	_ok(is_equal_approx(em.mean_revert(0.8, 1.0, 0.25), 0.85), "回归 25% 正确")
+	# 噪声可复现
+	_ok(is_equal_approx(em.seeded_noise([1, 2, 3], 0.03), em.seeded_noise([1, 2, 3], 0.03)),
+		"同种子噪声可复现")
+	_ok(absf(em.seeded_noise([1, 2, 3], 0.03)) <= 0.03, "噪声幅度受限")
+	# 变动上限
+	_ok(is_equal_approx(em.clamp_swing(1.0, 2.0, 0.15), 1.15), "单周上限 +15%")
+	_ok(is_equal_approx(em.clamp_swing(1.0, 0.1, 0.15), 0.85), "单周下限 -15%")
+
+	# 分段弹性影响真实价格
+	MarketModel.cfg["piecewise_enabled"] = true
+	var hi_stock_price := MarketModel.generic_price(100, 100, 100)
+	var lo_stock_price := MarketModel.generic_price(100, 10, 100)
+	_ok(lo_stock_price > hi_stock_price * 1.5, "低库存价格显著更高",
+		"%.1f vs %.1f" % [lo_stock_price, hi_stock_price])
+
+	# 市场事件
+	var me = load("res://scripts/systems/market_events.gd")
+	_ok(me.EVENTS.size() >= 8, "事件表至少 8 种", str(me.EVENTS.size()))
+	var ev := {"id": &"harvest", "port": "p1", "target": "grain", "kind": "supply", "value": -0.2, "weeks": 2}
+	var eff: float = float(me.effect_at([ev], "p1", &"grain"))
+	_ok(absf(eff - 1.2) < 0.001, "供给 +25% 使价格 ×1.2", str(eff))
+	var eff2: float = float(me.effect_at([ev], "p1", &"rum"))
+	_ok(is_equal_approx(eff2, 1.0), "其他商品不受影响")
+	var ticked: Array = me.tick([ev])
+	_ok(int(ticked[0].get("weeks", 0)) == 1, "事件周数递减")
+	_ok(me.tick(ticked).is_empty(), "到期事件被移除")
+
+	# 周结算推进价格漂移
+	GameState.reset_new_game()
+	GameState.ensure_stock(&"jadehaven", &"grain", 400)
+	var before := GameState.price_drift_of("jadehaven", &"grain")
+	GameState.tick_market(1)
+	var after := GameState.price_drift_of("jadehaven", &"grain")
+	_ok(after != before or is_equal_approx(after, 1.0), "周结算后漂移发生变化", "%.3f" % after)
+	_ok(after >= GameState.DRIFT_MIN - 0.001 and after <= GameState.DRIFT_MAX + 0.001,
+		"漂移被限制在 0.85~1.15", "%.3f" % after)
 
 # ---------------- 银行（0.12.0） ----------------
 func _test_bank_v012() -> void:

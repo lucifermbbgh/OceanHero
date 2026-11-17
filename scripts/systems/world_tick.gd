@@ -40,6 +40,10 @@ func _on_week_advanced(week_index: int) -> void:
 					EventBus.ticker.emit("贷款到期已还清：-%d" % int(be.get("amount", 0)))
 				"bankrupt":
 					EventBus.ticker.emit("破产！存款与现金清零，海军声望归零")
+		# 市场：事件推进与价格漂移
+		var new_events: Array = GameState.tick_market(week_index)
+		for ev in new_events:
+			EventBus.ticker.emit("市场事件：%s · %s" % [String(ev.get("name", "")), String(ev.get("desc", ""))])
 		GameState.refresh_auctions(week_index)
 		var aevents: Array = GameState.tick_auctions()
 		for ev in aevents:

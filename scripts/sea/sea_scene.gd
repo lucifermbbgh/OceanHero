@@ -551,6 +551,10 @@ func _rebuild_port() -> void:
 			bp = maxi(1, int(round(float(bp) * (1.0 - float(buy_disc) / 100.0))))
 		# 阶梯溢价（只作用于卖出）：目标地图不产出才有跨度溢价
 		sp = int(round(float(sp) * GameState.sale_multiplier_at(cid, map_index)))
+		# 市场漂移与事件
+		var pmod := GameState.price_modifier(String(pid), cid)
+		bp = maxi(1, int(round(float(bp) * pmod)))
+		sp = maxi(1, int(round(float(sp) * pmod)))
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 10)
 		port_list.add_child(hb)

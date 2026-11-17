@@ -761,6 +761,59 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 价格漂移与市场事件（0.13） ----------------
+
+const EconMath = preload("res://scripts/systems/econ_math.gd")
+const MarketEvents = preload("res://scripts/systems/market_events.gd")
+
+const DRIFT_MIN := 0.85
+const DRIFT_MAX := 1.15
+const DRIFT_SPEED := 0.25
+const DRIFT_NOISE := 0.03
+
+var price_drift: Dictionary = {}     # "port|cid" -> 漂移倍率（1.0 为基准）
+var market_events: Array = []        # 当前生效事件
+
+func _drift_key(port_key: String, cid: StringName) -> String:
+	return "%s|%s" % [port_key, String(cid)]
+
+## 当前漂移倍率（含事件影响）
+func price_drift_of(port_key: String, cid: StringName) -> float:
+	return float(price_drift.get(_drift_key(port_key, cid), 1.0))
+
+## 某港某商品当前受事件影响后的价格倍率
+func price_modifier(port_key: String, cid: StringName) -> float:
+	return price_drift_of(port_key, cid) * MarketEvents.effect_at(market_events, port_key, cid)
+
+## 周结算：事件推进与生成、价格漂移回归
+func tick_market(week: int) -> Array:
+	var events_out: Array = []
+	market_events = MarketEvents.tick(market_events)
+	for pk in port_stock.keys():
+		var port_key := String(pk)
+		if market_events.size() < MarketEvents.MAX_ACTIVE:
+			var ev: Dictionary = MarketEvents.roll_event(port_key, week)
+			if not ev.is_empty():
+				market_events.append(ev)
+				events_out.append(ev)
+		for cid in port_stock[pk].keys():
+			var key := _drift_key(port_key, cid)
+			var cur := float(price_drift.get(key, 1.0))
+			var target := MarketEvents.effect_at(market_events, port_key, cid)
+			price_drift[key + "|prev"] = cur
+			var next_v := EconMath.mean_revert(cur, target, DRIFT_SPEED)
+			next_v += EconMath.seeded_noise([hash(port_key), int(hash(String(cid))), week], DRIFT_NOISE)
+			next_v = clampf(next_v, DRIFT_MIN, DRIFT_MAX)
+			price_drift[key] = next_v
+	return events_out
+
+## 价格涨跌（相对上周）
+func price_change_pct(port_key: String, cid: StringName) -> float:
+	var cur := price_drift_of(port_key, cid)
+	var key := _drift_key(port_key, cid)
+	var prev := float(price_drift.get(key + "|prev", cur))
+	return EconMath.change_pct(prev, cur)
+
 # ---------------- 银行（0.12 / 0.12.1 多笔贷款） ----------------
 
 const DEPOSIT_RATE := 0.001
@@ -1423,6 +1476,7 @@ func to_dict() -> Dictionary:
 		"port_registry": port_registry.duplicate(true),
 		"contraband": contraband.duplicate(),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
+		"market": {"drift": price_drift.duplicate(), "events": market_events.duplicate(true)},
 		"license": {"has": has_privateer_license, "legal": license_is_legal},
 		"black_closed_week": black_closed_week,
 		"auctions": auctions.duplicate(true),
@@ -1504,6 +1558,14 @@ func from_dict(d: Dictionary) -> void:
 	var ups_d: Dictionary = d.get("island_upgrade_start", {})
 	for k in ups_d.keys():
 		island_upgrade_start[String(k)] = int(ups_d[k])
+	var mk: Dictionary = d.get("market", {})
+	price_drift.clear()
+	var dr: Dictionary = mk.get("drift", {})
+	for k in dr.keys():
+		price_drift[String(k)] = float(dr[k])
+	market_events.clear()
+	for e0 in mk.get("events", []):
+		market_events.append(e0)
 	var bk: Dictionary = d.get("bank", {})
 	bank_deposit = int(bk.get("deposit", 0))
 	loans.clear()
@@ -1702,6 +1764,8 @@ func reset_new_game() -> void:
 	port_registry.clear()
 	bank_deposit = 0
 	loans.clear()
+	price_drift.clear()
+	market_events.clear()
 	contraband.clear()
 	has_privateer_license = false
 	license_is_legal = false

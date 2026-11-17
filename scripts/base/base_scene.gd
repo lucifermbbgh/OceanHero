@@ -418,9 +418,18 @@ func _rebuild_market() -> void:
 	m_world.modulate = Color(1.0, 0.92, 0.6) if market_tab == "world" else Color(1, 1, 1)
 	m_world.pressed.connect(func(): market_tab = "world"; _rebuild_market())
 	mtabs.add_child(m_world)
+	var m_ev := Button.new()
+	m_ev.text = "市场事件"
+	m_ev.custom_minimum_size = Vector2(120, 32)
+	m_ev.modulate = Color(1.0, 0.92, 0.6) if market_tab == "events" else Color(1, 1, 1)
+	m_ev.pressed.connect(func(): market_tab = "events"; _rebuild_market())
+	mtabs.add_child(m_ev)
 
 	if market_tab == "world":
 		_rebuild_world_market()
+		return
+	if market_tab == "events":
+		_rebuild_events_tab()
 		return
 
 	# 交易目标页签：买入存到哪 / 卖出从哪拿
@@ -453,9 +462,16 @@ func _rebuild_market() -> void:
 		if port != null:
 			demand = float(port.demand.get(String(id), 1.0))
 			production = float(port.production.get(String(id), 1.0))
-		var bp := MarketModel.buy_price(c.base_price, stock, max_stock, demand)
+		var mod := GameState.price_modifier(String(PORT_ID), id)
+		var bp := int(round(float(MarketModel.buy_price(c.base_price, stock, max_stock, demand)) * mod))
 		var sp := int(round(float(MarketModel.sell_price(c.base_price, stock, max_stock, production))
-			* (1.0 + GameState.sell_bonus())))
+			* (1.0 + GameState.sell_bonus()) * mod))
+		var chg := GameState.price_change_pct(String(PORT_ID), id)
+		var arrow := "→"
+		if chg > 0.005:
+			arrow = "↑+%d%%" % int(round(chg * 100.0))
+		elif chg < -0.005:
+			arrow = "↓%d%%" % int(round(chg * 100.0))
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		market_list.add_child(row)
@@ -466,7 +482,7 @@ func _rebuild_market() -> void:
 		var price_l := Label.new()
 		var have := int(GameState.cargo.get(id, 0))
 		var in_wh := int(GameState.warehouse.get(id, 0))
-		price_l.text = "买 %d / 卖 %d   港 %d｜船 %d｜仓 %d" % [bp, sp, stock, have, in_wh]
+		price_l.text = "买 %d / 卖 %d %s   港 %d｜船 %d｜仓 %d" % [bp, sp, arrow, stock, have, in_wh]
 		price_l.custom_minimum_size = Vector2(240, 0)
 		row.add_child(price_l)
 		var b_buy := Button.new()
@@ -585,6 +601,25 @@ func _move_to_ship(cid: StringName) -> void:
 	_log("已装上船：%s × %d" % [c.display_name, n])
 	_rebuild_market()
 	_refresh()
+
+## 市场事件页签
+func _rebuild_events_tab() -> void:
+	var tip := Label.new()
+	tip.text = "本周影响市场的事件（决定价格波动的成因）"
+	tip.add_theme_font_size_override("font_size", 13)
+	tip.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
+	market_list.add_child(tip)
+	if GameState.market_events.is_empty():
+		market_list.add_child(_lbl("　（本周没有市场事件）", 400, Color(0.55, 0.6, 0.6)))
+		return
+	for e in GameState.market_events:
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 12)
+		market_list.add_child(hb)
+		hb.add_child(_lbl(String(e.get("port", "")), 180))
+		hb.add_child(_lbl(String(e.get("name", "")), 120, Color(0.9, 0.82, 0.45)))
+		hb.add_child(_lbl(String(e.get("desc", "")), 260, Color(0.8, 0.85, 0.7)))
+		hb.add_child(_lbl("剩 %d 周" % int(e.get("weeks", 0)), 100))
 
 ## 世界市场：跨港情报页（不参与交易）
 func _rebuild_world_market() -> void:

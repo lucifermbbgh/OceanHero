@@ -197,8 +197,12 @@ func _test_balance_config() -> void:
 	_ok(low <= 0.26, "hit_base 调低后命中贴近下限", "hit=%.2f" % low)
 	CRes.reset_defaults()
 
-	MRes.configure({"price_elasticity": 0.0})
-	_ok(MRes.buy_price(100, 0, 1000) == MRes.buy_price(100, 1000, 1000), "弹性为 0 时空/满库存同价")
+	MRes.configure({"price_elasticity": 0.0, "piecewise_enabled": false})
+	_ok(MRes.buy_price(100, 0, 1000) == MRes.buy_price(100, 1000, 1000), "线性模式下弹性为 0 时空/满库存同价")
+	MRes.reset_defaults()
+	MRes.configure({"piecewise_enabled": true})
+	_ok(MRes.buy_price(100, 0, 1000) > MRes.buy_price(100, 1000, 1000) * 1.5,
+		"分段弹性下低库存明显更贵")
 	MRes.reset_defaults()
 	_ok(MRes.buy_price(100, 0, 1000) > MRes.buy_price(100, 1000, 1000), "恢复默认后价格重新拉开")
 
