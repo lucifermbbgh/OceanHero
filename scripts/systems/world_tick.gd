@@ -24,6 +24,10 @@ func _on_week_advanced(week_index: int) -> void:
 		if not ups.is_empty():
 			EventBus.islands_upgraded.emit(ups)
 		# 拍卖行：刷新 + 每周竞价推进
+		# 通缉度 ≥ 80：黑市被盯上，关闭一周
+		if GameState.notoriety() >= 80 and GameState.black_closed_week < week_index:
+			GameState.black_closed_week = week_index
+			EventBus.ticker.emit("通缉度过高，黑市本周关闭")
 		GameState.refresh_auctions(week_index)
 		var aevents: Array = GameState.tick_auctions()
 		for ev in aevents:

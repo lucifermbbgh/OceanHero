@@ -404,6 +404,9 @@ func on_enemy_killed(kind: String, is_boss: bool) -> void:
 		noto = mini(100, noto + 8)
 		add_rep("merchant", -40)
 		add_rep("black_sail", 15)
+		# 持私掠许可证的合法劫掠：不对敌国商船额外扣海军声望
+		if has_privateer_license:
+			add_rep("royal_navy", 5)
 	reputation["notoriety"] = noto
 	if kind == "pirate":
 		add_rep("royal_navy", 8 if is_boss else 3)
@@ -758,6 +761,94 @@ func cargo_used() -> float:
 func cargo_free() -> float:
 	return maxf(0.0, float(cargo_capacity()) - cargo_used())
 
+# ---------------- 黑市 ----------------
+
+## 违禁品：id -> {名称, 价格, 说明}
+const CONTRABAND := {
+	&"stimulant": {"name": "违禁药物", "price": 2400, "desc": "下场战斗船员状态 +20%（有副作用）"},
+	&"forge_flag": {"name": "伪造旗帜", "price": 3600, "desc": "下场战斗敌方索敌半径 -50%"},
+	&"forge_pass": {"name": "伪造通行证", "price": 5200, "desc": "一次通缉度免检（不触发赏金猎人）"},
+	&"navy_gear": {"name": "海军制式火炮", "price": 8800, "desc": "非海军身份无法正规获得的高级装备"},
+}
+
+const BLACK_FENCE_RATE := 0.60       # 销赃收购价倍率
+const BLACK_SELL_LIMIT := 200       # 单次销赃上限
+const BLACK_LICENSE_MULT := 2.5     # 黑市私掠证价格倍数
+const BLACK_LICENSE_NOTORIETY := 5  # 黑市买证的通缉度代价
+const LEGAL_LICENSE_REP := 3000     # 正规私掠证所需海军声望
+
+var contraband: Dictionary = {}     # 违禁品库存
+var has_privateer_license := false
+var license_is_legal := false       # true = 正规途径购得
+var black_closed_week := -1         # 被海军盯上而关闭的周
+
+## 黑市是否开放：通缉度 ≥ 80 时关闭一周
+func black_market_open() -> bool:
+	if notoriety() < 80:
+		return true
+	return TimeService.total_weeks() > black_closed_week
+
+func _black_mark_activity() -> void:
+	reputation["notoriety"] = mini(100, notoriety() + 2)
+
+## 销赃：返回获得的金币
+func fence_goods(cid: StringName, amount: int, base_sell: int) -> Dictionary:
+	if not black_market_open():
+		return {"ok": false, "reason": "黑市暂闭"}
+	var have := int(cargo.get(cid, 0))
+	var real := mini(amount, mini(have, BLACK_SELL_LIMIT))
+	if real <= 0:
+		return {"ok": false, "reason": "货舱里没有该商品"}
+	remove_cargo(cid, real)
+	var gain := int(round(float(base_sell) * BLACK_FENCE_RATE)) * real
+	add_gold(gain)
+	_black_mark_activity()
+	return {"ok": true, "gold": gain, "amount": real}
+
+## 购买违禁品
+func buy_contraband(item_id: StringName) -> Dictionary:
+	var def: Dictionary = CONTRABAND.get(item_id, {})
+	if def.is_empty():
+		return {"ok": false, "reason": "未知物品"}
+	if not black_market_open():
+		return {"ok": false, "reason": "黑市暂闭"}
+	var price := int(def.get("price", 0))
+	if gold < price:
+		return {"ok": false, "reason": "金币不足"}
+	add_gold(-price)
+	contraband[item_id] = int(contraband.get(item_id, 0)) + 1
+	_black_mark_activity()
+	return {"ok": true, "price": price}
+
+## 购买私掠许可证（黑市途径）
+func buy_license_black() -> Dictionary:
+	if has_privateer_license:
+		return {"ok": false, "reason": "已经持有私掠许可证"}
+	if not black_market_open():
+		return {"ok": false, "reason": "黑市暂闭"}
+	var price := int(round(float(LEGAL_LICENSE_REP) * BLACK_LICENSE_MULT * 10.0))
+	if gold < price:
+		return {"ok": false, "reason": "金币不足，需要 %d" % price}
+	add_gold(-price)
+	has_privateer_license = true
+	license_is_legal = false
+	reputation["notoriety"] = mini(100, notoriety() + BLACK_LICENSE_NOTORIETY)
+	return {"ok": true, "price": price}
+
+## 购买私掠许可证（正规途径：声望交易）
+func buy_license_legal() -> Dictionary:
+	if has_privateer_license:
+		return {"ok": false, "reason": "已经持有私掠许可证"}
+	if rep_of("royal_navy") < LEGAL_LICENSE_REP:
+		return {"ok": false, "reason": "海军声望不足（需要 %d）" % LEGAL_LICENSE_REP}
+	var price := LEGAL_LICENSE_REP * 2
+	if gold < price:
+		return {"ok": false, "reason": "金币不足，需要 %d" % price}
+	add_gold(-price)
+	has_privateer_license = true
+	license_is_legal = true
+	return {"ok": true, "price": price}
+
 # ---------------- 拍卖行 ----------------
 
 var auctions: Array = []        # 当前挂单
@@ -790,7 +881,7 @@ func bid_auction(index: int, price: int) -> Dictionary:
 	return {"ok": true, "price": price}
 
 ## 每周：NPC 加价 → 倒计时 → 到期结算
-func tick_auctions() -> Array:
+func tick_auctions(npc_bid_enabled: bool = true) -> Array:
 	var events: Array = []
 	var kept: Array = []
 	for lot in auctions:
@@ -798,7 +889,7 @@ func tick_auctions() -> Array:
 		if not lot.has("leader"):
 			lot["leader"] = ""
 		# NPC 加价（40% 概率，+8%~15%）
-		if lot.get("leader") != "player" or true:
+		if npc_bid_enabled:
 			if RngService.chance(0.4):
 				var old := int(lot.get("price", 0))
 				var bump := old + int(round(float(old) * RngService.randf_range(0.08, 0.15)))
@@ -1168,6 +1259,12 @@ func to_dict() -> Dictionary:
 		"island_upgrade_start": island_upgrade_start.duplicate(),
 		"island_tier": island_tier.duplicate(),
 		"port_registry": port_registry.duplicate(true),
+		"contraband": contraband.duplicate(),
+		"license": {"has": has_privateer_license, "legal": license_is_legal},
+		"black_closed_week": black_closed_week,
+		"auctions": auctions.duplicate(true),
+		"auction_week": auction_week,
+		"auction_defects": auction_defects,
 		"world": {
 			"current_map": current_map, "pos_x": sea_position.x, "pos_y": sea_position.y,
 			"cleared": cleared_maps.duplicate(), "boss": boss_defeated.duplicate(),
@@ -1244,6 +1341,19 @@ func from_dict(d: Dictionary) -> void:
 	var ups_d: Dictionary = d.get("island_upgrade_start", {})
 	for k in ups_d.keys():
 		island_upgrade_start[String(k)] = int(ups_d[k])
+	contraband.clear()
+	var cb: Dictionary = d.get("contraband", {})
+	for k in cb.keys():
+		contraband[StringName(k)] = int(cb[k])
+	var lic: Dictionary = d.get("license", {})
+	has_privateer_license = bool(lic.get("has", false))
+	license_is_legal = bool(lic.get("legal", false))
+	black_closed_week = int(d.get("black_closed_week", -1))
+	auctions.clear()
+	for a in d.get("auctions", []):
+		auctions.append(a)
+	auction_week = int(d.get("auction_week", -1))
+	auction_defects = int(d.get("auction_defects", 0))
 	port_registry.clear()
 	var pr: Dictionary = d.get("port_registry", {})
 	for k in pr.keys():
@@ -1414,6 +1524,13 @@ func reset_new_game() -> void:
 	island_upgrade_start.clear()
 	island_tier.clear()
 	port_registry.clear()
+	contraband.clear()
+	has_privateer_license = false
+	license_is_legal = false
+	black_closed_week = -1
+	auctions.clear()
+	auction_week = -1
+	auction_defects = 0
 	home_port_tier = 1
 	current_map = 1
 	sea_position = Vector2.ZERO

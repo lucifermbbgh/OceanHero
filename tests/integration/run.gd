@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_black_market_v011()
 	await _test_auction_v010()
 	await _test_economy_v09()
 	await _test_port_tiers()
@@ -628,6 +629,70 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 黑市（0.11.0） ----------------
+func _test_black_market_v011() -> void:
+	print("\n[黑市]")
+	GameState.reset_new_game()
+	GameState.black_closed_week = -1
+	_ok(GameState.black_market_open(), "通缉度低时黑市开放")
+
+	# 销赃
+	GameState.cargo.clear()
+	GameState.add_cargo(&"grain", 50)
+	var gold0 := GameState.gold
+	var r: Dictionary = GameState.fence_goods(&"grain", 10, 100)
+	_ok(bool(r.get("ok", false)), "可以销赃")
+	_ok(int(r.get("amount", 0)) == 10, "销赃数量正确")
+	_ok(int(r.get("gold", 0)) == 600, "销赃价 = 合法价 60%", "gold=%d" % int(r.get("gold", 0)))
+	_ok(GameState.gold > gold0, "销赃获得金币")
+	_ok(GameState.notoriety() == 2, "销赃后通缉度 +2", str(GameState.notoriety()))
+
+	# 单次上限
+	GameState.cargo.clear()
+	GameState.add_cargo(&"grain", 500)
+	var r2: Dictionary = GameState.fence_goods(&"grain", 500, 100)
+	_ok(int(r2.get("amount", 0)) <= int(GameState.BLACK_SELL_LIMIT), "单次销赃不超过上限",
+		"amount=%d" % int(r2.get("amount", 0)))
+
+	# 违禁品
+	GameState.add_gold(100000)
+	var b1: Dictionary = GameState.buy_contraband(&"forge_flag")
+	_ok(bool(b1.get("ok", false)), "可以购买违禁品")
+	_ok(int(GameState.contraband.get(&"forge_flag", 0)) == 1, "违禁品入库")
+	_ok(int(b1.get("price", 0)) == 3600, "违禁品价格正确")
+
+	# 私掠许可证（黑市）
+	GameState.has_privateer_license = false
+	var n0 := GameState.notoriety()
+	var lic: Dictionary = GameState.buy_license_black()
+	_ok(bool(lic.get("ok", false)), "黑市可以买私掠证")
+	_ok(GameState.has_privateer_license, "获得私掠证")
+	_ok(not GameState.license_is_legal, "标记为黑市途径")
+	_ok(GameState.notoriety() == mini(100, n0 + 5), "买证通缉度 +5")
+
+	# 正规途径需要声望
+	GameState.reset_new_game()
+	GameState.add_gold(100000)
+	_ok(not bool(GameState.buy_license_legal().get("ok", true)), "声望不足时不能买正规私掠证")
+	GameState.reputation["royal_navy"] = int(GameState.LEGAL_LICENSE_REP)
+	var lr: Dictionary = GameState.buy_license_legal()
+	_ok(bool(lr.get("ok", false)), "声望达标后可买正规私掠证")
+	_ok(GameState.license_is_legal, "标记为正规途径")
+
+	# 持证劫掠商船：不额外降海军声望
+	var navy0 := GameState.rep_of("royal_navy")
+	GameState.on_enemy_killed("merchant", false)
+	_ok(GameState.rep_of("royal_navy") >= navy0, "持私掠证劫掠商船不降海军声望",
+		"%d -> %d" % [navy0, GameState.rep_of("royal_navy")])
+
+	# 通缉度过高关闭黑市
+	GameState.reset_new_game()
+	GameState.reputation["notoriety"] = 85
+	GameState.black_closed_week = TimeService.total_weeks()
+	_ok(not GameState.black_market_open(), "通缉度 ≥80 时黑市关闭")
+	GameState.black_closed_week = TimeService.total_weeks() - 1
+	_ok(GameState.black_market_open(), "关闭一周后重新开放")
+
 # ---------------- 拍卖行（0.10.0） ----------------
 func _test_auction_v010() -> void:
 	print("\n[拍卖行]")
@@ -650,7 +715,7 @@ func _test_auction_v010() -> void:
 	_ok(GameState.auctions.size() == before_n, "同周不重复刷新")
 
 	# 出价规则
-	GameState.add_gold(500000)
+	GameState.add_gold(50000000)
 	var cur := int(GameState.auctions[0].get("price", 0))
 	var low: Dictionary = GameState.bid_auction(0, int(float(cur) * 1.01))
 	_ok(not bool(low.get("ok", true)), "低于 1.05 倍被拒绝", String(low.get("reason", "")))
@@ -660,7 +725,7 @@ func _test_auction_v010() -> void:
 
 	# 倒计时与到期（把 weeks 压到 1，跑两次 tick）
 	GameState.auctions[0]["weeks"] = 1
-	var ev1: Array = GameState.tick_auctions()
+	var ev1: Array = GameState.tick_auctions(false)
 	var still := false
 	for l in GameState.auctions:
 		if int(l.get("weeks", 0)) > 0:
@@ -673,7 +738,7 @@ func _test_auction_v010() -> void:
 	GameState.auctions.append({"id": "t_lot", "kind": "gear", "name": "测试装备",
 		"price": 999999, "start": 1000, "leader": "player", "weeks": 1, "gear": []})
 	GameState.gold = 10
-	var ev2: Array = GameState.tick_auctions()
+	var ev2: Array = GameState.tick_auctions(false)
 	var had_default := false
 	for e in ev2:
 		if String(e.get("type", "")) == "default":

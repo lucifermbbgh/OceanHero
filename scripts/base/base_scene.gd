@@ -668,10 +668,45 @@ func _toggle_rep() -> void:
 	_rebuild_rep()
 	rep_root.visible = true
 
+func _buy_license_legal() -> void:
+	var r: Dictionary = GameState.buy_license_legal()
+	if bool(r.get("ok", false)):
+		_log("取得正规私掠许可证")
+		_rebuild_rep()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "购买失败")))
+
 func _rebuild_rep() -> void:
 	for c in rep_list.get_children():
 		c.queue_free()
 	_yard_title_to(rep_list, "声望与战功 —— 战功 %d · 通缉度 %d" % [GameState.commendation, GameState.notoriety()])
+
+	# 正规私掠许可证（声望交易）
+	_yard_title_to(rep_list, "私掠许可证（声望交易）")
+	if GameState.has_privateer_license:
+		rep_list.add_child(_lbl("　已持有（%s）" % ("正规途径" if GameState.license_is_legal else "黑市途径"),
+			400, Color(0.7, 0.9, 0.7)))
+	else:
+		var lhb := HBoxContainer.new()
+		lhb.add_theme_constant_override("separation", 10)
+		rep_list.add_child(lhb)
+		lhb.add_child(_lbl("正规私掠证", 140))
+		lhb.add_child(_lbl("需海军声望 %d" % int(GameState.LEGAL_LICENSE_REP), 200,
+			Color(0.8, 0.85, 0.8)))
+		var lprice := int(GameState.LEGAL_LICENSE_REP) * 2
+		lhb.add_child(_lbl("%d 金" % lprice, 120, Color(0.9, 0.82, 0.45)))
+		var lb := Button.new()
+		lb.text = "购买"
+		lb.custom_minimum_size = Vector2(80, 26)
+		lb.disabled = GameState.rep_of("royal_navy") < int(GameState.LEGAL_LICENSE_REP) or GameState.gold < lprice
+		lb.pressed.connect(func(): _buy_license_legal())
+		lhb.add_child(lb)
+		var hint := Label.new()
+		hint.text = "　持有后劫掠敌对阵营商船不降海军声望"
+		hint.add_theme_font_size_override("font_size", 13)
+		hint.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
+		rep_list.add_child(hint)
 
 	_yard_title_to(rep_list, "三阵营声望（0~10000）")
 	for fac in GameState.FACTIONS:

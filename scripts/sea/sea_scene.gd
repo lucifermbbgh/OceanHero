@@ -644,6 +644,75 @@ func _rebuild_port() -> void:
 			bb.pressed.connect(func(): _port_bid_auction(idx_v, amt_v2))
 			lhb.add_child(bb)
 
+	# ---- 港口城市：黑市 ----
+	if tier >= 3:
+		_p_title("黑市（城市专属 · 独立市场）")
+		if not GameState.black_market_open():
+			port_list.add_child(_p_lbl("　通缉度过高，黑市被海军盯上，本周关闭", 520, Color(0.9, 0.5, 0.45)))
+		else:
+			port_list.add_child(_p_lbl("　销赃价 = 合法市场价 60%% · 单次 ≤ %d 单位" % int(GameState.BLACK_SELL_LIMIT),
+				560, Color(0.8, 0.75, 0.6)))
+			# 销赃：列出货舱里能卖的三种
+			for cid3 in [&"grain", &"timber", &"rum", &"spice"]:
+				var have3 := int(GameState.cargo.get(cid3, 0))
+				if have3 <= 0:
+					continue
+				var c3: Resource = DataRegistry.get_commodity(cid3)
+				if c3 == null:
+					continue
+				var legal_sp := MarketModel.sell_price(int(c3.base_price), _port_max_stock(), _port_max_stock(), 1.0)
+				var fence_price := int(round(float(legal_sp) * 0.60))
+				var hb3 := HBoxContainer.new()
+				hb3.add_theme_constant_override("separation", 10)
+				port_list.add_child(hb3)
+				hb3.add_child(_p_lbl("%s × %d" % [String(c3.display_name), have3], 200))
+				hb3.add_child(_p_lbl("销赃 %d/件" % fence_price, 140, Color(0.9, 0.75, 0.5)))
+				var cid3v: StringName = cid3
+				var sp3 := legal_sp
+				var fb := Button.new()
+				fb.text = "销赃 10"
+				fb.custom_minimum_size = Vector2(90, 26)
+				fb.pressed.connect(func(): _port_fence(cid3v, 10, sp3))
+				hb3.add_child(fb)
+			# 违禁品
+			_p_title("违禁品")
+			for item_id in GameState.CONTRABAND.keys():
+				var cdef: Dictionary = GameState.CONTRABAND[item_id]
+				var ihb := HBoxContainer.new()
+				ihb.add_theme_constant_override("separation", 10)
+				port_list.add_child(ihb)
+				ihb.add_child(_p_lbl(String(cdef.get("name", "")), 160))
+				ihb.add_child(_p_lbl(String(cdef.get("desc", "")), 340, Color(0.78, 0.82, 0.72)))
+				ihb.add_child(_p_lbl("%d 金" % int(cdef.get("price", 0)), 100, Color(0.9, 0.82, 0.45)))
+				var have_n := int(GameState.contraband.get(item_id, 0))
+				ihb.add_child(_p_lbl("持有 %d" % have_n, 80, Color(0.7, 0.78, 0.7)))
+				var iid: StringName = item_id
+				var ib := Button.new()
+				ib.text = "购买"
+				ib.custom_minimum_size = Vector2(70, 26)
+				ib.disabled = GameState.gold < int(cdef.get("price", 0))
+				ib.pressed.connect(func(): _port_buy_contraband(iid))
+				ihb.add_child(ib)
+			# 私掠许可证
+			_p_title("私掠许可证")
+			if GameState.has_privateer_license:
+				port_list.add_child(_p_lbl("　已持有（%s）" % ("正规" if GameState.license_is_legal else "黑市"),
+					400, Color(0.7, 0.9, 0.7)))
+			else:
+				var lprice := int(round(float(GameState.LEGAL_LICENSE_REP) * GameState.BLACK_LICENSE_MULT * 10.0))
+				var lhb2 := HBoxContainer.new()
+				lhb2.add_theme_constant_override("separation", 10)
+				port_list.add_child(lhb2)
+				lhb2.add_child(_p_lbl("黑市私掠证（无需声望）", 240))
+				lhb2.add_child(_p_lbl("%d 金 · 通缉度 +%d" % [lprice, int(GameState.BLACK_LICENSE_NOTORIETY)],
+					200, Color(0.9, 0.75, 0.5)))
+				var lb := Button.new()
+				lb.text = "购买"
+				lb.custom_minimum_size = Vector2(70, 26)
+				lb.disabled = GameState.gold < lprice
+				lb.pressed.connect(func(): _port_buy_license())
+				lhb2.add_child(lb)
+
 	# ---- 港口城市：交易所 / 声望 ----
 	if GameState.port_service_unlocked(tier, "exchange"):
 		_p_title("交易所（城市开放）")
@@ -824,6 +893,33 @@ func _random_npc_cargo() -> Dictionary:
 		var cid: StringName = pool[RngService.randi_range(0, pool.size() - 1)]
 		out[cid] = int(out.get(cid, 0)) + RngService.randi_range(3, 8 + map_index * 2)
 	return out
+
+## 黑市销赃
+func _port_fence(cid: StringName, amount: int, legal_sell: int) -> void:
+	var r: Dictionary = GameState.fence_goods(cid, amount, legal_sell)
+	if bool(r.get("ok", false)):
+		hud.ticker("销赃 %d 件，得 %d 金（通缉度 +2）" % [int(r.get("amount", 0)), int(r.get("gold", 0))])
+		_rebuild_port()
+	else:
+		hud.ticker(String(r.get("reason", "销赃失败")))
+
+## 黑市购买违禁品
+func _port_buy_contraband(item_id: StringName) -> void:
+	var r: Dictionary = GameState.buy_contraband(item_id)
+	if bool(r.get("ok", false)):
+		hud.ticker("购得违禁品（通缉度 +2）")
+		_rebuild_port()
+	else:
+		hud.ticker(String(r.get("reason", "购买失败")))
+
+## 黑市购买私掠许可证
+func _port_buy_license() -> void:
+	var r: Dictionary = GameState.buy_license_black()
+	if bool(r.get("ok", false)):
+		hud.ticker("取得私掠许可证（黑市途径）")
+		_rebuild_port()
+	else:
+		hud.ticker(String(r.get("reason", "购买失败")))
 
 ## 拍卖行出价
 func _port_bid_auction(index: int, price: int) -> void:
