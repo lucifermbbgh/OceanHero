@@ -680,6 +680,16 @@ func _test_ui_panels_v019() -> void:
 	s._input(ev)
 	await _frames(2)
 	_ok(not s.goods_root.visible, "ESC 先关闭商品弹窗")
+	# 边际曲线应随真实库存变化（不是一条水平线）
+	var cd0: Dictionary = s._chart_data(&"grain", 10, 400, 800)
+	var mc0: Array = cd0.get("mc", [])
+	var mono := true
+	for i in range(1, mc0.size()):
+		if float(mc0[i]) < float(mc0[i - 1]) - 0.01:
+			mono = false
+	_ok(float(mc0[mc0.size() - 1]) > float(mc0[0]), "买得越多买价越高（MC 曲线上升）",
+		"%.1f -> %.1f" % [float(mc0[0]), float(mc0[mc0.size() - 1])])
+	_ok(mono, "MC 曲线单调不减")
 	var cd: Dictionary = s._chart_data(&"grain", 10, 200, 400)
 	_ok(cd.has("history") and cd.has("mc") and cd.has("price_by_stock") and cd.has("curve"),
 		"图表数据齐全", str(cd.keys()))

@@ -521,7 +521,7 @@ func _rebuild_market() -> void:
 	head_row.add_theme_constant_override("separation", 8)
 	market_list.add_child(head_row)
 	for spec in [["商品", 150], ["买价", 120], ["卖价", 120], ["周涨跌", 160],
-			["库存", 130], ["船上", 120], ["仓库", 120], ["操作", 220]]:
+			["库存", 130], ["船上", 120], ["仓库", 120]]:
 		head_row.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
 
 	for id in [&"grain", &"timber", &"rum", &"spice"]:
@@ -571,27 +571,12 @@ func _rebuild_market() -> void:
 		row.add_child(_cell_box(str(stock), 130))
 		row.add_child(_cell_box(str(have), 120))
 		row.add_child(_cell_box(str(in_wh), 120))
-		var trade_box := PanelContainer.new()
-		var tsb := StyleBoxFlat.new()
-		tsb.bg_color = Color(0.09, 0.12, 0.13)
-		tsb.border_width_left = 1
-		tsb.border_width_right = 1
-		tsb.border_width_top = 1
-		tsb.border_width_bottom = 1
-		tsb.border_color = Color(0.28, 0.36, 0.38)
-		tsb.content_margin_left = 10
-		tsb.content_margin_right = 10
-		tsb.content_margin_top = 3
-		tsb.content_margin_bottom = 3
-		trade_box.add_theme_stylebox_override("panel", tsb)
-		trade_box.custom_minimum_size = Vector2(220, 30)
 		var b_trade := Button.new()
 		b_trade.text = "交易"
-		b_trade.custom_minimum_size = Vector2(120, 26)
+		b_trade.custom_minimum_size = Vector2(150, 30)
 		var cid_t: StringName = id
 		b_trade.pressed.connect(func(): _open_goods(cid_t))
-		trade_box.add_child(b_trade)
-		row.add_child(trade_box)
+		row.add_child(b_trade)
 	_add_market_metrics(String(PORT_ID))
 
 	# 船上货舱汇总：买的东西到底装在哪儿
@@ -1669,7 +1654,7 @@ func _rebuild_overview() -> void:
 	var stock_total := cargo_v + wh_v + gear_v + ship_v
 	var debt := GameState.loan_exposure()
 	var net_worth := GameState.gold + GameState.bank_deposited() + stock_total - debt
-	_yard_title_to(overview_list, "一、年度经济信息")
+	_yard_title_to(overview_list, "一、年度经济信息（年资产负债表）")
 	overview_list.add_child(_lbl("　现金 %d ｜ 存款 %d ｜ 库存 %d ｜ 贷款 %d" % [
 		GameState.gold, GameState.bank_deposited(), stock_total, debt], 780, Color(0.8, 0.86, 0.82)))
 	overview_list.add_child(_lbl("　净资产 %d（现金 + 存款 + 库存 − 贷款）" % net_worth,
@@ -1678,7 +1663,7 @@ func _rebuild_overview() -> void:
 		cargo_v, wh_v, gear_v, ship_v], 780, Color(0.66, 0.72, 0.7)))
 
 	var s: Dictionary = GameState.finance_summary()
-	_yard_title_to(overview_list, "二、营收信息（年资产负债表）")
+	_yard_title_to(overview_list, "二、年度营收信息（年利润表）")
 	overview_list.add_child(_lbl("　年收入 %d ｜ 年支出 %d ｜ 年利润 %+d" % [
 		int(s["income_total"]), int(s["expense_total"]), int(s["net"])], 780,
 		Color(0.92, 0.45, 0.42) if int(s["net"]) >= 0 else Color(0.45, 0.85, 0.55)))
@@ -1706,9 +1691,52 @@ func _rebuild_overview() -> void:
 
 	var up: Dictionary = GameState.weekly_upkeep()
 	_yard_title_to(overview_list, "三、本周财务状况（周利润表）")
-	overview_list.add_child(_lbl("　本周支出 %d：船体 %d ｜ 停泊 %d ｜ 船员 %d ｜ 火炮 %d" % [
-		int(up.get("total", 0)), int(up.get("hull", 0)), int(up.get("berth", 0)),
-		int(up.get("crew", 0)), int(up.get("cannon", 0))], 780, Color(0.9, 0.62, 0.55)))
+	var h3 := HBoxContainer.new()
+	h3.add_theme_constant_override("separation", 0)
+	overview_list.add_child(h3)
+	for spec in [["成本项", 240], ["本周", 160], ["本年累计", 180], ["说明", 700]]:
+		h3.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	var cost_rows: Array = [
+		["船体维护", int(up.get("hull", 0)), "按船队估值 2%（固定）"],
+		["停泊费", int(up.get("berth", 0)), "按母港等级（固定）"],
+		["船员薪酬", int(up.get("crew", 0)), "按在岗船员（增量）"],
+		["火炮维护", int(up.get("cannon", 0)), "按装备火炮（增量）"],
+		["采购", 0, "本年累计见右列"],
+		["关税", 0, "非母港卖出 5%"],
+		["贷款利息", 0, "银行"],
+	]
+	var year_exp: Dictionary = s["expense"]
+	var total_week := 0
+	var total_year := 0
+	for rw in cost_rows:
+		var name_s := String(rw[0])
+		var week_v := int(rw[1])
+		var year_v := 0
+		if name_s == "采购":
+			year_v = int(year_exp.get("采购", 0))
+		elif name_s == "关税":
+			year_v = int(year_exp.get("关税", 0))
+		elif name_s == "贷款利息":
+			year_v = int(year_exp.get("利息", 0))
+		elif name_s == "船体维护" or name_s == "停泊费" or name_s == "船员薪酬" or name_s == "火炮维护":
+			year_v = 0
+		total_week += week_v
+		total_year += year_v
+		var hr := HBoxContainer.new()
+		hr.add_theme_constant_override("separation", 0)
+		overview_list.add_child(hr)
+		hr.add_child(_cell_box(name_s, 240))
+		hr.add_child(_cell_box(str(week_v), 160, Color(0.92, 0.72, 0.6)))
+		hr.add_child(_cell_box(str(year_v), 180, Color(0.92, 0.72, 0.6)))
+		hr.add_child(_cell_box(String(rw[2]), 700, Color(0.68, 0.74, 0.7)))
+	var tot_row := HBoxContainer.new()
+	tot_row.add_theme_constant_override("separation", 0)
+	overview_list.add_child(tot_row)
+	tot_row.add_child(_cell_box("成本合计", 240, Color(0.95, 0.85, 0.5)))
+	tot_row.add_child(_cell_box(str(total_week), 160, Color(0.98, 0.9, 0.55)))
+	tot_row.add_child(_cell_box(str(int(s["expense_total"])), 180, Color(0.98, 0.9, 0.55)))
+	tot_row.add_child(_cell_box("本周 = 固定 + 增量；本年累计含采购与关税", 700, Color(0.7, 0.76, 0.72)))
+
 	var inc_parts: Array = []
 	for k2 in s["income"].keys():
 		inc_parts.append("%s %d" % [String(k2), int(s["income"][k2])])
@@ -1757,7 +1785,8 @@ func _rebuild_goods() -> void:
 	if c == null:
 		return
 	var port: Resource = DataRegistry.get_port(PORT_ID)
-	var max_stock := int(TIER_STOCK_REF.get(GameState.home_port_tier, 40))
+	var port2: Resource = DataRegistry.get_port(PORT_ID)
+	var max_stock := int(port2.max_stock) if port2 != null else 800
 	var stock := GameState.ensure_stock(PORT_ID, goods_cid, max_stock)
 	var demand := 1.0
 	if port != null:
@@ -1900,7 +1929,8 @@ func _goods_choose_storage(price: int) -> void:
 			GameState.record_purchase(goods_cid, goods_qty, price * goods_qty)
 			GameState.add_gold(-price * goods_qty)
 			GameState.warehouse[goods_cid] = int(GameState.warehouse.get(goods_cid, 0)) + goods_qty
-			var ms := int(TIER_STOCK_REF.get(GameState.home_port_tier, 40))
+			var port3: Resource = DataRegistry.get_port(PORT_ID)
+			var ms := int(port3.max_stock) if port3 != null else 800
 			GameState.ensure_stock(PORT_ID, goods_cid, ms)
 			GameState.port_stock[PORT_ID][goods_cid] = maxi(0, int(GameState.port_stock[PORT_ID][goods_cid]) - goods_qty)
 			dlg.queue_free()
@@ -1912,9 +1942,11 @@ func _chart_data(cid: StringName, base_price: int, stock: int, max_stock: int) -
 	d["history"] = GameState.price_history_of(String(PORT_ID), cid)
 	var em = load("res://scripts/systems/econ_math.gd")
 	var mc: Array = []
-	for i in range(0, 41):
-		var s := maxi(0, stock - i * 3)
-		var r := clampf(float(s) / float(max_stock), 0.0, 1.0)
+	var steps := 40
+	var per_step := maxf(1.0, float(stock) / float(steps))
+	for i in range(0, steps + 1):
+		var s := float(stock) - per_step * float(i)
+		var r := clampf(maxf(0.0, s) / float(max_stock), 0.0, 1.0)
 		mc.append(float(base_price) * (1.0 + em.piecewise_elasticity(r) * (1.0 - r)))
 	d["mc"] = mc
 	d["mr"] = float(MarketModel.sell_price(base_price, stock, max_stock, 1.0))
