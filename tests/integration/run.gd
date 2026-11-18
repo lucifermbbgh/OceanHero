@@ -686,11 +686,10 @@ func _test_v120_component() -> void:
 	_ok(GameState.building_level(&"tavern") == 0, "母港初始无酒馆")
 	# 开局资源
 	GameState.reset_new_game()
-	var gold0 := GameState.gold
-	GameState.grant_start_resources()
-	_ok(GameState.gold == gold0 + 8000, "开局发放 8000 金", str(GameState.gold))
-	_ok(int(GameState.cargo.get(&"timber", 0)) == 300, "开局 300 木材")
-	_ok(int(GameState.cargo.get(&"iron_ore", 0)) == 120, "开局 120 铁矿")
+	_ok(GameState.gold == GameState.START_GOLD + 8000, "开局发放 8000 金", str(GameState.gold))
+	_ok(int(GameState.warehouse.get(&"timber", 0)) == 300, "开局 300 木材（仓库）",
+		str(GameState.warehouse.get(&"timber", 0)))
+	_ok(int(GameState.warehouse.get(&"iron_ore", 0)) == 120, "开局 120 铁矿（仓库）")
 
 # ---------------- 1.1.4 试玩反馈修复 ----------------
 func _test_v114_fixes() -> void:
@@ -719,6 +718,7 @@ func _test_v113_polish() -> void:
 	print("\n[1.1.3 打磨]")
 	GameState.reset_new_game()
 	# 生产受工坊等级限制
+	GameState.warehouse.clear()
 	GameState.warehouse[&"wheat"] = 30
 	var p0: Dictionary = GameState.tick_production("jadehaven")
 	var n0 := 0
@@ -726,6 +726,7 @@ func _test_v113_polish() -> void:
 		n0 += int(p0["产出"][k])
 	_ok(n0 <= 1, "工坊 0 级时每周最多 1 批", str(n0))
 	GameState.buildings[&"sawmill"] = 3
+	GameState.warehouse.clear()
 	GameState.warehouse[&"wheat"] = 30
 	var p3: Dictionary = GameState.tick_production("jadehaven")
 	var n3 := 0
@@ -858,6 +859,7 @@ func _test_v110_core() -> void:
 	# 生产运行时产出（C 块补齐）
 	GameState.reset_new_game()
 	GameState.buildings[&"sawmill"] = 3
+	GameState.warehouse.clear()
 	GameState.warehouse[&"wheat"] = 9
 	var prod: Dictionary = GameState.tick_production("jadehaven")
 	var made: Dictionary = prod.get("产出", {})
@@ -887,6 +889,7 @@ func _test_v110_core() -> void:
 	# 装备强化
 	GameState.reset_new_game()
 	GameState.add_gold(50000)
+	GameState.warehouse.clear()
 	GameState.warehouse[&"iron_ore"] = 10
 	var gid: StringName = &"nonexistent_gear"
 	_ok(GameState.gear_level_of(gid) == 0, "初始强化 0 级")

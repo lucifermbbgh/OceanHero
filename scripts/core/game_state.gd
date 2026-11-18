@@ -1210,7 +1210,8 @@ func grant_start_resources() -> void:
 			amount = int(START_RES["stone"])
 		else:
 			amount = int(START_RES["grain"])
-		cargo[cid] = int(cargo.get(cid, 0)) + amount
+		# 启动资源放港口仓库（船舱放不下：木材 300 + 铁 72 + 石 120 + 麦 50 = 542 单位）
+		warehouse[cid] = int(warehouse.get(cid, 0)) + amount
 
 ## 某建筑是否已建（等级 ≥ 1）
 func has_building(bid: StringName) -> bool:
