@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v111_ui()
 	await _test_v110_core()
 	await _test_ui_panels_v019()
 	await _test_finance_v018()
@@ -636,6 +637,35 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.1.1 界面入口 ----------------
+func _test_v111_ui() -> void:
+	print("\n[1.1.1 界面]")
+	GameState.reset_new_game()
+	GameState.add_gold(80000)
+	GameState.warehouse[&"iron_ore"] = 20
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	_ok(s.crew_root != null, "船员面板已创建")
+	_ok(s.gear_root != null, "装备面板已创建")
+	_ok(s.mod_root != null, "改装面板已创建")
+	s._toggle_crew_panel()
+	await _frames(1)
+	_ok(s.crew_root.visible, "船员面板可打开")
+	_ok(s.close_btn.visible, "打开面板后关闭按钮出现")
+	s._close_all_panels()
+	await _frames(1)
+	s._toggle_gear()
+	await _frames(1)
+	_ok(s.gear_root.visible, "装备面板可打开")
+	s._close_all_panels()
+	s._toggle_mod()
+	await _frames(1)
+	_ok(s.mod_root.visible, "改装面板可打开")
+	_ok(s.mod_list.get_child_count() > 1, "改装面板有内容", str(s.mod_list.get_child_count()))
+	s._close_all_panels()
+	await _frames(1)
 
 # ---------------- 1.1.0 商品分类 / 关税 / 建造 ----------------
 func _test_v110_core() -> void:

@@ -125,6 +125,9 @@ func _build_ui() -> void:
 	if GameState.home_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
 
+	_action_button(vb, "船员名单", _toggle_crew_panel)
+	_action_button(vb, "装备强化", _toggle_gear)
+	_action_button(vb, "船只改装", _toggle_mod)
 	_action_button(vb, "建造", _toggle_construct)
 	_action_button(vb, "经济总览", _toggle_overview)
 	if GameState.home_port_tier >= 3:
@@ -250,6 +253,54 @@ func _build_ui() -> void:
 	goods_list.add_theme_constant_override("separation", 6)
 	goods_list.custom_minimum_size = Vector2(1510, 0)
 	gscroll.add_child(goods_list)
+
+	# 船员名单面板
+	crew_root = PanelContainer.new()
+	crew_root.position = Vector2(16, 72)
+	crew_root.custom_minimum_size = Vector2(1568, 812)
+	crew_root.add_theme_stylebox_override("panel", _panel_style())
+	crew_root.visible = false
+	root.add_child(crew_root)
+	var crscroll := ScrollContainer.new()
+	crscroll.custom_minimum_size = Vector2(1530, 780)
+	crscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	crew_root.add_child(crscroll)
+	crew_list = VBoxContainer.new()
+	crew_list.add_theme_constant_override("separation", 4)
+	crew_list.custom_minimum_size = Vector2(1510, 0)
+	crscroll.add_child(crew_list)
+
+	# 装备强化面板
+	gear_root = PanelContainer.new()
+	gear_root.position = Vector2(16, 72)
+	gear_root.custom_minimum_size = Vector2(1568, 812)
+	gear_root.add_theme_stylebox_override("panel", _panel_style())
+	gear_root.visible = false
+	root.add_child(gear_root)
+	var grscroll := ScrollContainer.new()
+	grscroll.custom_minimum_size = Vector2(1530, 780)
+	grscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	gear_root.add_child(grscroll)
+	gear_list = VBoxContainer.new()
+	gear_list.add_theme_constant_override("separation", 4)
+	gear_list.custom_minimum_size = Vector2(1510, 0)
+	grscroll.add_child(gear_list)
+
+	# 船只改装面板
+	mod_root = PanelContainer.new()
+	mod_root.position = Vector2(16, 72)
+	mod_root.custom_minimum_size = Vector2(1568, 812)
+	mod_root.add_theme_stylebox_override("panel", _panel_style())
+	mod_root.visible = false
+	root.add_child(mod_root)
+	var mrscroll := ScrollContainer.new()
+	mrscroll.custom_minimum_size = Vector2(1530, 780)
+	mrscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	mod_root.add_child(mrscroll)
+	mod_list = VBoxContainer.new()
+	mod_list.add_theme_constant_override("separation", 4)
+	mod_list.custom_minimum_size = Vector2(1510, 0)
+	mrscroll.add_child(mod_list)
 
 	# 建造面板（材料提交）
 	construct_root = PanelContainer.new()
@@ -2034,6 +2085,163 @@ func _chart_data(cid: StringName, base_price: int, stock: int, max_stock: int) -
 	d["vol"] = [40, 90, 160]
 	return d
 
+# ---------------- 船员 / 装备 / 改装面板（1.1.1） ----------------
+
+var crew_root: PanelContainer = null
+var crew_list: VBoxContainer = null
+var gear_root: PanelContainer = null
+var gear_list: VBoxContainer = null
+var mod_root: PanelContainer = null
+var mod_list: VBoxContainer = null
+
+func _toggle_crew_panel() -> void:
+	if crew_root.visible:
+		crew_root.visible = false
+		return
+	_rebuild_crew_panel()
+	crew_root.visible = true
+
+func _rebuild_crew_panel() -> void:
+	for c in crew_list.get_children():
+		c.queue_free()
+	_yard_title_to(crew_list, "船员名单 —— 在岗 %d 人" % GameState.crew_roster.size())
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	crew_list.add_child(head)
+	for spec in [["姓名", 200], ["角色", 140], ["稀有度", 120], ["职级", 140], ["经验", 140], ["属性", 120]]:
+		head.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	if GameState.crew_roster.is_empty():
+		crew_list.add_child(_lbl("　（暂无船员，去酒馆招募）", 500, Color(0.55, 0.6, 0.6)))
+		return
+	for c in GameState.crew_roster:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		crew_list.add_child(row)
+		var cid: StringName = c.crew_id
+		row.add_child(_cell_box(String(c.display_name), 200))
+		row.add_child(_cell_box(String(c.role), 140))
+		row.add_child(_cell_box(str(int(c.rarity)), 120))
+		row.add_child(_cell_box(GameState.crew_rank_name(cid), 140, Color(0.95, 0.9, 0.55)))
+		row.add_child(_cell_box(str(int(GameState.crew_xp.get(cid, 0))), 140))
+		row.add_child(_cell_box(str(int(c.stat)), 120))
+
+func _toggle_gear() -> void:
+	if gear_root.visible:
+		gear_root.visible = false
+		return
+	_rebuild_gear()
+	gear_root.visible = true
+
+func _rebuild_gear() -> void:
+	for c in gear_list.get_children():
+		c.queue_free()
+	_yard_title_to(gear_list, "装备强化与合成 —— 铁矿 %d" % int(GameState.warehouse.get(&"iron_ore", 0)))
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	gear_list.add_child(head)
+	for spec in [["装备", 260], ["部位", 140], ["稀有度", 120], ["强化", 100], ["操作", 260]]:
+		head.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	if GameState.gear_owned.is_empty():
+		gear_list.add_child(_lbl("　（暂无装备）", 400, Color(0.55, 0.6, 0.6)))
+		return
+	for gid in GameState.gear_owned:
+		var gd: Resource = DataRegistry.get_gear(gid)
+		if gd == null:
+			continue
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		gear_list.add_child(row)
+		row.add_child(_cell_box(String(gd.display_name), 260))
+		row.add_child(_cell_box(String(gd.slot), 140))
+		row.add_child(_cell_box(str(int(gd.rarity)), 120))
+		row.add_child(_cell_box("+%d" % GameState.gear_level_of(gid), 100, Color(0.95, 0.9, 0.55)))
+		var op := PanelContainer.new()
+		op.custom_minimum_size = Vector2(260, 30)
+		var hb2 := HBoxContainer.new()
+		hb2.add_theme_constant_override("separation", 6)
+		op.add_child(hb2)
+		var up := Button.new()
+		up.text = "强化"
+		up.custom_minimum_size = Vector2(80, 26)
+		var gid_v: StringName = gid
+		up.pressed.connect(func(): _do_gear_upgrade(gid_v))
+		hb2.add_child(up)
+		var comb := Button.new()
+		comb.text = "合成"
+		comb.custom_minimum_size = Vector2(80, 26)
+		var slot_v := StringName(gd.slot)
+		var rar_v := int(gd.rarity)
+		comb.pressed.connect(func(): _do_gear_combine(slot_v, rar_v))
+		hb2.add_child(comb)
+		row.add_child(op)
+
+func _do_gear_upgrade(gid: StringName) -> void:
+	var r: Dictionary = GameState.gear_upgrade(gid)
+	if bool(r.get("ok", false)):
+		_log("强化成功：+%d" % int(r.get("level", 0)))
+		_rebuild_gear()
+	else:
+		_log(String(r.get("reason", "强化失败")))
+
+func _do_gear_combine(slot: StringName, rarity: int) -> void:
+	var r: Dictionary = GameState.gear_combine(slot, rarity)
+	if bool(r.get("ok", false)):
+		_log("合成成功")
+		_rebuild_gear()
+	else:
+		_log(String(r.get("reason", "合成失败")))
+
+func _toggle_mod() -> void:
+	if mod_root.visible:
+		mod_root.visible = false
+		return
+	_rebuild_mod()
+	mod_root.visible = true
+
+func _rebuild_mod() -> void:
+	for c in mod_list.get_children():
+		c.queue_free()
+	_yard_title_to(mod_list, "船只改装 —— 现金 %d" % GameState.gold)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	mod_list.add_child(head)
+	for spec in [["改装项", 260], ["等级", 120], ["当前加成", 220], ["下一级花费", 180], ["操作", 160]]:
+		head.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	var sail_lv := int(GameState.ship_mods.get("sail_tier", 0))
+	var can_lv := int(GameState.ship_mods.get("cannon_slots", 0))
+	var rows: Array = [
+		["帆具", str(sail_lv), "+%d%% 航速" % int(GameState.ship_sail_bonus() * 100.0),
+			str(int(GameState.MOD_SAIL_COST[sail_lv + 1])) if sail_lv < 2 else "已满", "sail"],
+		["火炮位", str(can_lv), "+%d 可装炮" % GameState.ship_cannon_bonus(),
+			str(int(GameState.MOD_CANNON_COST[can_lv + 1])) if can_lv < 2 else "已满", "cannon"],
+	]
+	for rw in rows:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		mod_list.add_child(row)
+		row.add_child(_cell_box(String(rw[0]), 260))
+		row.add_child(_cell_box(String(rw[1]), 120, Color(0.95, 0.9, 0.55)))
+		row.add_child(_cell_box(String(rw[2]), 220, Color(0.7, 0.85, 0.75)))
+		row.add_child(_cell_box(String(rw[3]), 180))
+		var op := PanelContainer.new()
+		op.custom_minimum_size = Vector2(160, 30)
+		var btn := Button.new()
+		btn.text = "改装"
+		btn.custom_minimum_size = Vector2(100, 26)
+		var kind := String(rw[4])
+		btn.disabled = (sail_lv >= 2) if kind == "sail" else (can_lv >= 2)
+		btn.pressed.connect(func(): _do_mod(kind))
+		op.add_child(btn)
+		row.add_child(op)
+
+func _do_mod(kind: String) -> void:
+	var r: Dictionary = GameState.mod_sail() if kind == "sail" else GameState.mod_cannon()
+	if bool(r.get("ok", false)):
+		_log("改装完成：%s Lv%d" % [kind, int(r.get("level", 0))])
+		_rebuild_mod()
+	else:
+		_log(String(r.get("reason", "改装失败")))
+
 # ---------------- 建造与投资（1.1） ----------------
 
 
@@ -2162,7 +2370,8 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root", "ex_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
-	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root"]
+	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
+	"crew_root", "gear_root", "mod_root"]
 
 var close_btn: Button = null
 var construct_root: PanelContainer = null
