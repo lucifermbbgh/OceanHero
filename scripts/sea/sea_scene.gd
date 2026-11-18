@@ -1105,7 +1105,7 @@ func _open_island_goods(cid: StringName, bp: int, sp: int, stock: int) -> void:
 	var etype_l := Label.new()
 	etype_l.text = "供给弹性 %.2f（%s）　库存 %d/%d\n均衡价 %.1f　当前买价 %d　偏离 %+.1f%%\n关税 %d%%（按声望）" % [
 		e, etype, stock, max_stock, eq, bp, dev * 100.0,
-		int(round(GameState.tariff_rate() * 100.0))]
+		int(round(GameState.tariff_rate_for_port(GameState.visit_port_id) * 100.0))]
 	vb.add_child(etype_l)
 	var qrow := HBoxContainer.new()
 	vb.add_child(qrow)

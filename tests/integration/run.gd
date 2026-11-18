@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v133_relations()
 	await _test_v132_adjacency()
 	await _test_v131_maps()
 	await _test_v130_nations()
@@ -655,6 +656,32 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.3 国家关系与关税 ----------------
+func _test_v133_relations() -> void:
+	print("\n[1.3.3 国家关系与关税]")
+	GameState.reset_new_game()
+	# 关系矩阵
+	_ok(GameState.nation_relation_between("lan", "xuanjiao") == "hostile", "澜国与玄礁敌对")
+	_ok(GameState.nation_relation_between("xuanjiao", "lan") == "hostile", "关系对称")
+	_ok(GameState.nation_relation_between("lan", "shuangyu") == "ally", "澜国与霜屿同盟")
+	_ok(GameState.nation_relation_between("lan", "chilin") == "neutral", "澜国与赤鳞中立")
+	_ok(GameState.nation_relation_between("lan", "lan") == "neutral", "同国为中立")
+	# 关税按港口归属国声望
+	GameState.register_port("p_lan", "澜国港", 1, 1)
+	GameState.register_port("p_jiao", "交界港", 6, 2)
+	GameState.nation_rep["lan"] = 0
+	_ok(is_equal_approx(GameState.tariff_rate_for_port(&"p_lan"), 0.10), "敌视国关税 10%",
+		str(GameState.tariff_rate_for_port(&"p_lan")))
+	GameState.nation_rep["lan"] = 3000
+	_ok(is_equal_approx(GameState.tariff_rate_for_port(&"p_lan"), 0.05), "中立国关税 5%")
+	GameState.nation_rep["lan"] = 6000
+	_ok(is_equal_approx(GameState.tariff_rate_for_port(&"p_lan"), 0.03), "友好国关税 3%")
+	GameState.nation_rep["lan"] = 9000
+	_ok(is_equal_approx(GameState.tariff_rate_for_port(&"p_lan"), 0.01), "盟友关税 1%")
+	_ok(is_equal_approx(GameState.tariff_rate_for_port(&"p_jiao"), 0.05), "交界港基准 5%",
+		str(GameState.tariff_rate_for_port(&"p_jiao")))
+	GameState.reset_new_game()
 
 # ---------------- 1.3.2 邻接图航行 ----------------
 func _test_v132_adjacency() -> void:

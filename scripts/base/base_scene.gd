@@ -1034,7 +1034,7 @@ func _sell(cid: StringName, amount: int, price: int) -> void:
 	var gross := price * amount
 	var tax := 0
 	if String(_pid()) != "jadehaven":
-		tax = int(round(float(gross) * GameState.tariff_rate()))
+		tax = int(round(float(gross) * GameState.tariff_rate_for_port(_pid())))
 		GameState.record_expense("关税", tax)
 	GameState.add_gold(gross - tax)
 	if tax > 0:

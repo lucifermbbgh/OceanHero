@@ -268,6 +268,46 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 国家关系与关税（1.3.3） ----------------
+
+## 国家关系矩阵：仅登记敌对与同盟，其余为中立
+const NATION_HOSTILE := [
+	["lan", "xuanjiao"],
+	["chilin", "xuanjiao"],
+	["baijing", "xuanjiao"],
+	["shuangyu", "xuanjiao"],
+]
+const NATION_ALLY := [
+	["lan", "shuangyu"],
+	["chilin", "cangwu"],
+	["baijing", "cangwu"],
+]
+
+func nation_relation_between(a: String, b: String) -> String:
+	if a == "" or b == "" or a == b:
+		return "neutral"
+	for pair in NATION_HOSTILE:
+		if (pair[0] == a and pair[1] == b) or (pair[0] == b and pair[1] == a):
+			return "hostile"
+	for pair2 in NATION_ALLY:
+		if (pair2[0] == a and pair2[1] == b) or (pair2[0] == b and pair2[1] == a):
+			return "ally"
+	return "neutral"
+
+## 按港口所属国计算关税
+func tariff_rate_for_port(pid: StringName) -> float:
+	var nation := port_nation(pid)
+	if nation == "":
+		return 0.05   # 交界 / 母港：基准
+	var v := nation_rep_of(nation)
+	if v < 2000:
+		return 0.10
+	if v < 5000:
+		return 0.05
+	if v < 8000:
+		return 0.03
+	return 0.01
+
 # ---------------- 邻接图航行（1.3.2） ----------------
 
 func map_tier_of(index: int) -> int:
@@ -2758,6 +2798,8 @@ func _cargo_to_dict() -> Dictionary:
 
 func reset_new_game() -> void:
 	gold = START_GOLD
+	nation_rep.clear()
+	_init_nation_rep()
 	commendation = 0
 	level = 1
 	xp = 0
