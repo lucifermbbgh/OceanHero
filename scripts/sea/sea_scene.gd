@@ -585,6 +585,14 @@ func _rebuild_port() -> void:
 		hb.add_child(_p_lbl(c.display_name, 80))
 		hb.add_child(_p_lbl("买 %d / 卖 %d（库存 %d）" % [bp, sp, stock], 220))
 		var cid_v: StringName = cid
+		var b0 := Button.new()
+		b0.text = "交易"
+		b0.custom_minimum_size = Vector2(80, 26)
+		var bp_v := bp
+		var sp_v := sp
+		var st_v := stock
+		b0.pressed.connect(func(): _open_island_goods(cid_v, bp_v, sp_v, st_v))
+		hb.add_child(b0)
 		var b1 := Button.new()
 		b1.text = "买10"
 		b1.custom_minimum_size = Vector2(70, 26)
@@ -1067,6 +1075,65 @@ func _port_max_stock() -> int:
 	return int(TIER_STOCK.get(int(islands[cur_port_island][2]), 40))
 
 ## 对当前岛注资
+## 岛屿市场商品详情弹窗
+var goods_dlg: AcceptDialog = null
+
+func _open_island_goods(cid: StringName, bp: int, sp: int, stock: int) -> void:
+	var c: Resource = DataRegistry.get_commodity(cid)
+	if c == null:
+		return
+	if goods_dlg != null and is_instance_valid(goods_dlg):
+		goods_dlg.queue_free()
+	goods_dlg = AcceptDialog.new()
+	goods_dlg.title = String(c.display_name)
+	goods_dlg.ok_button_text = "关闭"
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	goods_dlg.add_child(vb)
+	var max_stock := int(c.base_price) * 0 + 400
+	var ratio := clampf(float(stock) / float(max_stock), 0.0, 1.0)
+	var em = load("res://scripts/systems/econ_math.gd")
+	var e: float = float(em.piecewise_elasticity(ratio))
+	var etype := "富有弹性" if e >= 0.70 else ("单位弹性附近" if e >= 0.40 else "缺乏弹性")
+	var eq: float = float(c.base_price) * (1.0 + e * (1.0 - ratio))
+	var cur: float = float(bp)
+	var dev: float = (cur - eq) / maxf(0.01, eq)
+	var etype_l := Label.new()
+	etype_l.text = "供给弹性 %.2f（%s）　库存 %d/%d\n均衡价 %.1f　当前买价 %d　偏离 %+.1f%%\n关税 %d%%（按声望）" % [
+		e, etype, stock, max_stock, eq, bp, dev * 100.0,
+		int(round(GameState.tariff_rate() * 100.0))]
+	vb.add_child(etype_l)
+	var qrow := HBoxContainer.new()
+	vb.add_child(qrow)
+	qrow.add_child(Label.new())
+	(qrow.get_child(0) as Label).text = "数量"
+	var qty := LineEdit.new()
+	qty.text = "10"
+	qty.custom_minimum_size = Vector2(100, 30)
+	qrow.add_child(qty)
+	var brow := HBoxContainer.new()
+	vb.add_child(brow)
+	var cid_v: StringName = cid
+	var buy_b := Button.new()
+	buy_b.text = "买入"
+	buy_b.custom_minimum_size = Vector2(120, 32)
+	buy_b.pressed.connect(func():
+		var n := clampi(int(qty.text), 1, maxi(1, stock))
+		_port_buy(cid_v, n, bp)
+		goods_dlg.queue_free())
+	brow.add_child(buy_b)
+	var sell_b := Button.new()
+	sell_b.text = "卖出"
+	sell_b.custom_minimum_size = Vector2(120, 32)
+	sell_b.pressed.connect(func():
+		var have := int(GameState.cargo.get(cid_v, 0))
+		var n := clampi(int(qty.text), 1, maxi(1, have))
+		_port_sell(cid_v, n, sp)
+		goods_dlg.queue_free())
+	brow.add_child(sell_b)
+	add_child(goods_dlg)
+	goods_dlg.popup_centered()
+
 ## 用存款投资
 func _port_invest_deposit() -> void:
 	var key := _island_key()

@@ -1540,6 +1540,15 @@ func _res_line() -> String:
 		int(r.get("grain", 0)), int(r.get("saltpeter", 0)),
 	]
 
+func _start_parallel_upgrade(bid: StringName) -> void:
+	var r: Dictionary = GameState.building_start_upgrade(bid)
+	if bool(r.get("ok", false)):
+		_log("开始升级，工期 2 周")
+		_rebuild_build()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "升级失败")))
+
 func _rebuild_build() -> void:
 	for c in build_list.get_children():
 		c.queue_free()
@@ -1549,6 +1558,24 @@ func _rebuild_build() -> void:
 		int(prod.get("timber", 0)), int(prod.get("iron", 0)),
 		int(prod.get("grain", 0)), int(prod.get("saltpeter", 0)),
 	], 520, Color(0.6, 0.8, 0.65)))
+
+	# 并行升级（独立计时）
+	_yard_title_to(build_list, "并行升级（每座独立计时）")
+	var parallel_row := HBoxContainer.new()
+	parallel_row.add_theme_constant_override("separation", 8)
+	build_list.add_child(parallel_row)
+	for bid2 in [&"drydock", &"warehouse", &"exchange"]:
+		var bd2: Resource = DataRegistry.get_building(bid2)
+		if bd2 == null:
+			continue
+		var lv2 := GameState.building_level(bid2)
+		var pb := Button.new()
+		pb.text = "%s Lv%d → Lv%d" % [String(bd2.display_name), lv2, lv2 + 1]
+		pb.custom_minimum_size = Vector2(200, 30)
+		pb.disabled = lv2 >= int(bd2.max_level) or GameState.building_upgrades.has(bid2)
+		var bidv: StringName = bid2
+		pb.pressed.connect(func(): _start_parallel_upgrade(bidv))
+		parallel_row.add_child(pb)
 
 	if not GameState.build_queue.is_empty():
 		_yard_title_to(build_list, "建造中")
@@ -1578,8 +1605,11 @@ func _rebuild_build() -> void:
 			int(cost.gold), int(cost.timber), int(cost.iron), int(cost.weeks)]
 		var affordable: bool = GameState.has_resources(cost)
 		hb.add_child(_lbl(txt, 250, Color(0.85, 0.82, 0.6) if affordable else Color(0.85, 0.5, 0.5)))
+		var prog_txt := GameState.building_progress_text(StringName(bid))
+		if prog_txt != "":
+			hb.add_child(_lbl(prog_txt, 190, Color(0.95, 0.85, 0.5)))
 		var bb := Button.new()
-		var busy: bool = GameState.is_building(bid)
+		var busy: bool = GameState.is_building(bid) or GameState.building_upgrades.has(StringName(bid))
 		bb.text = "建造中" if busy else "升级"
 		bb.disabled = busy or not affordable
 		bb.custom_minimum_size = Vector2(80, 26)

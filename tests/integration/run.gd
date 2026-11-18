@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v112_parallel()
 	await _test_v111_ui()
 	await _test_v110_core()
 	await _test_ui_panels_v019()
@@ -637,6 +638,31 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.1.2 多建筑并行 ----------------
+func _test_v112_parallel() -> void:
+	print("\n[1.1.2 多建筑并行]")
+	GameState.reset_new_game()
+	GameState.add_gold(50000)
+	GameState.building_upgrades.clear()
+	# 两座建筑同时开工
+	var a: Dictionary = GameState.building_start_upgrade(&"drydock")
+	var b2: Dictionary = GameState.building_start_upgrade(&"warehouse")
+	_ok(bool(a.get("ok", false)), "船坞可开始升级", str(a))
+	_ok(bool(b2.get("ok", false)), "仓库可同时开始升级", str(b2))
+	_ok(GameState.building_upgrades.size() == 2, "两座并行升级中",
+		str(GameState.building_upgrades.size()))
+	var again: Dictionary = GameState.building_start_upgrade(&"drydock")
+	_ok(not bool(again.get("ok", true)), "同一建筑不能重复开工")
+	_ok(GameState.building_progress_text(&"drydock") != "", "有进度文本")
+	# 推进两周完成
+	GameState.tick_buildings()
+	_ok(GameState.building_upgrades.size() == 2, "一周后仍在进行")
+	TimeService.total_days += TimeService.DAYS_PER_WEEK * 2
+	var done: Array = GameState.tick_buildings()
+	_ok(done.size() == 2, "两周后两座同时完成", str(done))
+	_ok(GameState.building_level(&"drydock") == 1, "船坞升到 Lv1")
+	_ok(GameState.building_level(&"warehouse") == 1, "仓库升到 Lv1")
 
 # ---------------- 1.1.1 界面入口 ----------------
 func _test_v111_ui() -> void:

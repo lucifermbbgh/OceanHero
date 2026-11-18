@@ -1020,6 +1020,52 @@ func price_change_pct(port_key: String, cid: StringName) -> float:
 	var prev := float(price_drift.get(key + "|prev", cur))
 	return EconMath.change_pct(prev, cur)
 
+# ---------------- 多建筑并行升级（1.1.2） ----------------
+
+## 建造中：{建筑 id: {"start": 起始周, "target": 目标等级, "weeks": 工期}}
+var building_upgrades: Dictionary = {}
+
+const BUILDING_WEEKS := 2
+
+## 开始升级某建筑（独立计时，互不影响）
+func building_start_upgrade(bid: StringName) -> Dictionary:
+	var lv := building_level(bid)
+	var b: Resource = DataRegistry.get_building(bid) if DataRegistry.has_method("get_building") else null
+	var maxlv := int(b.max_level) if b != null else 5
+	if lv >= maxlv:
+		return {"ok": false, "reason": "已达最高等级"}
+	if building_upgrades.has(bid):
+		return {"ok": false, "reason": "该建筑正在升级"}
+	var cost := 2000 * (lv + 1)
+	if gold < cost:
+		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
+	add_gold(-cost)
+	building_upgrades[bid] = {"start": TimeService.total_weeks(), "target": lv + 1, "weeks": BUILDING_WEEKS}
+	return {"ok": true, "cost": cost}
+
+## 周结算推进建筑升级
+func tick_buildings() -> Array:
+	var done: Array = []
+	var cur := TimeService.total_weeks()
+	var finished: Array = []
+	for bid in building_upgrades.keys():
+		var rec: Dictionary = building_upgrades[bid]
+		if cur - int(rec.get("start", cur)) >= int(rec.get("weeks", BUILDING_WEEKS)):
+			buildings[bid] = int(rec.get("target", 1))
+			finished.append(bid)
+			done.append(String(bid))
+	for f in finished:
+		building_upgrades.erase(f)
+	return done
+
+## 建筑进度文本
+func building_progress_text(bid: StringName) -> String:
+	if not building_upgrades.has(bid):
+		return ""
+	var rec: Dictionary = building_upgrades[bid]
+	var used := TimeService.total_weeks() - int(rec.get("start", 0))
+	return "升级中 %d/%d 周 → Lv%d" % [used, int(rec.get("weeks", 2)), int(rec.get("target", 1))]
+
 # ---------------- 船只改装（1.1） ----------------
 
 ## 改装记录：{cannon_slots: int, sail_tier: int}
@@ -1936,6 +1982,7 @@ func to_dict() -> Dictionary:
 		"contraband": contraband.duplicate(),
 		"crew_xp": crew_xp.duplicate(),
 		"ship_mods": ship_mods.duplicate(),
+		"building_upgrades": building_upgrades.duplicate(true),
 		"gear_level": gear_level.duplicate(),
 		"build_submitted": build_submitted.duplicate(true),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
@@ -2065,6 +2112,10 @@ func from_dict(d: Dictionary) -> void:
 	var cxp: Dictionary = d.get("crew_xp", {})
 	for k0 in cxp.keys():
 		crew_xp[StringName(k0)] = int(cxp[k0])
+	building_upgrades.clear()
+	var bu: Dictionary = d.get("building_upgrades", {})
+	for kb in bu.keys():
+		building_upgrades[StringName(kb)] = bu[kb]
 	ship_mods = {"cannon_slots": 0, "sail_tier": 0}
 	var sm: Dictionary = d.get("ship_mods", {})
 	for k3 in sm.keys():
