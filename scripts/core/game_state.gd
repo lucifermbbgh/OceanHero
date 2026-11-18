@@ -2339,9 +2339,7 @@ func reset_new_game() -> void:
 	crew_assigned.clear()
 	tavern_pool.clear()
 	buildings.clear()
-	# 1.2.0：母港开局只带总督府与仓库，并发放启动资源
-	init_town_buildings(true, 1)
-	grant_start_resources()
+	# 1.2.0：母港开局只带总督府与仓库（启动资源在函数末尾发放，避免被清空）
 	resources = {"timber": 0, "iron": 0, "grain": 0, "saltpeter": 0}
 	build_queue.clear()
 	orders.clear()
@@ -2383,3 +2381,6 @@ func reset_new_game() -> void:
 	stat_bosses = 0
 	game_cleared = false
 	ensure_ship()
+	# 1.2.0：新游戏初始化母港建筑与启动资源（放在最后，避免被前面的 clear 清掉）
+	init_town_buildings(true, 1)
+	grant_start_resources()
