@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1211_recipes()
 	await _test_v1210_stats()
 	await _test_v129_validate()
 	await _test_v126_127_supply()
@@ -650,6 +651,21 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.11 配方数据化 ----------------
+func _test_v1211_recipes() -> void:
+	print("\n[1.2.11 配方数据化]")
+	GameState._load_recipes()
+	_ok(GameState.RECIPES.size() >= 8, "配方从数据载入", str(GameState.RECIPES.size()))
+	_ok(GameState.RECIPES.has(&"beer"), "啤酒配方存在")
+	var beer: Dictionary = GameState.RECIPES[&"beer"]
+	_ok(int(beer["in"].get(&"wheat", 0)) == 3, "啤酒配方：小麦 ×3",
+		str(beer["in"]))
+	_ok(String(beer.get("facility", "")) == "工坊", "啤酒设施为工坊")
+	# 数据文件存在性
+	_ok(FileAccess.file_exists("res://data/defs/recipes.json"), "配方 JSON 存在")
+	# 校验仍然通过
+	_ok(GameState.validate_defs().is_empty(), "配方数据化后校验通过")
 
 # ---------------- 1.2.10 成长数值生效 ----------------
 func _test_v1210_stats() -> void:

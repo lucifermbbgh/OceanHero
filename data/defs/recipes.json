@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "out": "cloth",
+      "in": {
+        "cotton": 2
+      },
+      "facility": "工坊"
+    },
+    {
+      "out": "pottery",
+      "in": {
+        "clay": 2
+      },
+      "facility": "工坊"
+    },
+    {
+      "out": "tools",
+      "in": {
+        "iron_ore": 2,
+        "timber": 1
+      },
+      "facility": "工坊"
+    },
+    {
+      "out": "beer",
+      "in": {
+        "wheat": 3
+      },
+      "facility": "工坊"
+    },
+    {
+      "out": "rum",
+      "in": {
+        "sugarcane": 3
+      },
+      "facility": "工坊"
+    },
+    {
+      "out": "musket",
+      "in": {
+        "iron_ore": 2,
+        "timber": 2
+      },
+      "facility": "工坊（军械）"
+    },
+    {
+      "out": "cannon_goods",
+      "in": {
+        "iron_ore": 3,
+        "copper": 2
+      },
+      "facility": "工坊（军械）"
+    },
+    {
+      "out": "ammo_goods",
+      "in": {
+        "iron_ore": 1,
+        "saltpeter": 1
+      },
+      "facility": "工坊（军械）"
+    }
+  ]
+}

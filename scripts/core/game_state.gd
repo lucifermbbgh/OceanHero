@@ -1218,6 +1218,9 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 # ---------------- 数据校验（1.2.9） ----------------
 
 ## 返回全部数据问题；空数组表示通过
+func _ready() -> void:
+	_load_recipes()
+
 func validate_defs() -> Array:
 	var errors: Array = []
 	var valid_cats := CATEGORIES
@@ -1501,7 +1504,10 @@ func all_commodities() -> Array:
 	return DataRegistry.commodities.keys()
 
 ## 生产配方：成品 -> {输入:{材料:数量}, 设施}
-const RECIPES := {
+## 1.2.11 起从 data/defs/recipes.json 载入，代码内保留兜底
+var RECIPES: Dictionary = {}
+
+const RECIPES_FALLBACK := {
 	&"cloth": {"in": {&"cotton": 2}, "facility": "工坊"},
 	&"pottery": {"in": {&"clay": 2}, "facility": "工坊"},
 	&"tools": {"in": {&"iron_ore": 2, &"timber": 1}, "facility": "工坊"},
@@ -1511,6 +1517,37 @@ const RECIPES := {
 	&"cannon_goods": {"in": {&"iron_ore": 3, &"copper": 2}, "facility": "工坊（军械）"},
 	&"ammo_goods": {"in": {&"iron_ore": 1, &"saltpeter": 1}, "facility": "工坊（军械）"},
 }
+
+## 从 JSON 载入配方；失败则用兜底
+func _load_recipes() -> void:
+	RECIPES = RECIPES_FALLBACK.duplicate(true)
+	var path := "res://data/defs/recipes.json"
+	if not FileAccess.file_exists(path):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return
+	var raw := f.get_as_text()
+	f.close()
+	var parsed = JSON.parse_string(raw)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var list: Array = parsed.get("recipes", [])
+	var out: Dictionary = {}
+	for r in list:
+		if typeof(r) != TYPE_DICTIONARY:
+			continue
+		var oid := StringName(String(r.get("out", "")))
+		if String(oid) == "":
+			continue
+		var ins: Dictionary = {}
+		var ins_raw = r.get("in", {})
+		if typeof(ins_raw) == TYPE_DICTIONARY:
+			for k in ins_raw.keys():
+				ins[StringName(String(k))] = int(ins_raw[k])
+		out[oid] = {"in": ins, "facility": String(r.get("facility", "工坊"))}
+	if not out.is_empty():
+		RECIPES = out
 
 ## 关税分档（按最高阵营声望）
 func tariff_rate() -> float:
