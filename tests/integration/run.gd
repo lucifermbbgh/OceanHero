@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1212_island_panels()
 	await _test_v1211_recipes()
 	await _test_v1210_stats()
 	await _test_v129_validate()
@@ -651,6 +652,41 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.12 岛屿高级面板 ----------------
+func _test_v1212_island_panels() -> void:
+	print("\n[1.2.12 岛屿高级面板]")
+	GameState.reset_new_game()
+	GameState.register_port("m3_c", GameState.town_name("青礁", 3), 0, 3)
+	GameState.visit_port_id = &"m3_c"
+	GameState.ensure_island_buildings(&"m3_c")
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	_ok(s.bank_root != null, "银行面板存在")
+	s._toggle_bank()
+	await _frames(1)
+	_ok(s.bank_root.visible, "港城岛可打开银行")
+	_ok(s.bank_list.get_child_count() > 0, "银行面板有内容")
+	s._close_all_panels()
+	await _frames(1)
+	s._toggle_black()
+	await _frames(1)
+	_ok(s.black_root.visible, "港城岛可打开黑市")
+	s._close_all_panels()
+	await _frames(1)
+	s._toggle_exchange()
+	await _frames(1)
+	_ok(s.ex_root.visible, "港城岛可打开交易所")
+	s._close_all_panels()
+	await _frames(1)
+	# 港村岛不应有这些服务
+	GameState.register_port("m1_v", GameState.town_name("白沙", 1), 0, 1)
+	GameState.visit_port_id = &"m1_v"
+	_ok(not GameState.visit_has("bank"), "港村无银行服务")
+	_ok(not GameState.visit_has("exchange"), "港村无交易所服务")
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 1.2.11 配方数据化 ----------------
 func _test_v1211_recipes() -> void:
