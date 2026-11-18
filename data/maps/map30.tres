@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map30"
+index = 30
+display_name = "10-3 玄礁海盗水域"
+level_min = 10
+level_max = 12
+hostile = true
+pirates = 8
+monsters = 2
+pirate_boss = &"boss_jack"
+monster_boss = &"boss_reef_crab"
+island_seed = 40
+tier = 10
+nation = &"xuanjiao"
+contested = false

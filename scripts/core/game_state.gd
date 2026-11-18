@@ -2063,8 +2063,29 @@ func island_key(map_index: int, idx: int) -> String:
 	return "m%d_%d" % [map_index, idx]
 
 ## 海域生成时登记港口元信息（世界市场靠它显示名称与位置）
+## 港口注册：自动继承所在海图的国家归属（1.3.1）
 func register_port(key: String, name: String, map_index: int, tier: int) -> void:
-	port_registry[key] = {"name": name, "map": map_index, "tier": tier}
+	var md: Resource = DataRegistry.get_map(map_index)
+	var nation := ""
+	var contested := false
+	if md != null:
+		nation = String(md.get("nation"))
+		contested = bool(md.get("contested"))
+	port_registry[key] = {"name": name, "map": map_index, "tier": tier,
+		"nation": nation, "contested": contested}
+
+## 某港所属国 id（空 = 交界/海盗区）
+func port_nation(pid: StringName) -> String:
+	if String(pid) == "jadehaven":
+		return ""
+	return String(port_registry.get(String(pid), {}).get("nation", ""))
+
+## 某港所属国显示名
+func port_nation_name(pid: StringName) -> String:
+	var n := port_nation(pid)
+	if n == "":
+		return "交界海域"
+	return String(NATION_NAMES.get(n, n))
 
 func island_tier_of(key: String, fallback: int) -> int:
 	return clampi(int(island_tier.get(key, fallback)), 1, 3)

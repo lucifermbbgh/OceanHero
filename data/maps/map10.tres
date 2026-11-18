@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map10"
+index = 10
+display_name = "4-1 霜屿水域"
+level_min = 4
+level_max = 6
+hostile = false
+pirates = 5
+monsters = 2
+pirate_boss = &"boss_jack"
+monster_boss = &"boss_reef_crab"
+island_seed = 20
+tier = 4
+nation = &"shuangyu"
+contested = false

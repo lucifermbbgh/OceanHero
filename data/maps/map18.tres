@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map18"
+index = 18
+display_name = "6-3 交界海域"
+level_min = 6
+level_max = 8
+hostile = false
+pirates = 7
+monsters = 3
+pirate_boss = &"boss_jack"
+monster_boss = &"boss_reef_crab"
+island_seed = 28
+tier = 6
+nation = &""
+contested = true

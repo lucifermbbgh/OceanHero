@@ -13,3 +13,8 @@ extends Resource
 @export var pirate_boss: StringName = &""
 @export var monster_boss: StringName = &""
 @export var island_seed: int = 1
+
+## 1.3.1：大级别（1~10）与国家归属
+@export var tier: int = 1              # 大级别 1~10
+@export var nation: StringName = &""   # 所属国 id；空表示交界/争夺
+@export var contested: bool = false    # 是否交界/争夺图

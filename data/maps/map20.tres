@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map20"
+index = 20
+display_name = "7-2 白鲸水域"
+level_min = 7
+level_max = 9
+hostile = false
+pirates = 5
+monsters = 2
+pirate_boss = &"boss_jack"
+monster_boss = &"boss_reef_crab"
+island_seed = 30
+tier = 7
+nation = &"baijing"
+contested = false

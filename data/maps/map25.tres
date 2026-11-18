@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"map25"
+index = 25
+display_name = "9-1 苍梧水域"
+level_min = 9
+level_max = 11
+hostile = false
+pirates = 5
+monsters = 2
+pirate_boss = &"boss_jack"
+monster_boss = &"boss_reef_crab"
+island_seed = 35
+tier = 9
+nation = &"cangwu"
+contested = false

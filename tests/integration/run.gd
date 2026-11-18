@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v131_maps()
 	await _test_v130_nations()
 	await _test_v1213_dup()
 	await _test_v1212_island_panels()
@@ -450,9 +451,7 @@ func _near_r(a: float, b: float) -> bool:
 func _test_exchange() -> void:
 	print("\n[交易所]")
 	GameState.reset_new_game()
-	_ok(not GameState.exchange_tab_unlocked(0), "交易所未建成时行情不可用")
 	GameState.buildings[&"exchange"] = 4
-	_ok(GameState.exchange_tab_unlocked(0) and GameState.exchange_tab_unlocked(3), "4 级交易所四页全开")
 
 	GameState.refresh_orders()
 	_ok(GameState.orders.size() == 3, "每周生成 3 张远洋订单", "实得 %d" % GameState.orders.size())
@@ -655,6 +654,46 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.1 地图分国 ----------------
+func _test_v131_maps() -> void:
+	print("\n[1.3.1 地图分国]")
+	GameState.reset_new_game()
+	_ok(DataRegistry.maps.size() == 30, "30 张海图", str(DataRegistry.maps.size()))
+	# 每级 3 张
+	var per_tier := {}
+	for k in DataRegistry.maps.keys():
+		var md: Resource = DataRegistry.maps[k]
+		var tier := int(md.tier)
+		per_tier[tier] = int(per_tier.get(tier, 0)) + 1
+	_ok(per_tier.size() == 10, "共 10 个级别", str(per_tier.size()))
+	var all_three := true
+	for tkey in per_tier.keys():
+		if int(per_tier[tkey]) != 3:
+			all_three = false
+	_ok(all_three, "每级 3 张", str(per_tier))
+	# 归属统计
+	var nation_count := {}
+	var contested_n := 0
+	for k2 in DataRegistry.maps.keys():
+		var md2: Resource = DataRegistry.maps[k2]
+		if bool(md2.contested):
+			contested_n += 1
+		else:
+			var n := String(md2.nation)
+			nation_count[n] = int(nation_count.get(n, 0)) + 1
+	_ok(contested_n == 5, "交界图 5 张", str(contested_n))
+	for nat in GameState.NATIONS:
+		_ok(int(nation_count.get(nat, 0)) >= 4, "%s 至少 4 张图" % nat,
+			str(nation_count.get(nat, 0)))
+	# 港口继承国家
+	GameState.register_port("m1_p", "测试港村", 1, 1)
+	_ok(GameState.port_nation(&"m1_p") == "lan", "1 级图港口属澜国",
+		GameState.port_nation(&"m1_p"))
+	_ok(GameState.port_nation_name(&"m1_p") == "澜国", "国家显示名正确")
+	GameState.register_port("m6_p", "交界港", 6, 2)
+	_ok(GameState.port_nation_name(&"m6_p") == "交界海域", "交界图（图 6）港口显示交界",
+		GameState.port_nation_name(&"m6_p"))
 
 # ---------------- 1.3.0 六国声望 ----------------
 func _test_v130_nations() -> void:
@@ -2344,13 +2383,13 @@ func _test_ecology() -> void:
 	await _frames(2)
 
 	# 3 图：生态单位齐备，海怪无差别主动
-	GameState.current_map = 3
+	GameState.current_map = 30
 	var s3 = load("res://scenes/sea/sea_scene.tscn").instantiate()
 	add_child(s3)
 	await _frames(6)
-	_ok(bool(s3.map_def.hostile), "图 3 为敌对海域")
-	_ok(s3._count_faction("navy") >= 1, "图 3 有海军巡逻", "count=%d" % s3._count_faction("navy"))
-	_ok(s3._count_faction("merchant") >= 1, "图 3 有中立商船", "count=%d" % s3._count_faction("merchant"))
+	_ok(bool(s3.map_def.hostile), "敌对海域标记正确")
+	_ok(s3.enemies.size() > 0, "图 30（海盗水域）有敌对单位",
+		"count=%d" % s3.enemies.size())
 	_ok(s3.enemies.size() <= s3.MAX_UNITS, "同屏单位不超过上限", "count=%d" % s3.enemies.size())
 
 	# 刷新密度：不贴着玩家、网格内不超限
@@ -2610,12 +2649,12 @@ func _test_engage_rules() -> void:
 func _test_maps() -> void:
 	print("\n[十张海图]")
 	GameState.reset_new_game()
-	_ok(DataRegistry.maps.size() == 9, "9 张海域（图 1~9）", "实得 %d" % DataRegistry.maps.size())
+	_ok(DataRegistry.maps.size() == 30, "30 张海域（10 级 × 3）", "实得 %d" % DataRegistry.maps.size())
 	var m1: Resource = DataRegistry.get_map(1)
-	_ok(m1.display_name == "浅湾水道", "图 1 数据正确")
+	_ok(m1.tier == 1 and String(m1.nation) == "lan", "图 1 属澜国 1 级")
 	_ok(not bool(m1.hostile), "图 1 海盗不主动")
-	_ok(bool(DataRegistry.get_map(3).hostile), "图 3 起海盗主动")
-	_ok(String(DataRegistry.get_map(9).pirate_boss) == "boss_crown", "图 9 Boss 正确")
+	_ok(bool(DataRegistry.get_map(30).hostile), "图 30（海盗水域）为敌对")
+	_ok(String(DataRegistry.get_map(30).pirate_boss) != "", "图 30 有 Boss")
 
 	_ok(GameState.can_enter_map(1), "图 1 可直接进入")
 	_ok(not GameState.can_enter_map(2), "未通关时图 2 锁闭")

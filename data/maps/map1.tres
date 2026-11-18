@@ -6,12 +6,15 @@
 script = ExtResource("1_m")
 id = &"map1"
 index = 1
-display_name = "浅湾水道"
+display_name = "1-1 澜国水域"
 level_min = 1
 level_max = 3
 hostile = false
-pirates = 4
+pirates = 5
 monsters = 2
 pirate_boss = &"boss_jack"
 monster_boss = &"boss_reef_crab"
 island_seed = 11
+tier = 1
+nation = &"lan"
+contested = false
