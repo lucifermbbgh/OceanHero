@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v126_127_supply()
 	await _test_v124_125()
 	await _test_v123_port_buildings()
 	await _test_v122_town()
@@ -648,6 +649,40 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 1.2.6 / 1.2.7 商品供应 ----------------
+func _test_v126_127_supply() -> void:
+	print("\n[1.2.6/1.2.7 商品供应]")
+	GameState.reset_new_game()
+	GameState.port_stock.clear()
+	# 港村岛：特产 80%，基础品类 40%，消费品 0，军用品 0
+	GameState.register_port("m1_v", GameState.town_name("白沙", 1), 0, 1)
+	GameState.port_registry["m1_v"]["specialty"] = "grain"
+	GameState.visit_port_id = &"m1_v"
+	var sp := GameState.ensure_stock(&"m1_v", &"grain", 40)
+	_ok(sp == 32, "特产初始 80%", str(sp))
+	var basic := GameState.ensure_stock(&"m1_v", &"wood_test", 40) if false else GameState.ensure_stock(&"m1_v", &"wheat", 40)
+	_ok(basic == 16, "基础品类 40%", str(basic))
+	var consumer := GameState.ensure_stock(&"m1_v", &"beer", 40)
+	_ok(consumer == 0, "港村无消费品", str(consumer))
+	var mil := GameState.ensure_stock(&"m1_v", &"musket", 40)
+	_ok(mil == 0, "无铸造厂不出军用品", str(mil))
+	# 港城：消费品 30%，贵金属 10%
+	GameState.register_port("m3_c", GameState.town_name("青礁", 3), 0, 3)
+	GameState.port_registry["m3_c"]["specialty"] = "spice"
+	GameState.visit_port_id = &"m3_c"
+	GameState.ensure_island_buildings(&"m3_c")
+	_ok(GameState.ensure_stock(&"m3_c", &"beer", 160) == 48, "港城消费品 30%")
+	_ok(GameState.ensure_stock(&"m3_c", &"silver", 160) == 16, "港城贵金属 10%")
+	_ok(GameState.ensure_stock(&"m3_c", &"musket", 160) > 0, "铸造厂港口有军用品")
+	# 随机补货：缺货商品有概率出现
+	GameState.port_stock["m3_c"][&"beer"] = 0
+	var appeared := 0
+	for i in range(40):
+		appeared += GameState.tick_supply()
+		if int(GameState.port_stock["m3_c"].get(&"beer", 0)) > 0:
+			break
+	_ok(appeared > 0, "随机补货有商品出现", str(appeared))
+
 # ---------------- 1.2.4 / 1.2.5 初始建筑与等级门禁 ----------------
 func _test_v124_125() -> void:
 	print("\n[1.2.4/1.2.5 初始建筑与门禁]")
@@ -876,8 +911,14 @@ func _test_v113_polish() -> void:
 	GameState.reset_new_game()
 	var wheat_stock := GameState.ensure_stock(&"jadehaven", &"wheat", 400)
 	_ok(wheat_stock > 0, "新商品有初始库存", str(wheat_stock))
+	# 1.2.6 起军用品需要铸造厂才供应
 	var ammo_stock := GameState.ensure_stock(&"jadehaven", &"ammo_goods", 400)
-	_ok(ammo_stock > 0, "军用品也有初始库存", str(ammo_stock))
+	_ok(ammo_stock == 0, "无铸造厂时无军用品", str(ammo_stock))
+	GameState.port_buildings["jadehaven"] = {&"foundry": 1}
+	GameState.buildings = GameState.port_buildings["jadehaven"]
+	GameState.port_stock["jadehaven"].erase(&"ammo_goods")
+	var ammo2 := GameState.ensure_stock(&"jadehaven", &"ammo_goods", 400)
+	_ok(ammo2 > 0, "有铸造厂后供应军用品", str(ammo2))
 
 # ---------------- 1.1.2 多建筑并行 ----------------
 func _test_v112_parallel() -> void:

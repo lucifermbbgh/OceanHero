@@ -1188,6 +1188,74 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 	gear_owned.append(new_id)
 	return {"ok": true, "new_id": new_id}
 
+# ---------------- 商品供应（1.2.6 / 1.2.7） ----------------
+
+const SUPPLY_RANDOM_CHANCE := 0.20      # 非特产每周出现概率
+const SUPPLY_SPECIALTY_RATE := 0.80     # 特产初始库存比例
+const SUPPLY_BASIC_RATE := 0.40         # 基础品类初始比例
+const SUPPLY_CONSUMER_RATE := 0.30      # 港城消费品初始比例
+const SUPPLY_PRECIOUS_RATE := 0.10      # 贵金属初始比例
+
+## 港口特产（母港默认谷物）
+func port_specialty(pid: StringName) -> StringName:
+	if String(pid) == "jadehaven":
+		return &"grain"
+	var meta: Dictionary = port_registry.get(String(pid), {})
+	return StringName(String(meta.get("specialty", "")))
+
+## 该港口是否生产军用品（需要铸造厂）
+func port_can_supply_military(pid: StringName) -> bool:
+	var key := String(pid)
+	var dict: Dictionary = port_buildings.get(key, {})
+	return int(dict.get(&"foundry", 0)) > 0
+
+## 初始库存比例（1.2.6）
+func _initial_stock_for(pid: StringName, cid: StringName, max_stock: int) -> int:
+	var tier := visit_port_tier() if String(visit_port_id) == String(pid) else int(port_registry.get(String(pid), {}).get("tier", 1))
+	var c: Resource = DataRegistry.get_commodity(cid)
+	if c == null:
+		return int(round(float(max_stock) * 0.5))
+	var cat := String(c.category)
+	# 特产优先
+	if port_specialty(pid) == cid:
+		return int(round(float(max_stock) * SUPPLY_SPECIALTY_RATE))
+	# 军用品：仅铸造厂港口
+	if cat == "military":
+		return int(round(float(max_stock) * 0.3)) if port_can_supply_military(pid) else 0
+	# 贵金属：仅港城
+	if cat == "precious":
+		return int(round(float(max_stock) * SUPPLY_PRECIOUS_RATE)) if tier >= 3 else 0
+	# 食物与原材料：基础供应
+	if cat == "food" or cat == "raw":
+		return int(round(float(max_stock) * SUPPLY_BASIC_RATE))
+	# 消费品：港城才有
+	if cat == "consumer":
+		return int(round(float(max_stock) * SUPPLY_CONSUMER_RATE)) if tier >= 3 else 0
+	return 0
+
+## 每周随机补货（1.2.7）：缺货商品有概率出现
+func tick_supply() -> int:
+	var appeared := 0
+	for pk in port_stock.keys():
+		var pid := StringName(String(pk))
+		var tier_v: int = visit_port_tier() if String(pid) == String(visit_port_id) else int(port_registry.get(String(pid), {}).get("tier", 1))
+		var max_stock: int = int(PORT_STOCK_BY_TIER.get(tier_v, 40))
+		for cid in all_commodities():
+			if int(port_stock[pk].get(cid, 0)) > 0:
+				continue
+			var c: Resource = DataRegistry.get_commodity(cid)
+			if c == null:
+				continue
+			var cat := String(c.category)
+			if cat == "military" and not port_can_supply_military(pid):
+				continue
+			if cat == "precious":
+				continue
+			if RngService.chance(SUPPLY_RANDOM_CHANCE):
+				port_stock[pk][cid] = int(round(float(max_stock) * RngService.randf_range(0.2, 0.4)))
+				appeared += 1
+	return appeared
+
 # ---------------- 港口上下文（1.2.2） ----------------
 
 ## 当前访问的港口（母港为 jadehaven）
@@ -2125,7 +2193,7 @@ func get_stock(port_id: StringName, commodity_id: StringName) -> int:
 func ensure_stock(port_id: StringName, commodity_id: StringName, max_stock: int) -> int:
 	var p: Dictionary = port_stock.get(port_id, {})
 	if not p.has(commodity_id):
-		p[commodity_id] = int(round(float(max_stock) * 0.5))
+		p[commodity_id] = _initial_stock_for(port_id, commodity_id, max_stock)
 		port_stock[port_id] = p
 	return int(p[commodity_id])
 

@@ -55,6 +55,10 @@ func _on_week_advanced(week_index: int) -> void:
 		var new_events: Array = GameState.tick_market(week_index)
 		for ev in new_events:
 			EventBus.ticker.emit("市场事件：%s · %s" % [String(ev.get("name", "")), String(ev.get("desc", ""))])
+		# 商品随机补货
+		var appeared: int = GameState.tick_supply()
+		if appeared > 0:
+			EventBus.ticker.emit("港口新到货：%d 种商品补货" % appeared)
 		# 多建筑并行升级
 		var bdone: Array = GameState.tick_buildings()
 		for bd in bdone:
