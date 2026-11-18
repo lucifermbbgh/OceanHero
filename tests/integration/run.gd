@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v134_license()
 	await _test_v133_relations()
 	await _test_v132_adjacency()
 	await _test_v131_maps()
@@ -656,6 +657,29 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.4 私掠许可证绑定国家 ----------------
+func _test_v134_license() -> void:
+	print("\n[1.3.4 私掠证]")
+	GameState.reset_new_game()
+	_ok(GameState.privateer_nation == "", "开局无证")
+	# 购证必须指定国家
+	GameState.add_gold(200000)
+	var r0: Dictionary = GameState.buy_license_black("")
+	_ok(not bool(r0.get("ok", false)), "未指定国家不能购证")
+	# 指定澜国
+	var r1: Dictionary = GameState.buy_license_black("lan")
+	_ok(bool(r1.get("ok", false)), "可购买澜国私掠证", str(r1.get("reason", "")))
+	_ok(GameState.privateer_nation == "lan", "证绑定澜国")
+	# 澜国的敌国（玄礁）→ 合法；盟友（霜屿）→ 非法
+	_ok(GameState.is_legal_privateering("xuanjiao"), "劫掠玄礁合法")
+	_ok(not GameState.is_legal_privateering("shuangyu"), "劫掠霜屿非法")
+	_ok(not GameState.is_legal_privateering("lan"), "劫掠本国非法")
+	_ok(not GameState.is_legal_privateering(""), "无国籍目标不合法")
+	# 重复购证被拒
+	var r2: Dictionary = GameState.buy_license_black("chilin")
+	_ok(not bool(r2.get("ok", false)), "已有证不能重复购买")
+	GameState.reset_new_game()
 
 # ---------------- 1.3.3 国家关系与关税 ----------------
 func _test_v133_relations() -> void:
@@ -1783,10 +1807,12 @@ func _test_black_market_v011() -> void:
 
 	# 私掠许可证（黑市）
 	GameState.has_privateer_license = false
+	GameState.privateer_nation = ""
 	var n0 := GameState.notoriety()
-	var lic: Dictionary = GameState.buy_license_black()
+	var lic: Dictionary = GameState.buy_license_black("lan")
 	_ok(bool(lic.get("ok", false)), "黑市可以买私掠证")
 	_ok(GameState.has_privateer_license, "获得私掠证")
+	_ok(GameState.privateer_nation == "lan", "私掠证绑定澜国")
 	_ok(not GameState.license_is_legal, "标记为黑市途径")
 	_ok(GameState.notoriety() == mini(100, n0 + 5), "买证通缉度 +5")
 

@@ -268,6 +268,14 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+## 1.3.4：对目标国劫掠是否合法
+func is_legal_privateering(target_nation: String) -> bool:
+	if not has_privateer_license or privateer_nation == "":
+		return false
+	if target_nation == "":
+		return false
+	return nation_relation_between(privateer_nation, target_nation) == "hostile"
+
 # ---------------- 国家关系与关税（1.3.3） ----------------
 
 ## 国家关系矩阵：仅登记敌对与同盟，其余为中立
@@ -558,7 +566,7 @@ func _quest_check() -> void:
 		else:
 			i += 1
 
-func on_enemy_killed(kind: String, is_boss: bool) -> void:
+func on_enemy_killed(kind: String, is_boss: bool, target_nation: String = "") -> void:
 	# 通缉度
 	var noto := int(reputation.get("notoriety", 0))
 	if kind == "pirate" or kind == "monster":
@@ -571,8 +579,8 @@ func on_enemy_killed(kind: String, is_boss: bool) -> void:
 		noto = mini(100, noto + 8)
 		add_rep("merchant", -40)
 		add_rep("black_sail", 15)
-		# 持私掠许可证的合法劫掠：不对敌国商船额外扣海军声望
-		if has_privateer_license:
+		# 1.3.4：持证劫掠该国敌对国为合法（未知国籍时按持证判断）
+		if is_legal_privateering(target_nation) or (target_nation == "" and has_privateer_license):
 			add_rep("royal_navy", 5)
 	reputation["notoriety"] = noto
 	if kind == "pirate":
@@ -1945,6 +1953,8 @@ const LEGAL_LICENSE_REP := 3000     # 正规私掠证所需海军声望
 
 var contraband: Dictionary = {}     # 违禁品库存
 var has_privateer_license := false
+## 1.3.4：私掠许可证绑定的国家（空 = 无证）
+var privateer_nation: String = ""
 var license_is_legal := false       # true = 正规途径购得
 var black_closed_week := -1         # 被海军盯上而关闭的周
 
@@ -1987,9 +1997,11 @@ func buy_contraband(item_id: StringName) -> Dictionary:
 	return {"ok": true, "price": price}
 
 ## 购买私掠许可证（黑市途径）
-func buy_license_black() -> Dictionary:
+func buy_license_black(nation: String = "") -> Dictionary:
 	if has_privateer_license:
 		return {"ok": false, "reason": "已经持有私掠许可证"}
+	if nation == "" or not NATIONS.has(nation):
+		return {"ok": false, "reason": "必须指定国家"}
 	if not black_market_open():
 		return {"ok": false, "reason": "黑市暂闭"}
 	var price := int(round(float(LEGAL_LICENSE_REP) * BLACK_LICENSE_MULT * 10.0))
@@ -1997,6 +2009,7 @@ func buy_license_black() -> Dictionary:
 		return {"ok": false, "reason": "金币不足，需要 %d" % price}
 	add_gold(-price)
 	has_privateer_license = true
+	privateer_nation = nation
 	license_is_legal = false
 	reputation["notoriety"] = mini(100, notoriety() + BLACK_LICENSE_NOTORIETY)
 	return {"ok": true, "price": price}
@@ -2503,7 +2516,8 @@ func to_dict() -> Dictionary:
 			"sales": finance.get("sales", {}).duplicate(true),
 			"income": finance.get("income", {}).duplicate(true),
 			"expense": finance.get("expense", {}).duplicate(true)},
-		"license": {"has": has_privateer_license, "legal": license_is_legal},
+		"license": {"has": has_privateer_license, "legal": license_is_legal,
+			"nation": privateer_nation},
 		"black_closed_week": black_closed_week,
 		"auctions": auctions.duplicate(true),
 		"auction_week": auction_week,
@@ -2649,6 +2663,7 @@ func from_dict(d: Dictionary) -> void:
 		contraband[StringName(k)] = int(cb[k])
 	var lic: Dictionary = d.get("license", {})
 	has_privateer_license = bool(lic.get("has", false))
+	privateer_nation = String(lic.get("nation", ""))
 	license_is_legal = bool(lic.get("legal", false))
 	black_closed_week = int(d.get("black_closed_week", -1))
 	auctions.clear()
@@ -2844,6 +2859,7 @@ func reset_new_game() -> void:
 	price_history.clear()
 	contraband.clear()
 	has_privateer_license = false
+	privateer_nation = ""
 	license_is_legal = false
 	black_closed_week = -1
 	auctions.clear()
