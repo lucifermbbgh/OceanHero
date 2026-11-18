@@ -1188,6 +1188,58 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 	gear_owned.append(new_id)
 	return {"ok": true, "new_id": new_id}
 
+# ---------------- 数据校验（1.2.9） ----------------
+
+## 返回全部数据问题；空数组表示通过
+func validate_defs() -> Array:
+	var errors: Array = []
+	var valid_cats := CATEGORIES
+	var seen_ids: Dictionary = {}
+	# 商品
+	for k in DataRegistry.commodities.keys():
+		var c: Resource = DataRegistry.commodities[k]
+		if c == null:
+			errors.append("商品 %s 加载失败" % String(k))
+			continue
+		if seen_ids.has(String(c.id)):
+			errors.append("商品 id 重复：%s" % String(c.id))
+		seen_ids[String(c.id)] = true
+		var cat := String(c.category)
+		if not valid_cats.has(cat):
+			errors.append("商品 %s 分类非法：%s" % [String(c.id), cat])
+		if int(c.base_price) <= 0:
+			errors.append("商品 %s 基础价 <= 0" % String(c.id))
+		if float(c.volume) <= 0.0:
+			errors.append("商品 %s 体积 <= 0" % String(c.id))
+	# 配方引用
+	for out_id in RECIPES.keys():
+		if DataRegistry.get_commodity(out_id) == null:
+			errors.append("配方产出不存在：%s" % String(out_id))
+		var rec: Dictionary = RECIPES[out_id]
+		for in_id in rec.get("in", {}).keys():
+			if DataRegistry.get_commodity(in_id) == null:
+				errors.append("配方 %s 的原料不存在：%s" % [String(out_id), String(in_id)])
+			elif int(rec["in"][in_id]) <= 0:
+				errors.append("配方 %s 的原料数量 <= 0：%s" % [String(out_id), String(in_id)])
+	# 建造需求引用
+	for tier in BUILD_COSTS.keys():
+		for m in BUILD_COSTS[tier].keys():
+			if String(m) == "gold":
+				continue
+			if DataRegistry.get_commodity(m) == null:
+				errors.append("建造需求 %d 级材料不存在：%s" % [int(tier), String(m)])
+	# 建筑字段
+	for bid in DataRegistry.buildings.keys():
+		var b: Resource = DataRegistry.buildings[bid]
+		if b == null:
+			errors.append("建筑 %s 加载失败" % String(bid))
+			continue
+		if int(b.unlock_tier) < 1 or int(b.unlock_tier) > 3:
+			errors.append("建筑 %s 解锁等级越界：%d" % [String(bid), int(b.unlock_tier)])
+		if String(b.slot_id) == "":
+			errors.append("建筑 %s 缺少 slot_id" % String(bid))
+	return errors
+
 # ---------------- 商品供应（1.2.6 / 1.2.7） ----------------
 
 const SUPPLY_RANDOM_CHANCE := 0.20      # 非特产每周出现概率

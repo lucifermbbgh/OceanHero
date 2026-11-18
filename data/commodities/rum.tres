@@ -6,7 +6,7 @@
 script = ExtResource("1_x")
 id = &"rum"
 display_name = "朗姆酒"
-category = &"food"
+category = &"consumer"
 base_price = 40
 volume = 0.5
 legal = true

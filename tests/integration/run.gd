@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v129_validate()
 	await _test_v126_127_supply()
 	await _test_v124_125()
 	await _test_v123_port_buildings()
@@ -648,6 +649,32 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.9 数据校验 ----------------
+func _test_v129_validate() -> void:
+	print("\n[1.2.9 数据校验]")
+	GameState.reset_new_game()
+	var errs: Array = GameState.validate_defs()
+	_ok(errs.is_empty(), "全部静态数据通过校验", str(errs).left(300))
+	# 分类修正验证
+	var rum: Resource = DataRegistry.get_commodity(&"rum")
+	var spice: Resource = DataRegistry.get_commodity(&"spice")
+	_ok(String(rum.category) == "consumer", "朗姆酒归入消费品", String(rum.category))
+	_ok(String(spice.category) == "consumer", "香料归入消费品", String(spice.category))
+	# 五大类下都能查到商品
+	var total := 0
+	for cat in GameState.CATEGORIES:
+		var n: int = GameState.commodities_of(cat).size()
+		_ok(n > 0, "分类 %s 下有商品" % cat, str(n))
+		total += n
+	_ok(total == GameState.all_commodities().size(), "所有商品都归属某个分类",
+		"%d vs %d" % [total, GameState.all_commodities().size()])
+	# 消费品在港村无货
+	GameState.port_stock.clear()
+	GameState.register_port("m1_v", GameState.town_name("白沙", 1), 0, 1)
+	GameState.visit_port_id = &"m1_v"
+	_ok(GameState.ensure_stock(&"m1_v", &"rum", 40) == 0, "港村无朗姆酒（消费品）")
+	_ok(GameState.ensure_stock(&"m1_v", &"spice", 40) == 0, "港村无香料（消费品）")
 
 # ---------------- 1.2.6 / 1.2.7 商品供应 ----------------
 func _test_v126_127_supply() -> void:

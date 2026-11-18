@@ -6,7 +6,7 @@
 script = ExtResource("1_x")
 id = &"spice"
 display_name = "香料"
-category = &"luxury"
+category = &"consumer"
 base_price = 120
 volume = 0.3
 legal = true
