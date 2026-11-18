@@ -1967,8 +1967,11 @@ func _toggle_island_port() -> void:
 	player.throttle = 0.0
 	player.nav_target = null
 	player.nav_queue.clear()
-	_rebuild_port()
-	port_panel.visible = true
+	# 1.2.2：停泊即进入城镇（复用母港面板）
+	var key := GameState.island_key(map_index, int(idx))
+	GameState.visit_port_id = StringName(key)
+	GameState.last_sea_map = map_index
+	SceneRouter.goto(&"base")
 
 ## 顶部罗盘：告诉玩家下一片海域怎么走
 func _refresh_nav_hint() -> void:

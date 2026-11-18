@@ -5,7 +5,8 @@ const MarketModel = preload("res://scripts/systems/market_model.gd")
 const StatsLib = preload("res://scripts/systems/ship_stats.gd")
 const Rarity = preload("res://scripts/ui/rarity.gd")
 const CrewFactory = preload("res://scripts/systems/crew_factory.gd")
-const PORT_ID := &"jadehaven"
+func _pid() -> StringName:
+	return GameState.visit_port_id
 
 var ui: CanvasLayer
 var status_label: Label
@@ -149,13 +150,19 @@ func _build_ui() -> void:
 	_action_button(vb, "装备强化", _toggle_gear)
 	_action_button(vb, "船只改装", _toggle_mod)
 	_action_button(vb, "仓库", _toggle_store)
-	_action_button(vb, "建造", _toggle_construct)
-	_action_button(vb, "经济总览", _toggle_overview)
+	if GameState.is_home_visit():
+		_action_button(vb, "建造", _toggle_construct)
+		_action_button(vb, "经济总览", _toggle_overview)
+	else:
+		_action_button(vb, "投资", _toggle_invest)
 	if GameState.home_port_tier >= 3:
 		_action_button(vb, "银行", _toggle_bank)
 		_action_button(vb, "黑市", _toggle_black)
 
-	_action_button(vb, "出航", _set_sail)
+	if GameState.is_home_visit():
+		_action_button(vb, "出航", _set_sail)
+	else:
+		_action_button(vb, "离港", _leave_town)
 	_action_button(vb, "存档", _toggle_save)
 	_action_button(vb, "帮助", _toggle_help)
 	_action_button(vb, "返回主菜单", func(): SceneRouter.goto(&"menu"))
@@ -322,6 +329,22 @@ func _build_ui() -> void:
 	mod_list.add_theme_constant_override("separation", 4)
 	mod_list.custom_minimum_size = Vector2(1510, 0)
 	mrscroll.add_child(mod_list)
+
+	# 投资面板（岛屿）
+	invest_root = PanelContainer.new()
+	invest_root.position = Vector2(16, 72)
+	invest_root.custom_minimum_size = Vector2(1568, 812)
+	invest_root.add_theme_stylebox_override("panel", _panel_style())
+	invest_root.visible = false
+	root.add_child(invest_root)
+	var invscroll := ScrollContainer.new()
+	invscroll.custom_minimum_size = Vector2(1530, 780)
+	invscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	invest_root.add_child(invscroll)
+	invest_list = VBoxContainer.new()
+	invest_list.add_theme_constant_override("separation", 6)
+	invest_list.custom_minimum_size = Vector2(1510, 0)
+	invscroll.add_child(invest_list)
 
 	# 仓库面板
 	store_root = PanelContainer.new()
@@ -565,7 +588,7 @@ func _toggle_market_target(t: String) -> void:
 func _rebuild_market() -> void:
 	for c in market_list.get_children():
 		c.queue_free()
-	var port: Resource = DataRegistry.get_port(PORT_ID)
+	var port: Resource = DataRegistry.get_port(_pid())
 	var max_stock := int(port.max_stock) if port != null else 800
 	var head := Label.new()
 	head.text = "市场行情（每周库存会向满值回归）"
@@ -626,19 +649,19 @@ func _rebuild_market() -> void:
 		var c: Resource = DataRegistry.get_commodity(id)
 		if c == null:
 			continue
-		var stock := GameState.ensure_stock(PORT_ID, id, max_stock)
+		var stock := GameState.ensure_stock(_pid(), id, max_stock)
 		var demand := 1.0
 		var production := 1.0
 		if port != null:
 			demand = float(port.demand.get(String(id), 1.0))
 			production = float(port.production.get(String(id), 1.0))
-		var mod := GameState.price_modifier(String(PORT_ID), id)
+		var mod := GameState.price_modifier(String(_pid()), id)
 		var rep_disc := GameState.rep_discount()
 		var bp := int(round(float(MarketModel.buy_price(c.base_price, stock, max_stock, demand))
 			* mod * (1.0 - rep_disc)))
 		var sp := int(round(float(MarketModel.sell_price(c.base_price, stock, max_stock, production))
 			* (1.0 + GameState.sell_bonus()) * mod))
-		var chg := GameState.price_change_pct(String(PORT_ID), id)
+		var chg := GameState.price_change_pct(String(_pid()), id)
 		var arrow := "→"
 		if chg > 0.005:
 			arrow = "↑+%d%%" % int(round(chg * 100.0))
@@ -654,7 +677,7 @@ func _rebuild_market() -> void:
 		row.add_child(_cell_box(str(sp), 120))
 		var chg_text := "—"
 		var chg_col := Color(0.55, 0.6, 0.6)
-		if GameState.has_price_history(String(PORT_ID), id):
+		if GameState.has_price_history(String(_pid()), id):
 			if absf(chg) < 0.005:
 				chg_text = "持平"
 			elif chg > 0.0:
@@ -675,7 +698,7 @@ func _rebuild_market() -> void:
 		var cid_t: StringName = id
 		b_trade.pressed.connect(func(): _open_goods(cid_t))
 		row.add_child(b_trade)
-	_add_market_metrics(String(PORT_ID))
+	_add_market_metrics(String(_pid()))
 
 	# 船上货舱汇总：买的东西到底装在哪儿
 	var sep := HSeparator.new()
@@ -774,7 +797,7 @@ func _move_to_ship(cid: StringName) -> void:
 
 ## 港口 id → 显示名
 func _port_display(key: String) -> String:
-	if key == String(PORT_ID):
+	if key == String(_pid()):
 		return "翡翠港"
 	var pd: Resource = DataRegistry.get_port(StringName(key))
 	if pd != null:
@@ -851,7 +874,7 @@ func _toggle_detail(cid: StringName) -> void:
 ## 价格明细区块
 func _add_detail_block(cid: StringName, base_price: int, stock: int, max_stock: int, final_price: int) -> void:
 	var ex = load("res://scripts/systems/econ_explain.gd")
-	var pk := String(PORT_ID)
+	var pk := String(_pid())
 	var me = load("res://scripts/systems/market_events.gd")
 	var info: Dictionary = ex.price_breakdown(pk, cid, base_price, stock, max_stock,
 		float(me.effect_at(GameState.market_events, pk, cid)),
@@ -890,7 +913,7 @@ func _add_market_metrics(pk: String) -> void:
 		if c == null:
 			continue
 		var max_stock := 400
-		var stock := GameState.ensure_stock(PORT_ID, cid, max_stock)
+		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
 		var ratio := clampf(float(stock) / float(max_stock), 0.0, 1.0)
 		parts.append("%s 弹性 %.2f（库存 %d%%）" % [String(c.display_name), em.piecewise_elasticity(ratio),
 			int(ratio * 100.0)])
@@ -958,9 +981,9 @@ func _rebuild_world_market() -> void:
 		var there_buy := 0
 		var cg: Resource = DataRegistry.get_commodity(&"grain")
 		if cg != null:
-			var lstock := GameState.ensure_stock(PORT_ID, &"grain", 400)
+			var lstock := GameState.ensure_stock(_pid(), &"grain", 400)
 			local_buy = int(round(float(MarketModel.buy_price(cg.base_price, lstock, 400, 1.0))
-				* GameState.price_modifier(String(PORT_ID), &"grain")))
+				* GameState.price_modifier(String(_pid()), &"grain")))
 			var tstock := GameState.ensure_stock(StringName(k), &"grain", stock_cap)
 			there_buy = int(round(float(MarketModel.sell_price(cg.base_price, tstock, stock_cap, 1.0))
 				* GameState.price_modifier(String(k), &"grain")))
@@ -995,13 +1018,13 @@ func _buy(cid: StringName, amount: int, price: int) -> void:
 	if free_space < float(c.volume) * amount:
 		_log("仓库空间不足" if to_wh else "货舱空间不足")
 		return
-	var port: Resource = DataRegistry.get_port(PORT_ID)
-	var stock := GameState.ensure_stock(PORT_ID, cid, int(port.max_stock))
+	var port: Resource = DataRegistry.get_port(_pid())
+	var stock := GameState.ensure_stock(_pid(), cid, int(port.max_stock))
 	if stock < amount:
 		_log("该港库存不足")
 		return
 	GameState.add_gold(-total)
-	GameState.set_stock(PORT_ID, cid, stock - amount)
+	GameState.set_stock(_pid(), cid, stock - amount)
 	if to_wh:
 		GameState.warehouse_add(cid, amount)
 	else:
@@ -1019,17 +1042,17 @@ func _sell(cid: StringName, amount: int, price: int) -> void:
 		_log("仓库里没有足够的该商品" if from_wh else "货舱里没有足够的该商品")
 		return
 	var c: Resource = DataRegistry.get_commodity(cid)
-	var port: Resource = DataRegistry.get_port(PORT_ID)
-	var stock := GameState.ensure_stock(PORT_ID, cid, int(port.max_stock))
+	var port: Resource = DataRegistry.get_port(_pid())
+	var stock := GameState.ensure_stock(_pid(), cid, int(port.max_stock))
 	if from_wh:
 		GameState.warehouse_remove(cid, amount)
 	else:
 		GameState.remove_cargo(cid, amount)
-	GameState.set_stock(PORT_ID, cid, stock + amount)
+	GameState.set_stock(_pid(), cid, stock + amount)
 	# 关税：在非母港卖出按 5% 扣除
 	var gross := price * amount
 	var tax := 0
-	if String(PORT_ID) != "jadehaven":
+	if String(_pid()) != "jadehaven":
 		tax = int(round(float(gross) * GameState.tariff_rate()))
 		GameState.record_expense("关税", tax)
 	GameState.add_gold(gross - tax)
@@ -1437,7 +1460,7 @@ func _ex_orders() -> void:
 		var b2 := Button.new()
 		b2.text = "在本港交付"
 		b2.custom_minimum_size = Vector2(110, 26)
-		b2.pressed.connect(func(): _deliver_order(idx2, PORT_ID))
+		b2.pressed.connect(func(): _deliver_order(idx2, _pid()))
 		hb2.add_child(b2)
 
 func _accept_order(idx: int) -> void:
@@ -1458,11 +1481,11 @@ func _ex_bulk() -> void:
 	if not GameState.exchange_tab_unlocked(2):
 		return
 	_yard_title_to(ex_list, "大宗交易（满 100 单位享 5% 折扣）")
-	var port: Resource = DataRegistry.get_port(PORT_ID)
+	var port: Resource = DataRegistry.get_port(_pid())
 	var max_stock := int(port.max_stock)
 	for cid in DataRegistry.commodities.keys():
 		var c: Resource = DataRegistry.get_commodity(cid)
-		var stock := GameState.ensure_stock(PORT_ID, cid, max_stock)
+		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
 		var demand := float(port.demand.get(String(cid), 1.0))
 		var bp := int(round(float(MarketModel.buy_price(int(c.base_price), stock, max_stock, demand)) * 0.95))
 		var sp := int(round(float(MarketModel.sell_price(int(c.base_price), stock, max_stock,
@@ -1496,11 +1519,11 @@ func _ex_futures() -> void:
 	if not GameState.exchange_tab_unlocked(3):
 		return
 	_yard_title_to(ex_list, "期货（付 20% 定金锁定本周价格，1 周内提货）")
-	var port: Resource = DataRegistry.get_port(PORT_ID)
+	var port: Resource = DataRegistry.get_port(_pid())
 	var max_stock := int(port.max_stock)
 	for cid in DataRegistry.commodities.keys():
 		var c: Resource = DataRegistry.get_commodity(cid)
-		var stock := GameState.ensure_stock(PORT_ID, cid, max_stock)
+		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
 		var bp := MarketModel.buy_price(int(c.base_price), stock, max_stock)
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 10)
@@ -1996,14 +2019,14 @@ func _rebuild_goods() -> void:
 	var c: Resource = DataRegistry.get_commodity(goods_cid)
 	if c == null:
 		return
-	var port: Resource = DataRegistry.get_port(PORT_ID)
-	var port2: Resource = DataRegistry.get_port(PORT_ID)
+	var port: Resource = DataRegistry.get_port(_pid())
+	var port2: Resource = DataRegistry.get_port(_pid())
 	var max_stock := int(port2.max_stock) if port2 != null else 800
-	var stock := GameState.ensure_stock(PORT_ID, goods_cid, max_stock)
+	var stock := GameState.ensure_stock(_pid(), goods_cid, max_stock)
 	var demand := 1.0
 	if port != null:
 		demand = float(port.demand.get(String(goods_cid), 1.0))
-	var mod := GameState.price_modifier(String(PORT_ID), goods_cid)
+	var mod := GameState.price_modifier(String(_pid()), goods_cid)
 	var bp := int(round(float(MarketModel.buy_price(c.base_price, stock, max_stock, demand))
 		* mod * (1.0 - GameState.rep_discount())))
 	var sp := int(round(float(MarketModel.sell_price(c.base_price, stock, max_stock, 1.0))
@@ -2034,7 +2057,7 @@ func _rebuild_goods() -> void:
 	var ratio: float = clampf(float(stock) / maxf(1.0, float(max_stock)), 0.0, 1.0)
 	var e: float = float(em0.piecewise_elasticity(ratio))
 	var eq: float = float(c.base_price) * (1.0 + e * (1.0 - ratio))
-	var cur: float = eq * GameState.price_drift_of(String(PORT_ID), goods_cid)
+	var cur: float = eq * GameState.price_drift_of(String(_pid()), goods_cid)
 	var dev: float = (cur - eq) / maxf(0.01, eq)
 	var step_v: float = (eq - cur) * 0.25
 	var opp: int = int(round(float(bp * goods_qty) * 0.001 * 8.0))
@@ -2052,7 +2075,7 @@ func _rebuild_goods() -> void:
 		["【均衡】均衡价", "%.1f" % eq,
 			"基础价 %d × (1 + %.2f × (1 − %.2f)) = %.1f" % [int(c.base_price), e, ratio, eq]],
 		["【均衡】当前价", "%.1f" % cur, "均衡价 %.1f × 漂移 %.3f = %.1f" % [
-			eq, GameState.price_drift_of(String(PORT_ID), goods_cid), cur]],
+			eq, GameState.price_drift_of(String(_pid()), goods_cid), cur]],
 		["【均衡】偏离度", "%+.1f%%" % (dev * 100.0), "(当前价 − 均衡价) ÷ 均衡价"],
 		["【均衡】本周回归步长", "%+.2f" % step_v, "(均衡价 − 当前价) × 25%"],
 		["【边际】买价 MC", "%d" % bp, "第 1 件买价（含声望折扣 %d%%）" % int(GameState.rep_discount() * 100.0)],
@@ -2141,17 +2164,17 @@ func _goods_choose_storage(price: int) -> void:
 			GameState.record_purchase(goods_cid, goods_qty, price * goods_qty)
 			GameState.add_gold(-price * goods_qty)
 			GameState.warehouse[goods_cid] = int(GameState.warehouse.get(goods_cid, 0)) + goods_qty
-			var port3: Resource = DataRegistry.get_port(PORT_ID)
+			var port3: Resource = DataRegistry.get_port(_pid())
 			var ms := int(port3.max_stock) if port3 != null else 800
-			GameState.ensure_stock(PORT_ID, goods_cid, ms)
-			GameState.port_stock[PORT_ID][goods_cid] = maxi(0, int(GameState.port_stock[PORT_ID][goods_cid]) - goods_qty)
+			GameState.ensure_stock(_pid(), goods_cid, ms)
+			GameState.port_stock[_pid()][goods_cid] = maxi(0, int(GameState.port_stock[_pid()][goods_cid]) - goods_qty)
 			dlg.queue_free()
 			_rebuild_goods())
 	dlg.popup_centered()
 
 func _chart_data(cid: StringName, base_price: int, stock: int, max_stock: int) -> Dictionary:
 	var d := {}
-	d["history"] = GameState.price_history_of(String(PORT_ID), cid)
+	d["history"] = GameState.price_history_of(String(_pid()), cid)
 	var em = load("res://scripts/systems/econ_math.gd")
 	var mc: Array = []
 	var steps := 40
@@ -2337,6 +2360,68 @@ func _do_mod(kind: String) -> void:
 		_rebuild_mod()
 	else:
 		_log(String(r.get("reason", "改装失败")))
+
+## 离开他岛城镇，返回海面
+func _leave_town() -> void:
+	var pid := GameState.visit_port_id
+	GameState.visit_port_id = &"jadehaven"
+	close_all_and_goto_sea(pid)
+
+func close_all_and_goto_sea(_pid: StringName) -> void:
+	_close_all_panels()
+	SceneRouter.goto(&"sea")
+
+## 投资面板（岛屿）
+func _toggle_invest() -> void:
+	if invest_root.visible:
+		invest_root.visible = false
+		return
+	_rebuild_invest()
+	invest_root.visible = true
+
+func _rebuild_invest() -> void:
+	for c in invest_list.get_children():
+		c.queue_free()
+	var key := String(GameState.visit_port_id)
+	var invested := int(GameState.island_investment.get(key, 0))
+	_yard_title_to(invest_list, "投资 · %s（已投 %d）" % [GameState.visit_port_name(), invested])
+	invest_list.add_child(_lbl("　买入折扣 %d%%　边际 +%.2f%%/千金" % [
+		GameState.island_discount(key), GameState.island_marginal_discount(key)],
+		700, Color(0.8, 0.85, 0.8)))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	invest_list.add_child(row)
+	for amt in [1000, 5000, 20000]:
+		var bb := Button.new()
+		bb.text = "注资 %d" % int(amt)
+		bb.custom_minimum_size = Vector2(130, 30)
+		bb.disabled = GameState.gold < int(amt)
+		var av := int(amt)
+		bb.pressed.connect(func(): _do_invest_cash(key, av))
+		row.add_child(bb)
+	var dep := Button.new()
+	dep.text = "用存款投资"
+	dep.custom_minimum_size = Vector2(130, 30)
+	dep.disabled = GameState.bank_deposited() <= 0
+	dep.pressed.connect(func(): _do_invest_deposit(key))
+	row.add_child(dep)
+
+func _do_invest_cash(key: String, amount: int) -> void:
+	var r: Dictionary = GameState.invest_from("cash", key, amount)
+	if bool(r.get("ok", false)):
+		_rebuild_invest()
+		_refresh()
+	else:
+		_log(String(r.get("reason", "投资失败")))
+
+func _do_invest_deposit(key: String) -> void:
+	var amount := int(GameState.bank_deposited() / 2)
+	if amount <= 0:
+		return
+	var r: Dictionary = GameState.invest_from("deposit", key, amount)
+	if bool(r.get("ok", false)):
+		_rebuild_invest()
+		_refresh()
 
 # ---------------- 仓库面板（1.2.1） ----------------
 
@@ -2581,11 +2666,13 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root", "ex_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
 	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
-	"crew_root", "gear_root", "mod_root", "store_root"]
+	"crew_root", "gear_root", "mod_root", "store_root", "invest_root"]
 
 var close_btn: Button = null
 var construct_root: PanelContainer = null
 var construct_list: VBoxContainer = null
+var invest_root: PanelContainer = null
+var invest_list: VBoxContainer = null
 
 func _apply_fullscreen_layout() -> void:
 	for pname in FULL_PANELS:
@@ -3041,7 +3128,7 @@ func _rebuild_yard() -> void:
 	var any_ship := false
 	for i in range(GameState.ships_owned.size()):
 		var entry: Dictionary = GameState.ships_owned[i]
-		if String(entry.get("station_port", "")) != String(PORT_ID):
+		if String(entry.get("station_port", "")) != String(_pid()):
 			continue
 		any_ship = true
 		var hb := HBoxContainer.new()

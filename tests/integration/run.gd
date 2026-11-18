@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v122_town()
 	await _test_v121_gate()
 	await _test_v120_component()
 	await _test_v114_fixes()
@@ -644,6 +645,24 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.2 港口上下文 ----------------
+func _test_v122_town() -> void:
+	print("\n[1.2.2 城镇上下文]")
+	GameState.reset_new_game()
+	_ok(GameState.is_home_visit(), "默认在母港")
+	_ok(GameState.visit_port_name().ends_with("港村"), "母港名称含港村",
+		GameState.visit_port_name())
+	_ok(GameState.visit_port_tier() == 1, "母港等级 1")
+	GameState.visit_port_id = &"m1_island0"
+	GameState.register_port("m1_island0", GameState.town_name("望潮", 2), 0, 2)
+	_ok(not GameState.is_home_visit(), "切换后不是母港")
+	_ok(GameState.visit_port_name() == "望潮港镇", "岛屿名含港镇", GameState.visit_port_name())
+	_ok(GameState.visit_port_tier() == 2, "岛屿等级 2", str(GameState.visit_port_tier()))
+	_ok(GameState.visit_port_max_stock() == 90, "港镇库存上限 90",
+		str(GameState.visit_port_max_stock()))
+	GameState.visit_port_id = &"jadehaven"
+	_ok(GameState.is_home_visit(), "可切回母港")
 
 # ---------------- 1.2.1 升级门槛与仓库 ----------------
 func _test_v121_gate() -> void:

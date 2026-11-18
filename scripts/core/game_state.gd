@@ -1176,6 +1176,38 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 	gear_owned.append(new_id)
 	return {"ok": true, "new_id": new_id}
 
+# ---------------- 港口上下文（1.2.2） ----------------
+
+## 当前访问的港口（母港为 jadehaven）
+var visit_port_id: StringName = &"jadehaven"
+## 离港后返回的海图
+var last_sea_map: int = 0
+
+func is_home_visit() -> bool:
+	return visit_port_id == &"jadehaven"
+
+## 当前港口显示名（含等级后缀）
+func visit_port_name() -> String:
+	if is_home_visit():
+		return town_name("翡翠", home_port_tier)
+	var meta: Dictionary = port_registry.get(String(visit_port_id), {})
+	if not meta.is_empty():
+		return String(meta.get("name", String(visit_port_id)))
+	return String(visit_port_id)
+
+## 当前港口等级
+func visit_port_tier() -> int:
+	if is_home_visit():
+		return home_port_tier
+	var meta2: Dictionary = port_registry.get(String(visit_port_id), {})
+	return int(meta2.get("tier", 1))
+
+## 当前港口库存上限（按等级）
+const PORT_STOCK_BY_TIER := {1: 40, 2: 90, 3: 160}
+
+func visit_port_max_stock() -> int:
+	return int(PORT_STOCK_BY_TIER.get(visit_port_tier(), 40))
+
 # ---------------- 城镇升级门槛（1.2.1） ----------------
 
 ## 升级门槛：目标等级 -> [建筑 id, 需求等级]
