@@ -19,8 +19,6 @@ var tavern_root: PanelContainer
 var tavern_list: VBoxContainer
 var build_root: PanelContainer
 var build_list: VBoxContainer
-var ex_root: PanelContainer
-var ex_list: VBoxContainer
 var ex_tab := 0
 var quest_root: PanelContainer
 var quest_list: VBoxContainer
@@ -141,8 +139,6 @@ func _build_ui() -> void:
 		_action_button(vb, "船厂与装备", _toggle_yard)
 	if GameState.visit_has("build"):
 		_action_button(vb, "基地建设", _toggle_build)
-	if GameState.visit_has("exchange"):
-		_action_button(vb, "交易所", _toggle_exchange)
 	if GameState.visit_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
 
@@ -234,22 +230,6 @@ func _build_ui() -> void:
 	build_list.add_theme_constant_override("separation", 5)
 	build_list.custom_minimum_size = Vector2(710, 0)
 	bscroll.add_child(build_list)
-
-	# 交易所面板
-	ex_root = PanelContainer.new()
-	ex_root.position = Vector2(280, 60)
-	ex_root.custom_minimum_size = Vector2(780, 560)
-	ex_root.add_theme_stylebox_override("panel", _panel_style())
-	ex_root.visible = false
-	root.add_child(ex_root)
-	var escroll := ScrollContainer.new()
-	escroll.custom_minimum_size = Vector2(750, 520)
-	escroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	ex_root.add_child(escroll)
-	ex_list = VBoxContainer.new()
-	ex_list.add_theme_constant_override("separation", 5)
-	ex_list.custom_minimum_size = Vector2(730, 0)
-	escroll.add_child(ex_list)
 
 	# 任务板
 	quest_root = PanelContainer.new()
@@ -567,7 +547,6 @@ func _toggle_market() -> void:
 		market_root.visible = false
 		return
 	yard_root.visible = false
-	ex_root.visible = false
 	build_root.visible = false
 	tavern_root.visible = false
 	_rebuild_market()
@@ -1075,7 +1054,6 @@ func _toggle_yard() -> void:
 	market_root.visible = false
 	tavern_root.visible = false
 	build_root.visible = false
-	ex_root.visible = false
 	_rebuild_yard()
 	yard_root.visible = true
 
@@ -1279,7 +1257,6 @@ func _show_victory_if_needed() -> void:
 
 # ---------------- 交易所 ----------------
 
-const EX_TABS := ["行情", "远洋订单", "大宗交易", "期货"]
 
 func _toggle_quests() -> void:
 	if quest_root.visible:
@@ -1289,7 +1266,6 @@ func _toggle_quests() -> void:
 	yard_root.visible = false
 	tavern_root.visible = false
 	build_root.visible = false
-	ex_root.visible = false
 	if GameState.quests_available.is_empty():
 		GameState.refresh_quests()
 	_rebuild_quests()
@@ -1358,228 +1334,6 @@ func _accept_quest(idx: int) -> void:
 		_log("同时最多进行 3 个任务")
 	_rebuild_quests()
 
-func _toggle_exchange() -> void:
-	if ex_root.visible:
-		ex_root.visible = false
-		return
-	market_root.visible = false
-	yard_root.visible = false
-	tavern_root.visible = false
-	build_root.visible = false
-	if GameState.orders.is_empty():
-		GameState.refresh_orders()
-	_rebuild_exchange()
-	ex_root.visible = true
-
-func _rebuild_exchange() -> void:
-	for c in ex_list.get_children():
-		ex_list.remove_child(c)
-		c.queue_free()
-	_yard_title_to(ex_list, "交易所 Lv%d —— 金币 %d" % [GameState.exchange_level(), GameState.gold])
-
-	var tab_hb := HBoxContainer.new()
-	tab_hb.add_theme_constant_override("separation", 8)
-	ex_list.add_child(tab_hb)
-	for i in range(EX_TABS.size()):
-		var b := Button.new()
-		var unlocked: bool = GameState.exchange_tab_unlocked(i)
-		b.text = EX_TABS[i] if unlocked else "%s(Lv%d)" % [EX_TABS[i], i + 1]
-		b.disabled = not unlocked
-		if i == ex_tab:
-			b.modulate = Color(1.2, 1.1, 0.7)
-		b.custom_minimum_size = Vector2(160, 32)
-		var idx := i
-		b.pressed.connect(func(): _switch_ex_tab(idx))
-		tab_hb.add_child(b)
-
-	if not GameState.exchange_tab_unlocked(0):
-		ex_list.add_child(_lbl("交易所尚未建成，先到「基地建设」把交易所升到 1 级。", 600, Color(0.8, 0.6, 0.4)))
-
-	match ex_tab:
-		0: _ex_quotes()
-		1: _ex_orders()
-		2: _ex_bulk()
-		3: _ex_futures()
-
-	var close := Button.new()
-	close.text = "关闭"
-	close.custom_minimum_size = Vector2(120, 32)
-	close.pressed.connect(func(): ex_root.visible = false)
-	ex_list.add_child(close)
-
-func _switch_ex_tab(idx: int) -> void:
-	ex_tab = idx
-	_rebuild_exchange()
-
-func _ex_quotes() -> void:
-	if not GameState.exchange_tab_unlocked(0):
-		return
-	_yard_title_to(ex_list, "各地行情")
-	for pid in DataRegistry.ports.keys():
-		var p: Resource = DataRegistry.ports[pid]
-		ex_list.add_child(_lbl("· %s" % p.display_name, 400, Color(0.8, 0.85, 0.7)))
-		for cid in DataRegistry.commodities.keys():
-			var c: Resource = DataRegistry.get_commodity(cid)
-			var stock := GameState.ensure_stock(pid, cid, int(p.max_stock))
-			var demand := float(p.demand.get(String(cid), 1.0))
-			var production := float(p.production.get(String(cid), 1.0))
-			var bp := MarketModel.buy_price(int(c.base_price), stock, int(p.max_stock), demand)
-			var sp := MarketModel.sell_price(int(c.base_price), stock, int(p.max_stock), production)
-			ex_list.add_child(_lbl("    %s　买 %d / 卖 %d（库存 %d）" % [c.display_name, bp, sp, stock], 520,
-				Color(0.75, 0.8, 0.75)))
-
-func _ex_orders() -> void:
-	if not GameState.exchange_tab_unlocked(1):
-		return
-	_yard_title_to(ex_list, "可接订单（每周刷新）")
-	if GameState.orders.is_empty():
-		ex_list.add_child(_lbl("　（本周没有订单）", 400, Color(0.5, 0.55, 0.55)))
-	for i in range(GameState.orders.size()):
-		var o: Dictionary = GameState.orders[i]
-		var c: Resource = DataRegistry.get_commodity(StringName(o.commodity))
-		var p: Resource = DataRegistry.get_port(StringName(o.dest))
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 10)
-		ex_list.add_child(hb)
-		hb.add_child(_lbl("%s × %d → %s" % [c.display_name, int(o.amount), p.display_name], 300))
-		hb.add_child(_lbl("锁定价 %d/单位" % int(o.price), 160, Color(0.9, 0.82, 0.45)))
-		hb.add_child(_lbl("期限 %d 周" % int(o.weeks_left), 120))
-		var idx := i
-		var b := Button.new()
-		b.text = "接受"
-		b.custom_minimum_size = Vector2(80, 26)
-		b.pressed.connect(func(): _accept_order(idx))
-		hb.add_child(b)
-
-	_yard_title_to(ex_list, "进行中的订单")
-	if GameState.active_orders.is_empty():
-		ex_list.add_child(_lbl("　（没有进行中的订单）", 400, Color(0.5, 0.55, 0.55)))
-	for i in range(GameState.active_orders.size()):
-		var o2: Dictionary = GameState.active_orders[i]
-		var c2: Resource = DataRegistry.get_commodity(StringName(o2.commodity))
-		var p2: Resource = DataRegistry.get_port(StringName(o2.dest))
-		var hb2 := HBoxContainer.new()
-		hb2.add_theme_constant_override("separation", 10)
-		ex_list.add_child(hb2)
-		hb2.add_child(_lbl("%s × %d → %s" % [c2.display_name, int(o2.amount), p2.display_name], 300))
-		hb2.add_child(_lbl("剩 %d 周" % int(o2.weeks_left), 120))
-		var idx2 := i
-		var b2 := Button.new()
-		b2.text = "在本港交付"
-		b2.custom_minimum_size = Vector2(110, 26)
-		b2.pressed.connect(func(): _deliver_order(idx2, _pid()))
-		hb2.add_child(b2)
-
-func _accept_order(idx: int) -> void:
-	if GameState.accept_order(idx):
-		_log("已接受远洋订单")
-		_rebuild_exchange()
-
-func _deliver_order(idx: int, port_id: StringName) -> void:
-	var res: Dictionary = GameState.deliver_order(idx, port_id)
-	if res.get("ok", false):
-		_log("交付完成，获得 %d 金" % int(res.gold))
-	else:
-		_log(String(res.get("reason", "交付失败")))
-	_rebuild_exchange()
-	_refresh()
-
-func _ex_bulk() -> void:
-	if not GameState.exchange_tab_unlocked(2):
-		return
-	_yard_title_to(ex_list, "大宗交易（满 100 单位享 5% 折扣）")
-	var port: Resource = DataRegistry.get_port(_pid())
-	var max_stock := GameState.visit_port_max_stock()
-	for cid in DataRegistry.commodities.keys():
-		var c: Resource = DataRegistry.get_commodity(cid)
-		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
-		var demand := float(port.demand.get(String(cid), 1.0))
-		var bp := int(round(float(MarketModel.buy_price(int(c.base_price), stock, max_stock, demand)) * 0.95))
-		var sp := int(round(float(MarketModel.sell_price(int(c.base_price), stock, max_stock,
-			float(port.production.get(String(cid), 1.0)))) * (1.0 + GameState.sell_bonus())))
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 10)
-		ex_list.add_child(hb)
-		hb.add_child(_lbl(c.display_name, 90))
-		hb.add_child(_lbl("买 100：%d 金" % (bp * 100), 180, Color(0.9, 0.82, 0.45)))
-		hb.add_child(_lbl("卖 100：%d 金" % (sp * 100), 180))
-		var cid_v: StringName = cid
-		var b1 := Button.new()
-		b1.text = "买入 100"
-		b1.custom_minimum_size = Vector2(90, 26)
-		b1.pressed.connect(func(): _bulk_trade(cid_v, 100, bp, true))
-		hb.add_child(b1)
-		var b2 := Button.new()
-		b2.text = "卖出 100"
-		b2.custom_minimum_size = Vector2(90, 26)
-		b2.pressed.connect(func(): _bulk_trade(cid_v, 100, sp, false))
-		hb.add_child(b2)
-
-func _bulk_trade(cid: StringName, amount: int, price: int, buying: bool) -> void:
-	if buying:
-		_buy(cid, amount, price)
-	else:
-		_sell(cid, amount, price)
-	_rebuild_exchange()
-
-func _ex_futures() -> void:
-	if not GameState.exchange_tab_unlocked(3):
-		return
-	_yard_title_to(ex_list, "期货（付 20% 定金锁定本周价格，1 周内提货）")
-	var port: Resource = DataRegistry.get_port(_pid())
-	var max_stock := GameState.visit_port_max_stock()
-	for cid in DataRegistry.commodities.keys():
-		var c: Resource = DataRegistry.get_commodity(cid)
-		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
-		var bp := MarketModel.buy_price(int(c.base_price), stock, max_stock)
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 10)
-		ex_list.add_child(hb)
-		hb.add_child(_lbl(c.display_name, 90))
-		hb.add_child(_lbl("现价 %d · 锁 100 单位定金 %d" % [bp, int(round(float(bp * 100) * 0.2))], 320))
-		var cid_v: StringName = cid
-		var b := Button.new()
-		b.text = "锁定"
-		b.custom_minimum_size = Vector2(80, 26)
-		b.pressed.connect(func(): _lock_future(cid_v, 100))
-		hb.add_child(b)
-
-	_yard_title_to(ex_list, "我的合约")
-	if GameState.futures.is_empty():
-		ex_list.add_child(_lbl("　（没有合约）", 400, Color(0.5, 0.55, 0.55)))
-	for i in range(GameState.futures.size()):
-		var fu: Dictionary = GameState.futures[i]
-		var c2: Resource = DataRegistry.get_commodity(StringName(fu.commodity))
-		var hb2 := HBoxContainer.new()
-		hb2.add_theme_constant_override("separation", 10)
-		ex_list.add_child(hb2)
-		hb2.add_child(_lbl("%s × %d @ %d" % [c2.display_name, int(fu.amount), int(fu.price)], 280))
-		hb2.add_child(_lbl("剩 %d 周" % int(fu.weeks_left), 120))
-		var idx := i
-		var b2 := Button.new()
-		b2.text = "付尾款提货"
-		b2.custom_minimum_size = Vector2(120, 26)
-		b2.pressed.connect(func(): _redeem_future(idx))
-		hb2.add_child(b2)
-
-func _lock_future(cid: StringName, amount: int) -> void:
-	var res: Dictionary = GameState.lock_future(cid, amount)
-	if res.get("ok", false):
-		_log("锁定合约，定金 %d 金" % int(res.deposit))
-	else:
-		_log(String(res.get("reason", "失败")))
-	_rebuild_exchange()
-	_refresh()
-
-func _redeem_future(idx: int) -> void:
-	var res: Dictionary = GameState.redeem_future(idx)
-	if res.get("ok", false):
-		_log("提货完成，支付尾款 %d 金" % int(res.gold))
-	else:
-		_log(String(res.get("reason", "失败")))
-	_rebuild_exchange()
-	_refresh()
-
 func _toggle_build() -> void:
 	if build_root.visible:
 		build_root.visible = false
@@ -1587,7 +1341,6 @@ func _toggle_build() -> void:
 	market_root.visible = false
 	yard_root.visible = false
 	tavern_root.visible = false
-	ex_root.visible = false
 	_rebuild_build()
 	build_root.visible = true
 
@@ -1736,7 +1489,6 @@ func _toggle_tavern() -> void:
 	market_root.visible = false
 	yard_root.visible = false
 	build_root.visible = false
-	ex_root.visible = false
 	if GameState.tavern_pool.is_empty():
 		GameState.refresh_tavern()
 	_rebuild_tavern()
@@ -2680,7 +2432,7 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 
 # ---------------- 面板统一规范（0.19） ----------------
 
-const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root", "ex_root",
+const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
 	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
 	"crew_root", "gear_root", "mod_root", "store_root", "invest_root"]
@@ -3327,7 +3079,6 @@ func _toggle_save() -> void:
 	yard_root.visible = false
 	tavern_root.visible = false
 	build_root.visible = false
-	ex_root.visible = false
 	quest_root.visible = false
 	_rebuild_save()
 	save_root.visible = true

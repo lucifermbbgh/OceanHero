@@ -721,16 +721,10 @@ func _test_v1212_island_panels() -> void:
 	_ok(s.black_root.visible, "港城岛可打开黑市")
 	s._close_all_panels()
 	await _frames(1)
-	s._toggle_exchange()
-	await _frames(1)
-	_ok(s.ex_root.visible, "港城岛可打开交易所")
-	s._close_all_panels()
-	await _frames(1)
 	# 港村岛不应有这些服务
 	GameState.register_port("m1_v", GameState.town_name("白沙", 1), 0, 1)
 	GameState.visit_port_id = &"m1_v"
 	_ok(not GameState.visit_has("bank"), "港村无银行服务")
-	_ok(not GameState.visit_has("exchange"), "港村无交易所服务")
 	s.queue_free()
 	await _frames(2)
 
