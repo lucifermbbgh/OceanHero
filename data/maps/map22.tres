@@ -18,3 +18,4 @@ island_seed = 32
 tier = 8
 nation = &"baijing"
 contested = false
+neighbors = [19, 20, 21, 23, 24, 25, 26, 27]

@@ -18,3 +18,4 @@ island_seed = 28
 tier = 6
 nation = &""
 contested = true
+neighbors = [13, 14, 15, 16, 17, 19, 20, 21]

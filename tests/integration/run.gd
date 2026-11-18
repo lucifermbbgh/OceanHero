@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v132_adjacency()
 	await _test_v131_maps()
 	await _test_v130_nations()
 	await _test_v1213_dup()
@@ -654,6 +655,43 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.2 邻接图航行 ----------------
+func _test_v132_adjacency() -> void:
+	print("\n[1.3.2 邻接图]")
+	GameState.reset_new_game()
+	# 同级三图两两相邻
+	var m1: Resource = DataRegistry.get_map(1)
+	_ok(m1.neighbors.has(2) and m1.neighbors.has(3), "1-1 与 1-2/1-3 相邻",
+		str(m1.neighbors))
+	# 跨级相连
+	_ok(m1.neighbors.has(4) and m1.neighbors.has(6), "1 级与 2 级相连", str(m1.neighbors))
+	# 母港在邻接中
+	_ok(m1.neighbors.has(0), "1-1 邻接母港")
+	# 级别与解锁
+	_ok(GameState.map_tier_of(1) == 1 and GameState.map_tier_of(4) == 2, "级别换算正确")
+	GameState.current_map = 1
+	var opts: Array = GameState.travel_options()
+	var has_same := false
+	for o in opts:
+		if int(o["index"]) == 2 and bool(o["unlocked"]):
+			has_same = true
+	_ok(has_same, "同级相邻图可前往")
+	var has_t2 := false
+	var t2_locked := false
+	for o2 in opts:
+		if int(o2["index"]) == 4:
+			has_t2 = true
+			t2_locked = not bool(o2["unlocked"])
+	_ok(has_t2, "2 级图在选项中")
+	_ok(t2_locked, "未通关 1 级时 2 级锁定")
+	_ok(GameState.can_travel_to(2), "可前往 1-2")
+	_ok(not GameState.can_travel_to(4), "不可直接前往 2-1")
+	# 通关 1 级后解锁 2 级
+	GameState.cleared_maps.append(1)
+	_ok(GameState.unlocked_tier() == 2, "通关 1 级后解锁 2 级",
+		str(GameState.unlocked_tier()))
+	_ok(GameState.can_travel_to(4), "通关后可前往 2-1")
 
 # ---------------- 1.3.1 地图分国 ----------------
 func _test_v131_maps() -> void:

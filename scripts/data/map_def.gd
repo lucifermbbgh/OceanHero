@@ -18,3 +18,4 @@ extends Resource
 @export var tier: int = 1              # 大级别 1~10
 @export var nation: StringName = &""   # 所属国 id；空表示交界/争夺
 @export var contested: bool = false    # 是否交界/争夺图
+@export var neighbors: Array = []      # 1.3.2 邻接图：可通行的相邻海图索引

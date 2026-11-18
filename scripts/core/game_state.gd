@@ -268,6 +268,46 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 邻接图航行（1.3.2） ----------------
+
+func map_tier_of(index: int) -> int:
+	if index <= 0:
+		return 0
+	var md: Resource = DataRegistry.get_map(index)
+	return int(md.tier) if md != null else 1
+
+## 已解锁的最高级别：已通关的最高级 + 1（未通关任何图时为 1）
+func unlocked_tier() -> int:
+	var best := 0
+	for idx in cleared_maps:
+		best = maxi(best, map_tier_of(int(idx)))
+	return maxi(1, best + 1)
+
+## 当前海图可前往的目标（邻接 + 级别解锁）
+func travel_options() -> Array:
+	var md: Resource = DataRegistry.get_map(current_map)
+	var out: Array = []
+	if md == null:
+		return out
+	for n in md.neighbors:
+		var idx := int(n)
+		if idx == 0:
+			out.append({"index": 0, "name": "翡翠港（母港）", "tier": 0, "unlocked": true})
+			continue
+		var t := map_tier_of(idx)
+		var ok := t <= unlocked_tier()
+		var nmd: Resource = DataRegistry.get_map(idx)
+		out.append({"index": idx,
+			"name": String(nmd.display_name) if nmd != null else str(idx),
+			"tier": t, "unlocked": ok})
+	return out
+
+func can_travel_to(target: int) -> bool:
+	for o in travel_options():
+		if int(o["index"]) == target:
+			return bool(o["unlocked"])
+	return false
+
 # ---------------- 六国与分国声望（1.3.0） ----------------
 
 const NATIONS := ["lan", "chilin", "shuangyu", "xuanjiao", "baijing", "cangwu"]

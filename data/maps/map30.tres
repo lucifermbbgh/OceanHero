@@ -18,3 +18,4 @@ island_seed = 40
 tier = 10
 nation = &"xuanjiao"
 contested = false
+neighbors = [25, 26, 27, 28, 29]

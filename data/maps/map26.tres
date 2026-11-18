@@ -18,3 +18,4 @@ island_seed = 36
 tier = 9
 nation = &"cangwu"
 contested = false
+neighbors = [22, 23, 24, 25, 27, 28, 29, 30]

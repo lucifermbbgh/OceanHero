@@ -2028,37 +2028,61 @@ func _edge_prompt() -> String:
 func _try_edge_travel() -> void:
 	if not SceneRouter.has_host():
 		return
-	var dir := _edge_dir()
-	if dir == "":
+	# 1.3.2：邻接图航行，前进门打开航线选择
+	var opts: Array = GameState.travel_options()
+	var usable: Array = []
+	for o in opts:
+		if int(o["index"]) != 0:
+			usable.append(o)
+	if usable.is_empty():
+		hud.ticker("没有可前往的相邻海域")
 		return
-	var info := _edge_info(dir)
-	if info.is_empty():
-		return
-	if not bool(info.get("unlocked", false)):
-		hud.ticker("航路未开：先击败本图 Boss")
+	_open_travel_panel(usable)
+
+var travel_panel: AcceptDialog = null
+
+func _open_travel_panel(options: Array) -> void:
+	if travel_panel != null and is_instance_valid(travel_panel):
+		travel_panel.queue_free()
+	travel_panel = AcceptDialog.new()
+	travel_panel.title = "选择航线"
+	travel_panel.ok_button_text = "取消"
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	travel_panel.add_child(vb)
+	for o in options:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		vb.add_child(row)
+		var nm := Label.new()
+		nm.text = String(o["name"])
+		nm.custom_minimum_size = Vector2(260, 0)
+		row.add_child(nm)
+		var lv := Label.new()
+		lv.text = "%d 级" % int(o["tier"])
+		lv.custom_minimum_size = Vector2(90, 0)
+		row.add_child(lv)
+		var btn := Button.new()
+		btn.text = "前往" if bool(o["unlocked"]) else "未解锁"
+		btn.disabled = not bool(o["unlocked"])
+		btn.custom_minimum_size = Vector2(110, 30)
+		var target := int(o["index"])
+		btn.pressed.connect(func(): _do_travel(target))
+		row.add_child(btn)
+	add_child(travel_panel)
+	travel_panel.popup_centered()
+
+func _do_travel(target: int) -> void:
+	if travel_panel != null and is_instance_valid(travel_panel):
+		travel_panel.queue_free()
+	if not GameState.can_travel_to(target):
+		hud.ticker("该海域尚未解锁")
 		return
 	_sync_to_game_state()
-	var target := int(info.get("target", 0))
-	if target == 0:
-		GameState.current_map = 1
-		GameState.sea_position = Vector2.ZERO
-		SceneRouter.goto(&"base")
-		return
-	# 从对面那条边进入，保持另一轴坐标不变（东出 → 西进）
-	var p: Vector2 = player.global_position
-	var spawn := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5)
-	match dir:
-		"east":
-			spawn = Vector2(EDGE_TRIGGER + 40.0, p.y)
-		"west":
-			spawn = Vector2(SEA_SIZE - EDGE_TRIGGER - 40.0, p.y)
-		"south":
-			spawn = Vector2(p.x, EDGE_TRIGGER + 40.0)
-		"north":
-			spawn = Vector2(p.x, SEA_SIZE - EDGE_TRIGGER - 40.0)
 	GameState.current_map = target
-	GameState.sea_position = spawn
-	hud.ticker("驶入 %s" % String(info.get("name")))
+	GameState.sea_position = Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5)
+	var nmd: Resource = DataRegistry.get_map(target)
+	hud.ticker("驶入 %s" % (String(nmd.display_name) if nmd != null else str(target)))
 	SceneRouter.goto(&"sea")
 
 func _lock_target(enemy) -> void:
