@@ -513,8 +513,8 @@ func _refresh() -> void:
 	var st: Dictionary = GameState.stats()
 	var hull_max := float(st.get("hull_max", 400.0))
 	var hull := GameState.hull_hp if GameState.hull_hp >= 0.0 else hull_max
-	status_label.text = "翡翠港（%s）· %s·%s · 金币 %d · 战功 %d · 船体 %.0f/%.0f · 货舱 %.0f/%.0f · %s" % [
-		GameState.home_port_name(),
+	status_label.text = "%s · %s·%s · 金币 %d · 战功 %d · 船体 %.0f/%.0f · 货舱 %.0f/%.0f · %s" % [
+		GameState.visit_port_name(),
 		def.display_name, String(st.get("variant_name", "")), GameState.gold, GameState.commendation,
 		hull, hull_max, GameState.cargo_used(), float(GameState.cargo_capacity()), TimeService.date_text(),
 	]
