@@ -1093,6 +1093,54 @@ func build_progress(port_key: String, tier: int) -> Dictionary:
 			ok = false
 	return {"need": need, "have": have, "ready": ok}
 
+## 投资：从现金或存款扣款
+## source: "cash" 或 "deposit"
+func invest_from(source: String, key: String, amount: int) -> Dictionary:
+	if amount <= 0:
+		return {"ok": false, "reason": "金额必须大于 0"}
+	if source == "deposit":
+		if bank_deposit < amount:
+			return {"ok": false, "reason": "存款不足"}
+		bank_deposit -= amount
+		# 存款减少后，贷款额度约束可能失效，这里只做余额重算
+	else:
+		if gold < amount:
+			return {"ok": false, "reason": "现金不足"}
+		add_gold(-amount)
+	var cur := int(island_investment.get(key, 0))
+	island_investment[key] = cur + amount
+	return {"ok": true, "invested": amount, "total": cur + amount}
+
+## 生产设施周产出：按配方把原料加工为成品（港口仓库侧）
+## 返回 {产出:{材料:数量}, 消耗:{材料:数量}}
+func tick_production(port_key: String) -> Dictionary:
+	var out: Dictionary = {}
+	var used: Dictionary = {}
+	# 轮转加工：每轮每个配方最多做 1 批，避免先到先得把原料吃光
+	var progressed := true
+	var guard := 0
+	while progressed and guard < 64:
+		progressed = false
+		guard += 1
+		for cid in RECIPES.keys():
+			var rec: Dictionary = RECIPES[cid]
+			var inputs: Dictionary = rec.get("in", {})
+			var can := true
+			for m in inputs.keys():
+				if int(warehouse.get(m, 0)) < maxi(1, int(inputs[m])):
+					can = false
+					break
+			if not can:
+				continue
+			for m2 in inputs.keys():
+				var need2 := maxi(1, int(inputs[m2]))
+				warehouse[m2] = maxi(0, int(warehouse.get(m2, 0)) - need2)
+				used[m2] = int(used.get(m2, 0)) + need2
+			warehouse[cid] = int(warehouse.get(cid, 0)) + 1
+			out[cid] = int(out.get(cid, 0)) + 1
+			progressed = true
+	return {"产出": out, "消耗": used}
+
 # ---------------- 银行（0.12 / 0.12.1 多笔贷款） ----------------
 
 const DEPOSIT_RATE := 0.001

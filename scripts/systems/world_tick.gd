@@ -55,6 +55,14 @@ func _on_week_advanced(week_index: int) -> void:
 		var new_events: Array = GameState.tick_market(week_index)
 		for ev in new_events:
 			EventBus.ticker.emit("市场事件：%s · %s" % [String(ev.get("name", "")), String(ev.get("desc", ""))])
+		# 生产：按配方把仓库原料加工为成品
+		var prod: Dictionary = GameState.tick_production("jadehaven")
+		var made: Dictionary = prod.get("产出", {})
+		if not made.is_empty():
+			var parts: Array = []
+			for k in made.keys():
+				parts.append("%s×%d" % [String(k), int(made[k])])
+			EventBus.ticker.emit("工坊产出：%s" % "　".join(parts))
 		GameState.week_roll()
 		GameState.refresh_auctions(week_index)
 		var aevents: Array = GameState.tick_auctions()

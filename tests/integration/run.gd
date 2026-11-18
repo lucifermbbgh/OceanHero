@@ -674,6 +674,39 @@ func _test_v110_core() -> void:
 	_ok(not bool(prog["ready"]), "材料不足时不可升级")
 	_ok(int(prog["have"].get(&"timber", 0)) == 100, "提交量被记录")
 
+	# 存款投资（B 块补齐）
+	GameState.reset_new_game()
+	GameState.add_gold(10000)
+	GameState.bank_deposit_gold(8000)
+	var r1: Dictionary = GameState.invest_from("deposit", "m1_island0", 3000)
+	_ok(bool(r1.get("ok", false)), "可用存款投资")
+	_ok(GameState.bank_deposited() == 5000, "存款被扣减", str(GameState.bank_deposited()))
+	_ok(int(GameState.island_investment.get("m1_island0", 0)) == 3000, "投资额累加")
+	var r2: Dictionary = GameState.invest_from("deposit", "m1_island0", 999999)
+	_ok(not bool(r2.get("ok", true)), "存款不足时拒绝")
+	var cash_before := GameState.gold
+	var r3: Dictionary = GameState.invest_from("cash", "m1_island0", 1000)
+	_ok(bool(r3.get("ok", false)) and GameState.gold == cash_before - 1000, "现金投资扣减正确",
+		"%d → %d" % [cash_before, GameState.gold])
+
+	# 生产运行时产出（C 块补齐）
+	GameState.reset_new_game()
+	GameState.warehouse[&"wheat"] = 9
+	var prod: Dictionary = GameState.tick_production("jadehaven")
+	var made: Dictionary = prod.get("产出", {})
+	_ok(int(made.get(&"beer", 0)) == 3, "小麦 9 → 啤酒 3", str(made))
+	_ok(int(GameState.warehouse.get(&"wheat", 0)) == 0, "原料被消耗")
+	_ok(int(GameState.warehouse.get(&"beer", 0)) == 3, "成品入库")
+	# 军用品链
+	GameState.warehouse.clear()
+	GameState.warehouse[&"iron_ore"] = 8
+	GameState.warehouse[&"timber"] = 6
+	GameState.warehouse[&"copper"] = 4
+	var p2: Dictionary = GameState.tick_production("jadehaven")
+	var made2: Dictionary = p2.get("产出", {})
+	_ok(int(made2.get(&"musket", 0)) >= 1, "铁矿+木材 → 火枪", str(made2))
+	_ok(int(made2.get(&"tools", 0)) >= 1, "铁矿+木材 → 工具（同原料多配方按序消耗）", str(made2))
+
 # ---------------- 面板规范（0.19.0） ----------------
 func _test_ui_panels_v019() -> void:
 	print("\n[面板规范]")
