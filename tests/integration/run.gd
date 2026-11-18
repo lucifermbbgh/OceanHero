@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v121_gate()
 	await _test_v120_component()
 	await _test_v114_fixes()
 	await _test_v113_polish()
@@ -643,6 +644,54 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.1 升级门槛与仓库 ----------------
+func _test_v121_gate() -> void:
+	print("\n[1.2.1 门槛与仓库]")
+	GameState.reset_new_game()
+	# 港村 → 港镇：条件未达标
+	_ok(GameState.home_port_tier == 1, "初始为港村")
+	_ok(not GameState.town_upgrade_ready(), "初始不可升级")
+	var reqs: Array = GameState.town_upgrade_requirements()
+	_ok(reqs.size() == 5, "港村升级条件 5 项", str(reqs.size()))
+	var none_ok := true
+	for rq in reqs:
+		if bool(rq["ok"]):
+			none_ok = false
+	_ok(none_ok, "初始所有条件均未完成")
+	# 全部达标后可升级
+	GameState.buildings[&"governor"] = 3
+	GameState.buildings[&"tavern"] = 2
+	GameState.buildings[&"warehouse"] = 2
+	GameState.buildings[&"sailmaker"] = 2
+	GameState.buildings[&"watchtower"] = 2
+	_ok(GameState.town_upgrade_ready(), "条件齐备后可升级")
+	var reqs2: Array = GameState.town_upgrade_requirements()
+	var ok_count := 0
+	for rq2 in reqs2:
+		if bool(rq2["ok"]):
+			ok_count += 1
+	_ok(ok_count == 5, "五项均显示已完成", str(ok_count))
+	# 升级后进入港镇，条件变为港城档
+	GameState.home_port_tier = 2
+	var reqs3: Array = GameState.town_upgrade_requirements()
+	_ok(reqs3.size() == 7, "港镇→港城 7 项条件", str(reqs3.size()))
+	var gov_need := 0
+	for rq3 in reqs3:
+		if String(rq3["id"]) == "governor":
+			gov_need = int(rq3["need"])
+	_ok(gov_need == 4, "港城要求总督府 Lv4", str(gov_need))
+
+	# 仓库转移
+	GameState.reset_new_game()
+	GameState.warehouse.clear()
+	GameState.warehouse[&"timber"] = 50
+	var moved: int = GameState.move_warehouse_to_cargo(&"timber")
+	_ok(moved > 0, "仓库→货舱 有转移", str(moved))
+	_ok(int(GameState.cargo.get(&"timber", 0)) == moved, "货舱收到货物")
+	var moved2: int = GameState.move_cargo_to_warehouse(&"timber")
+	_ok(moved2 > 0, "货舱→仓库 有转移", str(moved2))
+	_ok(int(GameState.cargo.get(&"timber", 0)) == 0, "货舱清空")
 
 # ---------------- 1.2.0 城镇与建筑组件化 ----------------
 func _test_v120_component() -> void:

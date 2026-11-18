@@ -148,6 +148,7 @@ func _build_ui() -> void:
 	_action_button(vb, "船员名单", _toggle_crew_panel)
 	_action_button(vb, "装备强化", _toggle_gear)
 	_action_button(vb, "船只改装", _toggle_mod)
+	_action_button(vb, "仓库", _toggle_store)
 	_action_button(vb, "建造", _toggle_construct)
 	_action_button(vb, "经济总览", _toggle_overview)
 	if GameState.home_port_tier >= 3:
@@ -321,6 +322,22 @@ func _build_ui() -> void:
 	mod_list.add_theme_constant_override("separation", 4)
 	mod_list.custom_minimum_size = Vector2(1510, 0)
 	mrscroll.add_child(mod_list)
+
+	# 仓库面板
+	store_root = PanelContainer.new()
+	store_root.position = Vector2(16, 72)
+	store_root.custom_minimum_size = Vector2(1568, 812)
+	store_root.add_theme_stylebox_override("panel", _panel_style())
+	store_root.visible = false
+	root.add_child(store_root)
+	var stscroll := ScrollContainer.new()
+	stscroll.custom_minimum_size = Vector2(1530, 780)
+	stscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	store_root.add_child(stscroll)
+	store_list = VBoxContainer.new()
+	store_list.add_theme_constant_override("separation", 4)
+	store_list.custom_minimum_size = Vector2(1510, 0)
+	stscroll.add_child(store_list)
 
 	# 建造面板（材料提交）
 	construct_root = PanelContainer.new()
@@ -2321,6 +2338,99 @@ func _do_mod(kind: String) -> void:
 	else:
 		_log(String(r.get("reason", "改装失败")))
 
+# ---------------- 仓库面板（1.2.1） ----------------
+
+var store_root: PanelContainer = null
+var store_list: VBoxContainer = null
+var store_tab := "all"
+
+func _toggle_store() -> void:
+	if store_root.visible:
+		store_root.visible = false
+		return
+	_rebuild_store()
+	store_root.visible = true
+
+func _rebuild_store() -> void:
+	for c in store_list.get_children():
+		c.queue_free()
+	var cap_ship := GameState.cargo_capacity()
+	var cap_wh: int = GameState.warehouse_capacity()
+	var used_ship: float = GameState.cargo_used()
+	var used_wh: float = GameState.warehouse_used()
+	_yard_title_to(store_list, "仓库与货舱")
+	var col_ship := Color(0.92, 0.55, 0.5) if used_ship > cap_ship else Color(0.8, 0.86, 0.82)
+	var col_wh2 := Color(0.92, 0.55, 0.5) if used_wh > cap_wh else Color(0.8, 0.86, 0.82)
+	store_list.add_child(_lbl("　货舱 %d / %d　　仓库 %d / %d" % [used_ship, cap_ship, used_wh, cap_wh],
+		700, col_ship))
+	var tabrow := HBoxContainer.new()
+	tabrow.add_theme_constant_override("separation", 8)
+	store_list.add_child(tabrow)
+	for spec in [["all", "全部"], ["ship", "货舱"], ["wh", "仓库"]]:
+		var tb := Button.new()
+		tb.text = String(spec[1])
+		tb.custom_minimum_size = Vector2(110, 30)
+		tb.modulate = Color(1.0, 0.92, 0.6) if store_tab == String(spec[0]) else Color(1, 1, 1)
+		var key := String(spec[0])
+		tb.pressed.connect(func(): store_tab = key; _rebuild_store())
+		tabrow.add_child(tb)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	store_list.add_child(head)
+	for spec2 in [["商品", 180], ["分类", 110], ["货舱", 110], ["仓库", 110], ["单位体积", 120], ["占用", 110], ["操作", 260]]:
+		head.add_child(_cell_box(String(spec2[0]), int(spec2[1]), Color(0.62, 0.78, 0.85), true))
+	for cid in GameState.all_commodities():
+		var cdef: Resource = DataRegistry.get_commodity(cid)
+		if cdef == null:
+			continue
+		var in_ship := int(GameState.cargo.get(cid, 0))
+		var in_wh := int(GameState.warehouse.get(cid, 0))
+		if in_ship <= 0 and in_wh <= 0:
+			continue
+		if store_tab == "ship" and in_ship <= 0:
+			continue
+		if store_tab == "wh" and in_wh <= 0:
+			continue
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		store_list.add_child(row)
+		row.add_child(_cell_box(String(cdef.display_name), 180))
+		row.add_child(_cell_box(String(GameState.CATEGORY_NAMES.get(String(cdef.category), String(cdef.category))), 110))
+		row.add_child(_cell_box(str(in_ship), 110, Color(0.95, 0.9, 0.55) if in_ship > 0 else Color(0.6, 0.6, 0.6)))
+		row.add_child(_cell_box(str(in_wh), 110, Color(0.95, 0.9, 0.55) if in_wh > 0 else Color(0.6, 0.6, 0.6)))
+		row.add_child(_cell_box("%.2f" % float(cdef.volume), 120))
+		row.add_child(_cell_box("%.0f" % (float(in_ship + in_wh) * float(cdef.volume)), 110))
+		var op := PanelContainer.new()
+		op.custom_minimum_size = Vector2(260, 30)
+		var hb2 := HBoxContainer.new()
+		hb2.add_theme_constant_override("separation", 6)
+		op.add_child(hb2)
+		var b1 := Button.new()
+		b1.text = "装船"
+		b1.custom_minimum_size = Vector2(90, 26)
+		var cv1: StringName = cid
+		b1.disabled = in_wh <= 0
+		b1.pressed.connect(func(): _do_move(cv1, "to_ship"))
+		hb2.add_child(b1)
+		var b2 := Button.new()
+		b2.text = "存仓"
+		b2.custom_minimum_size = Vector2(90, 26)
+		b2.disabled = in_ship <= 0
+		b2.pressed.connect(func(): _do_move(cv1, "to_wh"))
+		hb2.add_child(b2)
+		row.add_child(op)
+
+func _do_move(cid: StringName, dir: String) -> void:
+	var moved := 0
+	if dir == "to_ship":
+		moved = GameState.move_warehouse_to_cargo(cid)
+	else:
+		moved = GameState.move_cargo_to_warehouse(cid)
+	if moved > 0:
+		_log("转移 %d" % moved)
+	_rebuild_store()
+	_refresh()
+
 # ---------------- 建造与投资（1.1） ----------------
 
 
@@ -2374,21 +2484,48 @@ func _rebuild_construct() -> void:
 		btn.pressed.connect(func(): _start_parallel_upgrade(bidv))
 		op.add_child(btn)
 		row.add_child(op)
-	construct_list.add_child(_lbl("　说明：建造消耗金币与材料；港口升级（港村→港镇）在下方按钮", 700, Color(0.66, 0.72, 0.7)))
-	var up := Button.new()
-	up.text = "港口升级 → %s" % GameState.town_suffix(mini(3, tier + 1))
-	up.custom_minimum_size = Vector2(200, 34)
-	up.disabled = tier >= 3
-	up.pressed.connect(func(): _do_build_upgrade())
-	construct_list.add_child(up)
+	# 升级条件（逐条指示）
+	_yard_title_to(construct_list, "港口升级条件：%s → %s" % [
+		GameState.town_name("翡翠", tier), GameState.town_name("翡翠", mini(3, tier + 1))])
+	if tier >= 3:
+		construct_list.add_child(_lbl("　已是最高等级（港城）", 600, Color(0.75, 0.85, 0.7)))
+	else:
+		var reqs: Array = GameState.town_upgrade_requirements()
+		var rhead := HBoxContainer.new()
+		rhead.add_theme_constant_override("separation", 0)
+		construct_list.add_child(rhead)
+		for spec in [["建筑", 220], ["当前/需求", 200], ["状态", 160]]:
+			rhead.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+		for rq in reqs:
+			var rrow := HBoxContainer.new()
+			rrow.add_theme_constant_override("separation", 0)
+			construct_list.add_child(rrow)
+			rrow.add_child(_cell_box(String(rq["name"]), 220))
+			rrow.add_child(_cell_box("Lv%d / Lv%d" % [int(rq["have"]), int(rq["need"])], 200,
+				Color(0.55, 0.9, 0.6) if bool(rq["ok"]) else Color(0.92, 0.55, 0.45)))
+			rrow.add_child(_cell_box("已完成" if bool(rq["ok"]) else "未完成", 160,
+				Color(0.55, 0.9, 0.6) if bool(rq["ok"]) else Color(0.92, 0.55, 0.45)))
+		var ready := GameState.town_upgrade_ready()
+		var up := Button.new()
+		up.text = "港口升级 → %s" % GameState.town_suffix(mini(3, tier + 1)) if ready else "港口升级（条件未达成）"
+		up.custom_minimum_size = Vector2(260, 36)
+		up.disabled = not ready
+		up.modulate = Color(0.6, 1.0, 0.6) if ready else Color(1, 1, 1)
+		up.pressed.connect(func(): _do_build_upgrade())
+		construct_list.add_child(up)
 
 func _do_build_upgrade() -> void:
 	if GameState.home_port_tier >= 3:
 		return
+	if not GameState.town_upgrade_ready():
+		_log("升级条件未达成")
+		return
 	GameState.home_port_tier += 1
 	GameState.build_submitted.clear()
-	_log("建造完成：白帆%s" % GameState.town_suffix(GameState.home_port_tier))
+	_log("城镇升级完成：%s" % GameState.town_name("翡翠", GameState.home_port_tier))
 	_rebuild_construct()
+	_refresh()
+	queue_redraw()
 
 ## 提交弹窗：船上 / 仓库 两个输入框
 func _open_submit(mat: String, need: int, in_ship: int, in_wh: int) -> void:
@@ -2444,7 +2581,7 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root", "ex_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
 	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
-	"crew_root", "gear_root", "mod_root"]
+	"crew_root", "gear_root", "mod_root", "store_root"]
 
 var close_btn: Button = null
 var construct_root: PanelContainer = null

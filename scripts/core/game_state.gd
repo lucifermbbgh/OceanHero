@@ -1176,6 +1176,37 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 	gear_owned.append(new_id)
 	return {"ok": true, "new_id": new_id}
 
+# ---------------- 城镇升级门槛（1.2.1） ----------------
+
+## 升级门槛：目标等级 -> [建筑 id, 需求等级]
+const TOWN_UPGRADE_GATES := {
+	2: [[&"governor", 3], [&"tavern", 2], [&"warehouse", 2], [&"sailmaker", 2], [&"watchtower", 2]],
+	3: [[&"governor", 4], [&"drydock", 2], [&"foundry", 2],
+		[&"tavern", 4], [&"warehouse", 4], [&"sailmaker", 4], [&"watchtower", 4]],
+}
+
+## 返回 [{id, name, need, have, ok}]
+func town_upgrade_requirements() -> Array:
+	var target := mini(3, home_port_tier + 1)
+	var gate: Array = TOWN_UPGRADE_GATES.get(target, [])
+	var out: Array = []
+	for pair in gate:
+		var bid: StringName = pair[0]
+		var need := int(pair[1])
+		var bdef: Resource = DataRegistry.get_building(bid)
+		var nm: String = String(bdef.display_name) if bdef != null else String(bid)
+		var have := building_level(bid)
+		out.append({"id": bid, "name": nm, "need": need, "have": have, "ok": have >= need})
+	return out
+
+func town_upgrade_ready() -> bool:
+	if home_port_tier >= 3:
+		return false
+	for r in town_upgrade_requirements():
+		if not bool(r["ok"]):
+			return false
+	return true
+
 # ---------------- 城镇建筑与开局资源（1.2.0） ----------------
 
 const TownPanelLib = preload("res://scripts/ui/town_panel.gd")
@@ -1917,6 +1948,36 @@ func warehouse_add(id: StringName, amount: int) -> int:
 		warehouse[id] = int(warehouse.get(id, 0)) + real
 		EventBus.cargo_changed.emit(cargo_used(), cargo_capacity())
 	return real
+
+## 货舱 → 仓库（受仓库余量限制）
+func move_cargo_to_warehouse(id: StringName) -> int:
+	var have := int(cargo.get(id, 0))
+	if have <= 0:
+		return 0
+	var c: Resource = DataRegistry.get_commodity(id)
+	var vol := float(c.volume) if c != null else 1.0
+	var free := float(warehouse_capacity()) - warehouse_used()
+	var can := mini(have, int(free / maxf(0.01, vol)))
+	if can <= 0:
+		return 0
+	remove_cargo(id, can)
+	warehouse[id] = int(warehouse.get(id, 0)) + can
+	return can
+
+## 仓库 → 货舱（受货舱余量限制）
+func move_warehouse_to_cargo(id: StringName) -> int:
+	var have := int(warehouse.get(id, 0))
+	if have <= 0:
+		return 0
+	var c: Resource = DataRegistry.get_commodity(id)
+	var vol := float(c.volume) if c != null else 1.0
+	var free := float(cargo_capacity()) - cargo_used()
+	var can := mini(have, int(free / maxf(0.01, vol)))
+	if can <= 0:
+		return 0
+	warehouse_remove(id, can)
+	add_cargo(id, can)
+	return can
 
 func warehouse_remove(id: StringName, amount: int) -> int:
 	var have := int(warehouse.get(id, 0))
