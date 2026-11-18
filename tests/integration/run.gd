@@ -707,6 +707,41 @@ func _test_v110_core() -> void:
 	_ok(int(made2.get(&"musket", 0)) >= 1, "铁矿+木材 → 火枪", str(made2))
 	_ok(int(made2.get(&"tools", 0)) >= 1, "铁矿+木材 → 工具（同原料多配方按序消耗）", str(made2))
 
+	# 船员职级
+	GameState.reset_new_game()
+	GameState.crew_xp[&"c1"] = 0
+	_ok(GameState.crew_rank_name(&"c1") == "水手", "初始为水手")
+	GameState.crew_xp[&"c1"] = 120
+	_ok(GameState.crew_rank_name(&"c1") == "舵手", "120 经验升舵手", GameState.crew_rank_name(&"c1"))
+	GameState.crew_xp[&"c1"] = 700
+	_ok(GameState.crew_rank_name(&"c1") == "大副", "700 经验升大副")
+
+	# 装备强化
+	GameState.reset_new_game()
+	GameState.add_gold(50000)
+	GameState.warehouse[&"iron_ore"] = 10
+	var gid: StringName = &"nonexistent_gear"
+	_ok(GameState.gear_level_of(gid) == 0, "初始强化 0 级")
+	var gup: Dictionary = GameState.gear_upgrade(gid)
+	_ok(bool(gup.get("ok", false)), "可以强化", str(gup))
+	_ok(GameState.gear_level_of(gid) == 1, "强化到 1 级")
+	_ok(int(GameState.warehouse.get(&"iron_ore", 0)) == 8, "消耗 2 铁矿",
+		str(GameState.warehouse.get(&"iron_ore", 0)))
+	GameState.add_gold(-GameState.gold)
+	var poor: Dictionary = GameState.gear_upgrade(gid)
+	_ok(not bool(poor.get("ok", true)), "金币不足时拒绝")
+
+	# 任务类型扩展
+	GameState.reset_new_game()
+	GameState.quests_available.clear()
+	var types := {}
+	for trial in range(30):
+		GameState.refresh_quests()
+		for q in GameState.quests_available:
+			types[String(q.get("type", ""))] = true
+		GameState.quests_available.clear()
+	_ok(types.size() >= 5, "任务类型至少 5 种被抽到", str(types.keys()))
+
 # ---------------- 面板规范（0.19.0） ----------------
 func _test_ui_panels_v019() -> void:
 	print("\n[面板规范]")

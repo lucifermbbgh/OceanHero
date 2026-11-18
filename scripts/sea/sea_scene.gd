@@ -544,6 +544,13 @@ func _rebuild_port() -> void:
 		ab.disabled = GameState.gold < amt
 		var amt_v: int = int(amt)
 		ab.pressed.connect(func(): _port_invest(amt_v))
+		if amt == 20000:
+			var dep_btn := Button.new()
+			dep_btn.text = "用存款投资"
+			dep_btn.custom_minimum_size = Vector2(130, 28)
+			dep_btn.disabled = GameState.bank_deposited() <= 0
+			dep_btn.pressed.connect(func(): _port_invest_deposit())
+			inv_hb.add_child(dep_btn)
 		inv_hb.add_child(ab)
 
 	var max_stock := int(TIER_STOCK.get(tier, 40))
@@ -1060,6 +1067,20 @@ func _port_max_stock() -> int:
 	return int(TIER_STOCK.get(int(islands[cur_port_island][2]), 40))
 
 ## 对当前岛注资
+## 用存款投资
+func _port_invest_deposit() -> void:
+	var key := _island_key()
+	var amount := int(GameState.bank_deposited() / 2)
+	if amount <= 0:
+		hud.ticker("银行存款不足")
+		return
+	var r: Dictionary = GameState.invest_from("deposit", key, amount)
+	if bool(r.get("ok", false)):
+		hud.ticker("存款注资 %d，投资累计 %d" % [amount, int(r.get("total", 0))])
+		_rebuild_port()
+	else:
+		hud.ticker(String(r.get("reason", "投资失败")))
+
 func _port_invest(amount: int) -> void:
 	if GameState.invest_island(_island_key(), amount):
 		hud.ticker("已注资 %d 金，投资 Lv%d" % [amount, GameState.island_level(_island_key())])

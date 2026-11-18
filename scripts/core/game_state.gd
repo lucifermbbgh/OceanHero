@@ -333,7 +333,7 @@ func refresh_quests() -> void:
 	quests_available.clear()
 	var comms: Array = DataRegistry.commodities.keys()
 	for i in range(9):
-		var t: String = ["hunt", "trade", "transport", "escort", "gather"][RngService.randi_range(0, 4)]
+		var t: String = ["hunt", "trade", "transport", "escort", "gather", "raid", "treasure"][RngService.randi_range(0, 6)]
 		var q := {"id": "q_%d_%d" % [Time.get_ticks_usec(), i], "type": t, "progress": 0,
 			"reward_xp": 40 + level * 12, "reward_comm": 1,
 			"faction": FACTIONS[RngService.randi_range(0, FACTIONS.size() - 1)]}
@@ -365,6 +365,16 @@ func refresh_quests() -> void:
 				q["amount"] = RngService.randi_range(2, 4)
 				q["title"] = "打捞 %d 处沉船残骸" % int(q.amount)
 				q["reward_gold"] = 500 + level * 80
+			"raid":
+				q["target_kind"] = "merchant"
+				q["amount"] = RngService.randi_range(2, 4)
+				q["title"] = "劫掠 %d 艘敌对商船" % int(q.amount)
+				q["reward_gold"] = 900 + level * 90
+			"treasure":
+				q["amount"] = 1
+				q["treasure_map"] = 1 + RngService.randi_range(0, 2)
+				q["title"] = "在第 %d 图海域打捞宝藏" % int(q["treasure_map"])
+				q["reward_gold"] = 1500 + level * 150
 		quests_available.append(q)
 
 func _quest_finish(index: int) -> void:
@@ -416,7 +426,8 @@ func on_enemy_killed(kind: String, is_boss: bool) -> void:
 	stat_add_kill(is_boss)
 	# 讨伐任务进度
 	for q in quests_active:
-		if String(q.get("type", "")) == "hunt" and String(q.get("target_kind", "")) == kind:
+		var qt := String(q.get("type", ""))
+		if (qt == "hunt" or qt == "raid") and String(q.get("target_kind", "")) == kind:
 			q["progress"] = int(q.get("progress", 0)) + 1
 	_quest_check()
 
@@ -1008,6 +1019,78 @@ func price_change_pct(port_key: String, cid: StringName) -> float:
 	var key := _drift_key(port_key, cid)
 	var prev := float(price_drift.get(key + "|prev", cur))
 	return EconMath.change_pct(prev, cur)
+
+# ---------------- 船员职级与装备强化（1.1） ----------------
+
+const CREW_RANKS := ["水手", "舵手", "炮长", "大副"]
+const CREW_RANK_BONUS := [0.0, 0.05, 0.10, 0.15]
+
+## 船员经验与职级：按 crew_id 记录
+var crew_xp: Dictionary = {}
+
+func crew_rank_of(cid: StringName) -> int:
+	var xp := int(crew_xp.get(cid, 0))
+	if xp >= 600:
+		return 3
+	if xp >= 300:
+		return 2
+	if xp >= 100:
+		return 1
+	return 0
+
+func crew_rank_name(cid: StringName) -> String:
+	return String(CREW_RANKS[crew_rank_of(cid)])
+
+## 参战后给全部在岗船员加经验
+func crew_gain_xp(amount: int) -> void:
+	for key in crew_xp.keys():
+		crew_xp[key] = int(crew_xp[key]) + amount
+
+## 装备强化：消耗金币与材料，属性按强化等级提升
+const GEAR_UPGRADE_COST := {1: 2000, 2: 5000, 3: 12000}
+const GEAR_UPGRADE_MAT := {1: 2, 2: 4, 3: 8}
+var gear_level: Dictionary = {}
+
+func gear_level_of(gid: StringName) -> int:
+	return int(gear_level.get(String(gid), 0))
+
+func gear_upgrade(gid: StringName) -> Dictionary:
+	var lv := gear_level_of(gid)
+	if lv >= 3:
+		return {"ok": false, "reason": "已达最高强化等级"}
+	var cost := int(GEAR_UPGRADE_COST.get(lv + 1, 99999))
+	var mat_n := int(GEAR_UPGRADE_MAT.get(lv + 1, 99))
+	if gold < cost:
+		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
+	if int(warehouse.get(&"iron_ore", 0)) < mat_n:
+		return {"ok": false, "reason": "铁矿不足，需要 %d" % mat_n}
+	add_gold(-cost)
+	warehouse[&"iron_ore"] = int(warehouse.get(&"iron_ore", 0)) - mat_n
+	gear_level[String(gid)] = lv + 1
+	return {"ok": true, "level": lv + 1, "cost": cost}
+
+## 装备合成：同部位三件同级合成一件高一级
+func gear_combine(slot: StringName, rarity: int) -> Dictionary:
+	var candidates: Array = []
+	for g in gear_owned:
+		var gd: Resource = DataRegistry.get_gear(g)
+		if gd != null and String(gd.slot) == String(slot) and int(gd.rarity) == rarity:
+			candidates.append(g)
+	if candidates.size() < 3:
+		return {"ok": false, "reason": "同部位同稀有度装备不足 3 件"}
+	for i in range(3):
+		gear_owned.erase(candidates[i])
+	var pool: Array = []
+	for k in DataRegistry.gear.keys():
+		var gd2: Resource = DataRegistry.gear[k]
+		if gd2 != null and String(gd2.slot) == String(slot) and int(gd2.rarity) == rarity + 1:
+			pool.append(k)
+	if pool.is_empty():
+		gear_owned.append(candidates[0])
+		return {"ok": false, "reason": "没有更高一级的同类装备"}
+	var new_id: StringName = pool[RngService.randi_range(0, pool.size() - 1)]
+	gear_owned.append(new_id)
+	return {"ok": true, "new_id": new_id}
 
 # ---------------- 商品分类与建造（1.1） ----------------
 
@@ -1813,6 +1896,9 @@ func to_dict() -> Dictionary:
 		"island_tier": island_tier.duplicate(),
 		"port_registry": port_registry.duplicate(true),
 		"contraband": contraband.duplicate(),
+		"crew_xp": crew_xp.duplicate(),
+		"gear_level": gear_level.duplicate(),
+		"build_submitted": build_submitted.duplicate(true),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
 		"market": {"drift": price_drift.duplicate(), "events": market_events.duplicate(true),
 			"history": price_history.duplicate(true)},
@@ -1936,6 +2022,18 @@ func from_dict(d: Dictionary) -> void:
 			"left": int(bk.get("left", 12)), "itotal": int(bk.get("itotal", 0)),
 			"ipaid": int(bk.get("ipaid", 0)), "month": int(bk.get("month", 0)),
 		})
+	crew_xp.clear()
+	var cxp: Dictionary = d.get("crew_xp", {})
+	for k0 in cxp.keys():
+		crew_xp[StringName(k0)] = int(cxp[k0])
+	gear_level.clear()
+	var glv: Dictionary = d.get("gear_level", {})
+	for k1 in glv.keys():
+		gear_level[String(k1)] = int(glv[k1])
+	build_submitted.clear()
+	var bsub: Dictionary = d.get("build_submitted", {})
+	for k2 in bsub.keys():
+		build_submitted[String(k2)] = bsub[k2]
 	contraband.clear()
 	var cb: Dictionary = d.get("contraband", {})
 	for k in cb.keys():
