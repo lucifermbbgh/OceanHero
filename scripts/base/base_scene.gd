@@ -868,7 +868,7 @@ func _add_market_metrics(pk: String) -> void:
 	market_list.add_child(title)
 	var em = load("res://scripts/systems/econ_math.gd")
 	var parts: Array = []
-	for cid in [&"grain", &"timber", &"rum", &"spice"]:
+	for cid in GameState.commodities_of(market_cat):
 		var c: Resource = DataRegistry.get_commodity(cid)
 		if c == null:
 			continue
@@ -895,6 +895,17 @@ func _rebuild_world_market() -> void:
 	note.add_theme_font_size_override("font_size", 13)
 	note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
 	market_list.add_child(note)
+	var catrow2 := HBoxContainer.new()
+	catrow2.add_theme_constant_override("separation", 8)
+	market_list.add_child(catrow2)
+	for cat in ["food", "raw", "consumer", "military", "precious"]:
+		var cb2 := Button.new()
+		cb2.text = String(GameState.CATEGORY_NAMES.get(cat, cat))
+		cb2.custom_minimum_size = Vector2(110, 28)
+		cb2.modulate = Color(1.0, 0.92, 0.6) if market_cat == cat else Color(1, 1, 1)
+		var cv2 := String(cat)
+		cb2.pressed.connect(func(): market_cat = cv2; _rebuild_market())
+		catrow2.add_child(cb2)
 	var cur_map := GameState.current_map
 	var keys: Array = GameState.port_registry.keys()
 	if keys.is_empty():
@@ -913,7 +924,7 @@ func _rebuild_world_market() -> void:
 		hb.add_child(_lbl("第 %d 图 · 距 %d" % [pmap, dist], 130, Color(0.8, 0.85, 0.9)))
 		var stock_cap := int(TIER_STOCK_REF.get(ptier, 40))
 		var parts: Array = []
-		for cid in [&"grain", &"timber", &"rum", &"spice"]:
+		for cid in GameState.commodities_of(market_cat):
 			var c: Resource = DataRegistry.get_commodity(cid)
 			if c == null:
 				continue

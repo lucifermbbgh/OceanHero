@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v113_polish()
 	await _test_v112_parallel()
 	await _test_v111_ui()
 	await _test_v110_core()
@@ -639,6 +640,40 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 1.1.3 打磨与平衡 ----------------
+func _test_v113_polish() -> void:
+	print("\n[1.1.3 打磨]")
+	GameState.reset_new_game()
+	# 生产受工坊等级限制
+	GameState.warehouse[&"wheat"] = 30
+	var p0: Dictionary = GameState.tick_production("jadehaven")
+	var n0 := 0
+	for k in p0.get("产出", {}).keys():
+		n0 += int(p0["产出"][k])
+	_ok(n0 <= 1, "工坊 0 级时每周最多 1 批", str(n0))
+	GameState.buildings[&"sawmill"] = 3
+	GameState.warehouse[&"wheat"] = 30
+	var p3: Dictionary = GameState.tick_production("jadehaven")
+	var n3 := 0
+	for k2 in p3.get("产出", {}).keys():
+		n3 += int(p3["产出"][k2])
+	_ok(n3 >= 2 and n3 <= 3, "工坊 3 级时每周最多 3 批", str(n3))
+
+	# 旧存档兼容：缺新字段也能读
+	var legacy := {"player": {"gold": 1234, "level": 2}}
+	GameState.from_dict(legacy)
+	_ok(GameState.gold == 1234, "旧档金币可读", str(GameState.gold))
+	_ok(GameState.ship_mods.get("sail_tier", -1) == 0, "缺 ship_mods 时补默认值")
+	_ok(GameState.building_upgrades.is_empty(), "缺 building_upgrades 时为空")
+	_ok(GameState.gear_level.is_empty(), "缺 gear_level 时为空")
+
+	# 新商品在港口有初始库存
+	GameState.reset_new_game()
+	var wheat_stock := GameState.ensure_stock(&"jadehaven", &"wheat", 400)
+	_ok(wheat_stock > 0, "新商品有初始库存", str(wheat_stock))
+	var ammo_stock := GameState.ensure_stock(&"jadehaven", &"ammo_goods", 400)
+	_ok(ammo_stock > 0, "军用品也有初始库存", str(ammo_stock))
+
 # ---------------- 1.1.2 多建筑并行 ----------------
 func _test_v112_parallel() -> void:
 	print("\n[1.1.2 多建筑并行]")
@@ -747,6 +782,7 @@ func _test_v110_core() -> void:
 
 	# 生产运行时产出（C 块补齐）
 	GameState.reset_new_game()
+	GameState.buildings[&"sawmill"] = 3
 	GameState.warehouse[&"wheat"] = 9
 	var prod: Dictionary = GameState.tick_production("jadehaven")
 	var made: Dictionary = prod.get("产出", {})
@@ -755,6 +791,7 @@ func _test_v110_core() -> void:
 	_ok(int(GameState.warehouse.get(&"beer", 0)) == 3, "成品入库")
 	# 军用品链
 	GameState.warehouse.clear()
+	GameState.buildings[&"sawmill"] = 5
 	GameState.warehouse[&"iron_ore"] = 8
 	GameState.warehouse[&"timber"] = 6
 	GameState.warehouse[&"copper"] = 4

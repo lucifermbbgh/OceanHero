@@ -1284,9 +1284,13 @@ func tick_production(port_key: String) -> Dictionary:
 	var out: Dictionary = {}
 	var used: Dictionary = {}
 	# 轮转加工：每轮每个配方最多做 1 批，避免先到先得把原料吃光
+	# 平衡：每周加工批次上限 = 工坊等级（0 级不可加工），最低 1
+	var workshop := building_level(&"sawmill")
+	var max_batches := maxi(1, workshop)
+	var batches := 0
 	var progressed := true
 	var guard := 0
-	while progressed and guard < 64:
+	while progressed and guard < 64 and batches < max_batches:
 		progressed = false
 		guard += 1
 		for cid in RECIPES.keys():
@@ -1306,6 +1310,7 @@ func tick_production(port_key: String) -> Dictionary:
 			warehouse[cid] = int(warehouse.get(cid, 0)) + 1
 			out[cid] = int(out.get(cid, 0)) + 1
 			progressed = true
+			batches += 1
 	return {"产出": out, "消耗": used}
 
 # ---------------- 银行（0.12 / 0.12.1 多笔贷款） ----------------
