@@ -1176,6 +1176,46 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 	gear_owned.append(new_id)
 	return {"ok": true, "new_id": new_id}
 
+# ---------------- 城镇建筑与开局资源（1.2.0） ----------------
+
+const TownPanelLib = preload("res://scripts/ui/town_panel.gd")
+
+## 开局启动资源（够建两三座建筑）
+const START_RES = {
+	"gold": 8000, "timber": 300, "iron": 120, "stone": 150, "grain": 100,
+}
+
+## 按城镇规则初始化建筑等级
+func init_town_buildings(is_home: bool, tier: int) -> void:
+	var ids: Array = TownPanelLib.initial_buildings(is_home, tier)
+	for bid in ids:
+		if not buildings.has(bid):
+			buildings[bid] = 1
+	if not is_home:
+		# 其他岛屿：按等级给更完整的建筑等级
+		for b in TownPanelLib.buildings_for_tier(tier):
+			buildings[StringName(String(b.id))] = maxi(1, tier - 1)
+
+## 发放开局资源
+func grant_start_resources() -> void:
+	add_gold(int(START_RES["gold"]))
+	for cid in [&"timber", &"iron_ore", &"stone", &"wheat"]:
+		var key := String(cid)
+		var amount := 0
+		if key == "timber":
+			amount = int(START_RES["timber"])
+		elif key == "iron_ore":
+			amount = int(START_RES["iron"])
+		elif key == "stone":
+			amount = int(START_RES["stone"])
+		else:
+			amount = int(START_RES["grain"])
+		cargo[cid] = int(cargo.get(cid, 0)) + amount
+
+## 某建筑是否已建（等级 ≥ 1）
+func has_building(bid: StringName) -> bool:
+	return building_level(bid) >= 1
+
 # ---------------- 商品分类与建造（1.1） ----------------
 
 const CATEGORIES := ["food", "raw", "consumer", "military", "precious"]
@@ -2299,6 +2339,9 @@ func reset_new_game() -> void:
 	crew_assigned.clear()
 	tavern_pool.clear()
 	buildings.clear()
+	# 1.2.0：母港开局只带总督府与仓库，并发放启动资源
+	init_town_buildings(true, 1)
+	grant_start_resources()
 	resources = {"timber": 0, "iron": 0, "grain": 0, "saltpeter": 0}
 	build_queue.clear()
 	orders.clear()

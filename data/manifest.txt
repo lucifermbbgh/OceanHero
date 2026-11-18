@@ -110,3 +110,6 @@ res://data/ships/sand_junk.tres
 res://data/ships/schooner.tres
 res://data/ships/sixth_rate.tres
 res://data/ships/third_rate.tres
+res://data/towns/layout_1.tres
+res://data/towns/layout_2.tres
+res://data/towns/layout_3.tres

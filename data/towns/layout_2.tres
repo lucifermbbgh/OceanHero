@@ -1,0 +1,10 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/town_layout.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+tier = 2
+background_path = ""
+menu_side = "left"
+slots = [{"h": 140.0, "id": "slot_governor", "w": 220.0, "x": 120.0, "y": 120.0}, {"h": 140.0, "id": "slot_warehouse", "w": 220.0, "x": 400.0, "y": 120.0}, {"h": 140.0, "id": "slot_tavern", "w": 220.0, "x": 680.0, "y": 120.0}, {"h": 140.0, "id": "slot_sailmaker", "w": 220.0, "x": 960.0, "y": 120.0}, {"h": 140.0, "id": "slot_watchtower", "w": 220.0, "x": 1240.0, "y": 120.0}, {"h": 140.0, "id": "slot_drydock", "w": 220.0, "x": 120.0, "y": 300.0}, {"h": 140.0, "id": "slot_foundry", "w": 220.0, "x": 400.0, "y": 300.0}, {"h": 140.0, "id": "slot_exchange", "w": 220.0, "x": 680.0, "y": 300.0}]

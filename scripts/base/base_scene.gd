@@ -1608,9 +1608,14 @@ func _rebuild_build() -> void:
 			build_list.add_child(_lbl("%s → Lv%d　剩余 %d 周" % [nm, int(q.get("target", 1)), int(q.get("weeks_left", 1))],
 				460, Color(0.9, 0.85, 0.55)))
 
-	_yard_title_to(build_list, "建筑")
-	var ids: Array = DataRegistry.buildings.keys()
-	ids.sort()
+	_yard_title_to(build_list, "建筑（按槽位顺序）")
+	var layout: Resource = load("res://scripts/ui/town_panel.gd").layout_for(GameState.home_port_tier)
+	var ordered: Array = []
+	for slot in layout.slots:
+		for bdef in load("res://scripts/ui/town_panel.gd").buildings_for_tier(GameState.home_port_tier):
+			if String(bdef.slot_id) == String(slot.get("id", "")):
+				ordered.append(StringName(String(bdef.id)))
+	var ids: Array = ordered if not ordered.is_empty() else DataRegistry.buildings.keys()
 	for bid in ids:
 		var b: Resource = DataRegistry.buildings[bid]
 		var lv := GameState.building_level(bid)

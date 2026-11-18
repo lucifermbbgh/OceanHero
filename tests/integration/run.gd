@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v120_component()
 	await _test_v114_fixes()
 	await _test_v113_polish()
 	await _test_v112_parallel()
@@ -368,7 +369,9 @@ func _test_buildings() -> void:
 	print("\n[母港建设]")
 	GameState.reset_new_game()
 	_ok(DataRegistry.buildings.size() == 8, "8 座建筑", "实得 %d" % DataRegistry.buildings.size())
-	_ok(GameState.building_level(&"warehouse") == 0, "初始建筑等级 0")
+	# 1.2.0 起母港开局自带仓库与总督府；此处显式清空以测试建造流程
+	GameState.buildings.clear()
+	_ok(GameState.building_level(&"warehouse") == 0, "清空后建筑等级 0")
 
 	# 生产为 0
 	_ok(int(GameState.total_production().get("timber", 0)) == 0, "0 级仓库不产木材")
@@ -641,6 +644,54 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 1.2.0 城镇与建筑组件化 ----------------
+func _test_v120_component() -> void:
+	print("\n[1.2.0 组件化]")
+	var tp = load("res://scripts/ui/town_panel.gd")
+	# 建筑定义字段
+	var dd: Resource = DataRegistry.get_building(&"drydock")
+	_ok(dd != null, "船坞定义存在")
+	_ok(String(dd.category) == "生产", "船坞分类为生产", String(dd.category))
+	_ok(int(dd.unlock_tier) == 2, "船坞港口镇解锁", str(dd.get("unlock_tier")))
+	_ok(String(dd.slot_id) == "slot_drydock", "船坞有槽位 id")
+	_ok(dd.get("scene_path") == "", "美术资源留空待接入")
+	# 开局自带建筑
+	var w: Resource = DataRegistry.get_building(&"warehouse")
+	var gv: Resource = DataRegistry.get_building(&"governor")
+	_ok(bool(w.is_initial), "仓库开局自带")
+	_ok(bool(gv.is_initial), "总督府开局自带")
+	var tv: Resource = DataRegistry.get_building(&"tavern")
+	_ok(not bool(tv.is_initial), "酒馆不自动送")
+	# 等级过滤
+	var t1: Array = tp.buildings_for_tier(1)
+	var t3: Array = tp.buildings_for_tier(3)
+	_ok(t1.size() < t3.size(), "高等级建筑更多", "%d vs %d" % [t1.size(), t3.size()])
+	var has_exchange := false
+	for bb in t1:
+		if String(bb.id) == "exchange":
+			has_exchange = true
+	_ok(not has_exchange, "交易所不在港村解锁列表")
+	# 布局坐标化
+	var lay: Resource = tp.layout_for(1)
+	_ok(lay != null, "港村布局存在")
+	_ok(lay.slots.size() >= 8, "槽位数量 ≥ 8", str(lay.slots.size()))
+	var s0: Dictionary = lay.slots[0]
+	_ok(s0.has("x") and s0.has("y") and s0.has("w") and s0.has("h"), "槽位含坐标与尺寸", str(s0))
+	# 初始建筑初始化
+	GameState.reset_new_game()
+	GameState.buildings.clear()
+	GameState.init_town_buildings(true, 1)
+	_ok(GameState.building_level(&"warehouse") >= 1, "母港初始有仓库")
+	_ok(GameState.building_level(&"governor") >= 1, "母港初始有总督府")
+	_ok(GameState.building_level(&"tavern") == 0, "母港初始无酒馆")
+	# 开局资源
+	GameState.reset_new_game()
+	var gold0 := GameState.gold
+	GameState.grant_start_resources()
+	_ok(GameState.gold == gold0 + 8000, "开局发放 8000 金", str(GameState.gold))
+	_ok(int(GameState.cargo.get(&"timber", 0)) == 300, "开局 300 木材")
+	_ok(int(GameState.cargo.get(&"iron_ore", 0)) == 120, "开局 120 铁矿")
+
 # ---------------- 1.1.4 试玩反馈修复 ----------------
 func _test_v114_fixes() -> void:
 	print("\n[1.1.4 修复]")
@@ -703,6 +754,7 @@ func _test_v112_parallel() -> void:
 	GameState.reset_new_game()
 	GameState.add_gold(50000)
 	GameState.building_upgrades.clear()
+	GameState.buildings.clear()   # 1.2.0 起开局自带仓库/总督府，此处清空以测建造
 	# 两座建筑同时开工
 	var a: Dictionary = GameState.building_start_upgrade(&"drydock")
 	var b2: Dictionary = GameState.building_start_upgrade(&"warehouse")
@@ -2509,14 +2561,17 @@ func _test_save_slots() -> void:
 	_ok(SaveManager.save(3), "写入存档位 3")
 	var meta: Dictionary = SaveManager.slot_meta(3)
 	_ok(bool(meta.get("exists", false)), "元数据可读")
-	_ok(int(meta.get("gold", 0)) == 500 + 4321, "元数据金币正确", "实得 %d" % int(meta.get("gold", 0)))
+	var expect_gold := GameState.START_GOLD + int(GameState.START_RES["gold"]) + 4321
+	_ok(int(meta.get("gold", 0)) == expect_gold, "元数据金币正确",
+		"实得 %d / 期望 %d" % [int(meta.get("gold", 0)), expect_gold])
 	_ok(int(meta.get("level", 0)) == 7, "元数据等级正确")
 	_ok(int(meta.get("map", 0)) == 4, "元数据地图正确")
 	_ok(not bool(SaveManager.slot_meta(4).get("exists", false)), "空槽位显示为空")
 	_ok(SaveManager.all_slot_ids().size() == 6, "共 6 个槽位（1 自动 + 5 手动）")
 	GameState.reset_new_game()
 	_ok(SaveManager.load_slot(3), "读取存档位 3")
-	_ok(GameState.gold == 500 + 4321, "读档金币还原")
+	_ok(GameState.gold == GameState.START_GOLD + int(GameState.START_RES["gold"]) + 4321,
+		"读档金币还原", str(GameState.gold))
 	_ok(SaveManager.auto_save(), "自动存档可写")
 	_ok(bool(SaveManager.slot_meta(SaveManager.AUTO_SLOT).get("exists", false)), "自动槽位有元数据")
 	SaveManager.delete_slot(3)
@@ -2650,7 +2705,8 @@ func _test_save_roundtrip() -> void:
 	GameState.reset_new_game()
 	var ok2 := SaveManager.load_slot(9)
 	_ok(ok2, "读取存档位 9")
-	_ok(GameState.gold == 500 + 1234, "金币还原", "gold=%d" % GameState.gold)
+	_ok(GameState.gold == GameState.START_GOLD + int(GameState.START_RES["gold"]) + 1234,
+		"金币还原", "gold=%d" % GameState.gold)
 	_ok(int(GameState.cargo.get(&"rum", 0)) == 7, "货物还原")
 	_ok(is_equal_approx(GameState.hull_hp, 321.0), "船体还原")
 	GameState.reset_new_game()
