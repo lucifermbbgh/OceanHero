@@ -69,10 +69,30 @@ func _draw() -> void:
 	# 岛屿
 	draw_circle(Vector2(0, 120), 420.0, Color(0.30, 0.34, 0.20))
 	draw_arc(Vector2(0, 120), 420.0, 0, TAU, 40, Color(0.45, 0.50, 0.30), 4.0)
-	# 总督府 / 码头 / 船坞 三块建筑
-	_building(Vector2(-40, -180), Vector2(130, 84), Color(0.55, 0.45, 0.30), "总督府")
-	_building(Vector2(190, -110), Vector2(96, 64), Color(0.45, 0.40, 0.32), "船坞")
-	_building(Vector2(60, 160), Vector2(110, 60), Color(0.50, 0.42, 0.28), "市场")
+	# 建筑：数据驱动（只画已建成的，位置来自 TownLayout 槽位）
+	var tp = load("res://scripts/ui/town_panel.gd")
+	var layout: Resource = tp.layout_for(GameState.home_port_tier)
+	if layout != null:
+		for slot in layout.slots:
+			var sid := String(slot.get("id", ""))
+			var bdef: Resource = null
+			for cand in tp.buildings_for_tier(GameState.home_port_tier):
+				if String(cand.slot_id) == sid:
+					bdef = cand
+					break
+			if bdef == null:
+				continue
+			if GameState.building_level(StringName(String(bdef.id))) <= 0:
+				continue
+			# 布局坐标（1600×900 画布）映射到城镇世界坐标
+			var sx := float(slot.get("x", 0.0))
+			var sy := float(slot.get("y", 0.0))
+			var sw := float(slot.get("w", 220.0))
+			var sh := float(slot.get("h", 140.0))
+			var world := Vector2((sx / 1600.0 - 0.5) * 760.0, (sy / 900.0 - 0.5) * 520.0 + 120.0)
+			var size := Vector2(sw * 0.42, sh * 0.42)
+			var col := Color(0.55, 0.45, 0.30) if String(bdef.category) == "民生" else Color(0.45, 0.42, 0.34)
+			_building(world, size, col, String(bdef.display_name))
 
 func _building(center: Vector2, size: Vector2, col: Color, label: String) -> void:
 	draw_rect(Rect2(center - size * 0.5, size), col)
@@ -1537,6 +1557,7 @@ func _start_parallel_upgrade(bid: StringName) -> void:
 		_log("开始升级，工期 2 周")
 		_rebuild_build()
 		_refresh()
+		queue_redraw()
 	else:
 		_log(String(r.get("reason", "升级失败")))
 
@@ -2314,59 +2335,50 @@ func _rebuild_construct() -> void:
 	for c in construct_list.get_children():
 		c.queue_free()
 	var tier := GameState.home_port_tier
-	var prefix := "翡翠"
-	var next_tier := mini(3, tier + 1)
-	_yard_title_to(construct_list, "建造 · %s → %s" % [
-		GameState.town_name(prefix, tier), GameState.town_name(prefix, next_tier)])
-	if tier >= 3:
-		construct_list.add_child(_lbl("　已是最高等级（港城）", 500, Color(0.75, 0.85, 0.7)))
-		return
-	var prog: Dictionary = GameState.build_progress("jadehaven", tier)
-	var need: Dictionary = prog["need"]
-	var have: Dictionary = prog["have"]
+	var tp = load("res://scripts/ui/town_panel.gd")
+	_yard_title_to(construct_list, "建造 · %s（现金 %d）" % [
+		GameState.town_name("翡翠", tier), GameState.gold])
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 0)
 	construct_list.add_child(head)
-	for spec in [["项目", 200], ["需求", 140], ["船上", 140], ["仓库", 140], ["已提交", 140], ["操作", 160]]:
+	for spec in [["建筑", 180], ["分类", 100], ["等级", 90], ["花费", 300], ["状态", 140], ["操作", 140]]:
 		head.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
-	for m in need.keys():
-		var mat := String(m)
+	for bdef in tp.buildings_for_tier(tier):
+		var bid := StringName(String(bdef.id))
+		var lv := GameState.building_level(bid)
+		var maxlv := int(bdef.max_level)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 0)
 		construct_list.add_child(row)
-		var nm := "金币" if mat == "gold" else mat
-		if mat != "gold":
-			var cd: Resource = DataRegistry.get_commodity(StringName(mat))
-			if cd != null:
-				nm = String(cd.display_name)
-		var in_ship := 0
-		var in_wh := 0
-		if mat == "gold":
-			in_ship = GameState.gold
-			in_wh = GameState.bank_deposited()
-		else:
-			in_ship = int(GameState.cargo.get(StringName(mat), 0))
-			in_wh = int(GameState.warehouse.get(StringName(mat), 0))
-		row.add_child(_cell_box(nm, 200))
-		row.add_child(_cell_box(str(int(need[m])), 140, Color(0.95, 0.9, 0.55)))
-		row.add_child(_cell_box(str(in_ship), 140))
-		row.add_child(_cell_box(str(in_wh), 140))
-		row.add_child(_cell_box(str(int(have.get(m, 0))), 140, Color(0.6, 0.85, 0.7)))
-		var btn_box := PanelContainer.new()
-		btn_box.custom_minimum_size = Vector2(160, 30)
-		var sub := Button.new()
-		sub.text = "提交"
-		sub.custom_minimum_size = Vector2(120, 26)
-		var mv := String(mat)
-		var need_v := int(need[m])
-		sub.pressed.connect(func(): _open_submit(mv, need_v, in_ship, in_wh))
-		btn_box.add_child(sub)
-		row.add_child(btn_box)
-	var ready := bool(prog["ready"])
+		row.add_child(_cell_box(String(bdef.display_name), 180))
+		row.add_child(_cell_box(String(bdef.category), 100))
+		row.add_child(_cell_box("Lv%d/%d" % [lv, maxlv], 90, Color(0.95, 0.9, 0.55)))
+		var cost_txt := "—"
+		var can := false
+		if lv < maxlv:
+			var cost: Dictionary = bdef.cost_for(lv + 1)
+			cost_txt = "%d 金 / 木 %d / 铁 %d" % [int(cost.gold), int(cost.timber), int(cost.iron)]
+			can = GameState.gold >= int(cost.gold)
+		row.add_child(_cell_box(cost_txt, 300))
+		var st := "已建成" if lv > 0 else "未建"
+		if GameState.building_upgrades.has(bid):
+			st = "升级中"
+		row.add_child(_cell_box(st, 140, Color(0.6, 0.85, 0.7) if lv > 0 else Color(0.8, 0.75, 0.6)))
+		var op := PanelContainer.new()
+		op.custom_minimum_size = Vector2(140, 30)
+		var btn := Button.new()
+		btn.text = "升级" if lv > 0 else "建造"
+		btn.custom_minimum_size = Vector2(100, 26)
+		btn.disabled = (lv >= maxlv) or GameState.building_upgrades.has(bid) or not can
+		var bidv: StringName = bid
+		btn.pressed.connect(func(): _start_parallel_upgrade(bidv))
+		op.add_child(btn)
+		row.add_child(op)
+	construct_list.add_child(_lbl("　说明：建造消耗金币与材料；港口升级（港村→港镇）在下方按钮", 700, Color(0.66, 0.72, 0.7)))
 	var up := Button.new()
-	up.text = "确认升级"
-	up.custom_minimum_size = Vector2(180, 34)
-	up.disabled = not ready
+	up.text = "港口升级 → %s" % GameState.town_suffix(mini(3, tier + 1))
+	up.custom_minimum_size = Vector2(200, 34)
+	up.disabled = tier >= 3
 	up.pressed.connect(func(): _do_build_upgrade())
 	construct_list.add_child(up)
 
