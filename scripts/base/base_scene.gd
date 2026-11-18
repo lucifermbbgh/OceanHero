@@ -1409,7 +1409,7 @@ func _rebuild_build() -> void:
 	var parallel_row := HBoxContainer.new()
 	parallel_row.add_theme_constant_override("separation", 8)
 	build_list.add_child(parallel_row)
-	for bid2 in [&"drydock", &"warehouse", &"exchange"]:
+	for bid2 in [&"drydock", &"warehouse", &"sawmill"]:
 		var bd2: Resource = DataRegistry.get_building(bid2)
 		if bd2 == null:
 			continue
@@ -2537,13 +2537,29 @@ func _toggle_bank() -> void:
 func _rebuild_bank() -> void:
 	_rebuild_bank_rows()
 
+## 银行面板：顶部数字原地更新，列表部分重建（1.2.15 方案 A）
+var bank_cash_label: Label = null
+var bank_deposit_label: Label = null
+var bank_loan_label: Label = null
+var bank_list_box: VBoxContainer = null
+
 func _rebuild_bank_rows() -> void:
-	# 先彻底摘除旧节点：queue_free 是延迟删除，紧接着 add_child 会叠出多套内容
+	# 首次构建整块骨架
+	if bank_cash_label == null or not is_instance_valid(bank_cash_label):
+		_build_bank_skeleton()
+	_refresh_bank_numbers()
+	_rebuild_bank_body()
+
+func _build_bank_skeleton() -> void:
 	for c in bank_list.get_children():
 		bank_list.remove_child(c)
 		c.queue_free()
-	_yard_title_to(bank_list, "银行 —— 现金 %d · 全城通存通取" % GameState.gold)
-	_yard_title_to(bank_list, "存款 %d（周息 0.1%%，每月结算）" % GameState.bank_deposited())
+	bank_cash_label = Label.new()
+	bank_cash_label.add_theme_font_size_override("font_size", 16)
+	bank_list.add_child(bank_cash_label)
+	bank_deposit_label = Label.new()
+	bank_deposit_label.add_theme_font_size_override("font_size", 15)
+	bank_list.add_child(bank_deposit_label)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 8)
 	bank_list.add_child(hb)
@@ -2551,26 +2567,45 @@ func _rebuild_bank_rows() -> void:
 		var db := Button.new()
 		db.text = "存入 %d" % amt
 		db.custom_minimum_size = Vector2(110, 30)
-		db.disabled = GameState.gold < amt
 		var av: int = amt
 		db.pressed.connect(func(): _bank_deposit(av))
 		hb.add_child(db)
+		db.name = "Deposit%d" % amt
 	var wb := Button.new()
 	wb.text = "全部取出"
 	wb.custom_minimum_size = Vector2(110, 30)
-	wb.disabled = GameState.bank_deposited() <= 0
 	wb.pressed.connect(func(): _bank_withdraw_all())
 	hb.add_child(wb)
+	bank_loan_label = Label.new()
+	bank_loan_label.add_theme_font_size_override("font_size", 15)
+	bank_list.add_child(bank_loan_label)
+	bank_list_box = VBoxContainer.new()
+	bank_list_box.add_theme_constant_override("separation", 4)
+	bank_list.add_child(bank_list_box)
 
-	_yard_title_to(bank_list, "未还贷款 %d / %d 笔 · 未还本息 %d" % [
-		GameState.loan_count(), int(GameState.MAX_LOANS), GameState.loan_exposure()])
+## 只改文字，不重建控件
+func _refresh_bank_numbers() -> void:
+	if bank_cash_label == null:
+		return
+	bank_cash_label.text = "银行 —— 现金 %d · 全城通存通取" % GameState.gold
+	bank_deposit_label.text = "存款 %d（周息 0.1%%，每月结算）" % GameState.bank_deposited()
+	bank_loan_label.text = "未还贷款 %d / %d 笔 · 未还本息 %d" % [
+		GameState.loan_count(), int(GameState.MAX_LOANS), GameState.loan_exposure()]
+
+## 动态部分（贷款列表 + 可选贷款档位）才重建
+func _rebuild_bank_body() -> void:
+	if bank_list_box == null:
+		return
+	for c in bank_list_box.get_children():
+		bank_list_box.remove_child(c)
+		c.queue_free()
 	if GameState.loans.is_empty():
-		bank_list.add_child(_lbl("　（没有未还贷款）", 400, Color(0.5, 0.55, 0.55)))
+		bank_list_box.add_child(_lbl("　（没有未还贷款）", 400, Color(0.5, 0.55, 0.55)))
 	for i in range(GameState.loans.size()):
 		var l: Dictionary = GameState.loans[i]
 		var lhb := HBoxContainer.new()
 		lhb.add_theme_constant_override("separation", 10)
-		bank_list.add_child(lhb)
+		bank_list_box.add_child(lhb)
 		lhb.add_child(_lbl("贷款 %d：%d 金" % [i + 1, int(l.get("amount", 0))], 200))
 		lhb.add_child(_lbl("剩 %d 周 · 下次付息 %d" % [int(l.get("left", 0)),
 			GameState.loan_monthly_due(l)], 220, Color(0.9, 0.82, 0.45)))
@@ -2585,14 +2620,14 @@ func _rebuild_bank_rows() -> void:
 		ab.text = "全部还清"
 		ab.custom_minimum_size = Vector2(120, 30)
 		ab.pressed.connect(func(): _bank_repay())
-		bank_list.add_child(ab)
-
-	_yard_title_to(bank_list, "新增贷款（本息总额不得超过存款 %d）" % GameState.bank_deposited())
+		bank_list_box.add_child(ab)
+	bank_list_box.add_child(_lbl("新增贷款（本息总额不得超过存款 %d）" % GameState.bank_deposited(),
+		600, Color(0.85, 0.82, 0.6)))
 	var term_names := {12: "一季", 26: "半年", 52: "一年"}
 	for amount in GameState.LOAN_TIERS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		bank_list.add_child(row)
+		bank_list_box.add_child(row)
 		row.add_child(_lbl("%d 金" % int(amount), 110))
 		for weeks in GameState.LOAN_TERMS[amount]:
 			var wk := int(weeks)
@@ -2607,6 +2642,7 @@ func _rebuild_bank_rows() -> void:
 			row.add_child(bb)
 
 func _bank_deposit(amount: int) -> void:
+
 	if GameState.bank_deposit_gold(amount):
 		_log("存入 %d 金" % amount)
 		_rebuild_bank_rows()

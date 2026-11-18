@@ -547,13 +547,6 @@ func bounty_active() -> bool:
 
 # ---------------- 交易所 ----------------
 
-func exchange_level() -> int:
-	return building_level(&"exchange")
-
-## 标签页解锁：行情 1 / 订单 2 / 大宗 3 / 期货 4
-func exchange_tab_unlocked(tab: int) -> bool:
-	return exchange_level() >= tab + 1
-
 func refresh_orders() -> void:
 	orders.clear()
 	var ports: Array = DataRegistry.ports.keys()
@@ -668,8 +661,9 @@ func assigned_wages() -> int:
 func repair_discount() -> float:
 	return 0.06 * float(building_level(&"drydock"))
 
+## 卖出加成（1.2.16 起交易所建筑已删除，此加成改为固定 0）
 func sell_bonus() -> float:
-	return 0.03 * float(building_level(&"exchange"))
+	return 0.0
 
 func cannon_class_cap() -> int:
 	return 3 + 2 * building_level(&"foundry")
@@ -1375,7 +1369,7 @@ const ISLAND_BUILDING_PLAN := {
 	1: {&"governor": 1, &"warehouse": 1, &"tavern": 1},
 	2: {&"governor": 2, &"warehouse": 2, &"tavern": 2, &"sailmaker": 1, &"watchtower": 1},
 	3: {&"governor": 3, &"warehouse": 3, &"tavern": 3, &"sailmaker": 2,
-		&"watchtower": 2, &"drydock": 2, &"foundry": 2, &"exchange": 3},
+		&"watchtower": 2, &"drydock": 2, &"foundry": 2},
 }
 
 ## 确保该岛屿有建筑数据（首次访问按等级方案下发）
@@ -1398,7 +1392,7 @@ func visit_has(service: String) -> bool:
 	match service:
 		"shipyard", "yard":
 			return tier >= 2
-		"exchange", "reputation", "bank", "black":
+		"reputation", "bank", "black":
 			return tier >= 3
 		"build":
 			return is_home_visit()

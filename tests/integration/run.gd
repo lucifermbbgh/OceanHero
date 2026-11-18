@@ -378,7 +378,8 @@ func _test_crew() -> void:
 func _test_buildings() -> void:
 	print("\n[母港建设]")
 	GameState.reset_new_game()
-	_ok(DataRegistry.buildings.size() == 8, "8 座建筑", "实得 %d" % DataRegistry.buildings.size())
+	_ok(DataRegistry.buildings.size() == 7, "7 座建筑（交易所已删除）",
+		"实得 %d" % DataRegistry.buildings.size())
 	# 1.2.0 起母港开局自带仓库与总督府；此处显式清空以测试建造流程
 	GameState.buildings.clear()
 	_ok(GameState.building_level(&"warehouse") == 0, "清空后建筑等级 0")
@@ -416,7 +417,7 @@ func _test_buildings() -> void:
 	GameState.buildings[&"drydock"] = 2
 	_ok(_near_r(GameState.repair_discount(), 0.12), "2 级船坞修理费 -12%")
 	GameState.buildings[&"exchange"] = 3
-	_ok(_near_r(GameState.sell_bonus(), 0.09), "3 级交易所卖出 +9%")
+	_ok(_near_r(GameState.sell_bonus(), 0.0), "交易所建筑已删除，卖出加成为 0")
 	GameState.buildings[&"foundry"] = 2
 	_ok(GameState.cannon_class_cap() == 7, "2 级铸造厂可购 7 级以下火炮", "实得 %d" % GameState.cannon_class_cap())
 	GameState.buildings[&"sailmaker"] = 1
@@ -666,7 +667,7 @@ func _test_v1213_dup() -> void:
 	await _frames(1)
 	var n0: int = s.bank_list.get_child_count()
 	_ok(n0 > 0, "银行面板有内容", str(n0))
-	# 连续操作三次，行数不应累加
+	# 1.2.15：数字原地更新，骨架节点数恒定
 	s._bank_deposit(1000)
 	await _frames(1)
 	var n1: int = s.bank_list.get_child_count()
@@ -678,6 +679,9 @@ func _test_v1213_dup() -> void:
 	var n3: int = s.bank_list.get_child_count()
 	_ok(n1 == n0 and n2 == n0 and n3 == n0, "多次存款不叠加内容",
 		"%d/%d/%d/%d" % [n0, n1, n2, n3])
+	_ok(s.bank_deposit_label != null and s.bank_deposit_label.text.contains("3000"),
+		"存款数字原地刷新", s.bank_deposit_label.text if s.bank_deposit_label != null else "null")
+	_ok(s.bank_cash_label != null and s.bank_cash_label.text.contains("现金"), "现金标签存在")
 	s._close_all_panels()
 	await _frames(1)
 	# 黑市、仓库同样验证一次
@@ -865,7 +869,7 @@ func _test_v124_125() -> void:
 	GameState.register_port("m3_c", GameState.town_name("青礁", 3), 0, 3)
 	GameState.visit_port_id = &"m3_c"
 	GameState.ensure_island_buildings(&"m3_c")
-	_ok(GameState.port_buildings["m3_c"].size() == 8, "港城岛初始 8 座",
+	_ok(GameState.port_buildings["m3_c"].size() == 7, "港城岛初始 7 座",
 		str(GameState.port_buildings["m3_c"].size()))
 
 	# 1.2.5：等级门禁
@@ -875,7 +879,7 @@ func _test_v124_125() -> void:
 	_ok(GameState.visit_has("black"), "港城有黑市")
 	_ok(not GameState.visit_has("build"), "非母港不能建造")
 	GameState.visit_port_id = &"m1_v"
-	_ok(not GameState.visit_has("exchange"), "港村无交易所")
+	_ok(not GameState.visit_has("bank"), "港村无银行服务")
 	_ok(not GameState.visit_has("yard"), "港村无船厂")
 	GameState.visit_port_id = &"m2_t"
 	_ok(GameState.visit_has("yard"), "港镇有船厂")

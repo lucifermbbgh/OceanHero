@@ -3,7 +3,6 @@ res://data/ammo/grape.tres
 res://data/ammo/solid.tres
 res://data/balance/balance_config.tres
 res://data/buildings/drydock.tres
-res://data/buildings/exchange.tres
 res://data/buildings/foundry.tres
 res://data/buildings/governor.tres
 res://data/buildings/sailmaker.tres
