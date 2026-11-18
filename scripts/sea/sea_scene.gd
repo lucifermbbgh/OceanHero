@@ -1970,6 +1970,7 @@ func _toggle_island_port() -> void:
 	# 1.2.2：停泊即进入城镇（复用母港面板）
 	var key := GameState.island_key(map_index, int(idx))
 	GameState.visit_port_id = StringName(key)
+	GameState.ensure_island_buildings(StringName(key))
 	GameState.last_sea_map = map_index
 	SceneRouter.goto(&"base")
 

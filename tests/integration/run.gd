@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v123_port_buildings()
 	await _test_v122_town()
 	await _test_v121_gate()
 	await _test_v120_component()
@@ -645,6 +646,27 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.3 建筑按港口隔离 ----------------
+func _test_v123_port_buildings() -> void:
+	print("\n[1.2.3 建筑隔离]")
+	GameState.reset_new_game()
+	var home_gov: int = GameState.building_level(&"governor")
+	_ok(home_gov >= 1, "母港总督府已建", str(home_gov))
+	# 切到岛屿并初始化
+	GameState.register_port("m1_island0", GameState.town_name("望潮", 2), 0, 2)
+	GameState.visit_port_id = &"m1_island0"
+	GameState.ensure_island_buildings(&"m1_island0")
+	var isl_gov: int = GameState.building_level(&"governor")
+	_ok(isl_gov >= 1, "岛屿总督府存在", str(isl_gov))
+	# 提升岛屿某建筑，不应影响母港
+	GameState.buildings[&"tavern"] = 3
+	GameState.visit_port_id = &"jadehaven"
+	_ok(GameState.building_level(&"tavern") == 0, "岛屿升级不影响母港酒馆",
+		str(GameState.building_level(&"tavern")))
+	# 两港分桶独立
+	_ok(GameState.port_buildings.has("m1_island0"), "岛屿有独立分桶")
+	_ok(GameState.port_buildings.has("jadehaven"), "母港有独立分桶")
 
 # ---------------- 1.2.2 港口上下文 ----------------
 func _test_v122_town() -> void:

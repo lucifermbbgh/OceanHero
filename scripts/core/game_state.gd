@@ -34,7 +34,8 @@ var cannon_id: StringName = &"pound3_light"
 var cannons_owned: Array = [&"pound3_light"]
 
 # --- 母港建设 ---
-var buildings: Dictionary = {}      # id(StringName) -> level
+var buildings: Dictionary = {}      # 当前港口视图：id(StringName) -> level
+var port_buildings: Dictionary = {}  # {port_key: {id: level}}（1.2.3 分桶存储）
 var resources: Dictionary = {"timber": 0, "iron": 0, "grain": 0, "saltpeter": 0}
 var build_queue: Array = []         # [{id, target, weeks_left}]
 
@@ -126,6 +127,17 @@ func record_boss_defeat(id: StringName, map_index: int) -> bool:
 			cleared_maps.append(map_index)
 			return true
 	return false
+
+## 切到指定港口的建筑视图
+func _load_buildings_for(pid: StringName) -> void:
+	var key := String(pid)
+	if not port_buildings.has(key):
+		port_buildings[key] = {}
+	buildings = port_buildings[key]
+
+## 保存当前视图回分桶
+func _save_buildings_view() -> void:
+	port_buildings[String(visit_port_id)] = buildings
 
 func building_level(id: StringName) -> int:
 	return int(buildings.get(id, 0))
@@ -1179,7 +1191,13 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 # ---------------- 港口上下文（1.2.2） ----------------
 
 ## 当前访问的港口（母港为 jadehaven）
-var visit_port_id: StringName = &"jadehaven"
+var visit_port_id: StringName = &"jadehaven" :
+	set(v):
+		if visit_port_id == v:
+			return
+		_save_buildings_view()
+		visit_port_id = v
+		_load_buildings_for(v)
 ## 离港后返回的海图
 var last_sea_map: int = 0
 
@@ -1201,6 +1219,19 @@ func visit_port_tier() -> int:
 		return home_port_tier
 	var meta2: Dictionary = port_registry.get(String(visit_port_id), {})
 	return int(meta2.get("tier", 1))
+
+## 确保该岛屿有建筑数据（首次访问按其等级下发全套）
+func ensure_island_buildings(pid: StringName) -> void:
+	var key := String(pid)
+	if port_buildings.has(key) and not port_buildings[key].is_empty():
+		return
+	var tier := visit_port_tier() if String(visit_port_id) == key else int(port_registry.get(key, {}).get("tier", 1))
+	var dict: Dictionary = {}
+	for b in TownPanelLib.buildings_for_tier(tier):
+		dict[StringName(String(b.id))] = maxi(1, tier - 1)
+	port_buildings[key] = dict
+	if String(visit_port_id) == key:
+		buildings = dict
 
 ## 当前港口库存上限（按等级）
 const PORT_STOCK_BY_TIER := {1: 40, 2: 90, 3: 160}
@@ -2103,6 +2134,7 @@ func to_dict() -> Dictionary:
 		"base": {
 			"port_tier": home_port_tier,
 			"buildings": _buildings_to_dict(), "resources": resources.duplicate(),
+			"port_buildings": port_buildings.duplicate(true),
 			"queue": _queue_to_array(),
 		},
 		"quests": {"available": _orders_to_array(quests_available), "active": _orders_to_array(quests_active)},
@@ -2318,6 +2350,10 @@ func from_dict(d: Dictionary) -> void:
 	var bs: Dictionary = d.get("base", {})
 	# 旧存档没有该字段 → 按 Lv3 兼容，避免老玩家被降级
 	home_port_tier = clampi(int(bs.get("port_tier", 3)), 1, 3)
+	port_buildings.clear()
+	var pb0: Dictionary = d.get("port_buildings", {})
+	for pk0 in pb0.keys():
+		port_buildings[String(pk0)] = pb0[pk0]
 	buildings.clear()
 	var bld: Dictionary = bs.get("buildings", {})
 	for k in bld.keys():
@@ -2433,6 +2469,10 @@ func reset_new_game() -> void:
 	crew_assigned.clear()
 	tavern_pool.clear()
 	buildings.clear()
+	# 1.2.3：建筑按港口分桶
+	port_buildings.clear()
+	visit_port_id = &"jadehaven"
+	buildings = {}
 	# 1.2.0：母港开局只带总督府与仓库（启动资源在函数末尾发放，避免被清空）
 	resources = {"timber": 0, "iron": 0, "grain": 0, "saltpeter": 0}
 	build_queue.clear()
