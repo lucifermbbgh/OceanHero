@@ -101,7 +101,34 @@ func stats() -> Dictionary:
 	var d := ship_def()
 	if d == null:
 		return {"hull_max": 400.0, "cargo_capacity": 200}
-	return StatsLib.compute(d, ship_variant, equipped, assigned_crews())
+	var st: Dictionary = StatsLib.compute(d, ship_variant, equipped, assigned_crews())
+	# ---- 1.2.10：把「已获得但未生效」的成长接入数值 ----
+	# 1) 船员职级：总职级每级 +2% 装填、+1% 命中、+1 接舷
+	var rank_sum := 0
+	for c in assigned_crews():
+		if c != null:
+			rank_sum += crew_rank_of(c.crew_id)
+	if rank_sum > 0:
+		st["reload_bonus"] = float(st.get("reload_bonus", 0.0)) + 0.02 * float(rank_sum)
+		st["accuracy_bonus"] = float(st.get("accuracy_bonus", 0.0)) + 0.01 * float(rank_sum)
+		st["boarding"] = int(st.get("boarding", 0)) + rank_sum
+	# 2) 装备强化：每级 +1% 航速/转向、+2 装甲
+	var up_sum := 0
+	for slot_id in equipped.keys():
+		up_sum += gear_level_of(StringName(String(equipped[slot_id])))
+	if up_sum > 0:
+		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + 0.01 * float(up_sum))
+		st["turn_rate"] = float(st.get("turn_rate", 0.0)) * (1.0 + 0.01 * float(up_sum))
+		st["armor"] = int(st.get("armor", 0)) + 2 * up_sum
+	# 3) 火炮位改装：每级 +2 门
+	var gun_add := ship_cannon_bonus()
+	if gun_add > 0:
+		st["guns_per_side"] = int(st.get("guns_per_side", 1)) + gun_add
+	# 4) 帆具改装：每级 +6% 航速
+	var sail_add := ship_sail_bonus()
+	if sail_add > 0.0:
+		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + sail_add)
+	return st
 
 # ---------------- 母港建设 ----------------
 

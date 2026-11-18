@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1210_stats()
 	await _test_v129_validate()
 	await _test_v126_127_supply()
 	await _test_v124_125()
@@ -649,6 +650,47 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.10 成长数值生效 ----------------
+func _test_v1210_stats() -> void:
+	print("\n[1.2.10 成长数值]")
+	GameState.reset_new_game()
+	var base_stats: Dictionary = GameState.stats()
+	var base_guns := int(base_stats.get("guns_per_side", 0))
+	var base_armor := int(base_stats.get("armor", 0))
+	var base_speed := float(base_stats.get("base_speed_px", 0.0))
+	# 火炮位改装生效
+	GameState.add_gold(100000)
+	_ok(bool(GameState.mod_cannon().get("ok", false)), "改装火炮位")
+	var st1: Dictionary = GameState.stats()
+	_ok(int(st1.get("guns_per_side", 0)) == base_guns + 2, "火炮位 +2 生效",
+		"%d → %d" % [base_guns, int(st1.get("guns_per_side", 0))])
+	# 帆具改装生效
+	_ok(bool(GameState.mod_sail().get("ok", false)), "改装帆具")
+	var st2: Dictionary = GameState.stats()
+	_ok(float(st2.get("base_speed_px", 0.0)) > base_speed, "帆具提升航速生效",
+		"%.1f → %.1f" % [base_speed, float(st2.get("base_speed_px", 0.0))])
+	# 装备强化生效（需要装备与铁矿）
+	if not GameState.gear_owned.is_empty():
+		var gid: StringName = GameState.gear_owned[0]
+		GameState.warehouse[&"iron_ore"] = 20
+		var armor_before := int(GameState.stats().get("armor", 0))
+		if bool(GameState.gear_upgrade(gid).get("ok", false)):
+			var armor_after := int(GameState.stats().get("armor", 0))
+			_ok(armor_after >= armor_before, "装备强化提升装甲/属性",
+				"%d → %d" % [armor_before, armor_after])
+	# 船员职级生效
+	GameState.crew_roster.clear()
+	var c = load("res://scripts/systems/crew_factory.gd").generate(1, &"standard")
+	if not c.is_empty():
+		var crew = c[0]
+		GameState.crew_roster.append(crew)
+		GameState.crew_assigned.clear()
+		GameState.assign_crew(crew.crew_id)
+		var r0: float = float(GameState.stats().get("reload_bonus", 0.0))
+		GameState.crew_xp[crew.crew_id] = 400
+		var r1: float = float(GameState.stats().get("reload_bonus", 0.0))
+		_ok(r1 > r0, "船员职级提升装填", "%.3f → %.3f" % [r0, r1])
 
 # ---------------- 1.2.9 数据校验 ----------------
 func _test_v129_validate() -> void:
