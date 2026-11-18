@@ -590,7 +590,7 @@ func _rebuild_market() -> void:
 	for c in market_list.get_children():
 		c.queue_free()
 	var port: Resource = DataRegistry.get_port(_pid())
-	var max_stock := int(port.max_stock) if port != null else 800
+	var max_stock := GameState.visit_port_max_stock()
 	var head := Label.new()
 	head.text = "市场行情（每周库存会向满值回归）"
 	head.add_theme_font_size_override("font_size", 18)
@@ -913,7 +913,7 @@ func _add_market_metrics(pk: String) -> void:
 		var c: Resource = DataRegistry.get_commodity(cid)
 		if c == null:
 			continue
-		var max_stock := 400
+		var max_stock := GameState.visit_port_max_stock()
 		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
 		var ratio := clampf(float(stock) / float(max_stock), 0.0, 1.0)
 		parts.append("%s 弹性 %.2f（库存 %d%%）" % [String(c.display_name), em.piecewise_elasticity(ratio),
@@ -1020,7 +1020,7 @@ func _buy(cid: StringName, amount: int, price: int) -> void:
 		_log("仓库空间不足" if to_wh else "货舱空间不足")
 		return
 	var port: Resource = DataRegistry.get_port(_pid())
-	var stock := GameState.ensure_stock(_pid(), cid, int(port.max_stock))
+	var stock := GameState.ensure_stock(_pid(), cid, GameState.visit_port_max_stock())
 	if stock < amount:
 		_log("该港库存不足")
 		return
@@ -1044,7 +1044,7 @@ func _sell(cid: StringName, amount: int, price: int) -> void:
 		return
 	var c: Resource = DataRegistry.get_commodity(cid)
 	var port: Resource = DataRegistry.get_port(_pid())
-	var stock := GameState.ensure_stock(_pid(), cid, int(port.max_stock))
+	var stock := GameState.ensure_stock(_pid(), cid, GameState.visit_port_max_stock())
 	if from_wh:
 		GameState.warehouse_remove(cid, amount)
 	else:
@@ -1483,7 +1483,7 @@ func _ex_bulk() -> void:
 		return
 	_yard_title_to(ex_list, "大宗交易（满 100 单位享 5% 折扣）")
 	var port: Resource = DataRegistry.get_port(_pid())
-	var max_stock := int(port.max_stock)
+	var max_stock := GameState.visit_port_max_stock()
 	for cid in DataRegistry.commodities.keys():
 		var c: Resource = DataRegistry.get_commodity(cid)
 		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
@@ -1521,7 +1521,7 @@ func _ex_futures() -> void:
 		return
 	_yard_title_to(ex_list, "期货（付 20% 定金锁定本周价格，1 周内提货）")
 	var port: Resource = DataRegistry.get_port(_pid())
-	var max_stock := int(port.max_stock)
+	var max_stock := GameState.visit_port_max_stock()
 	for cid in DataRegistry.commodities.keys():
 		var c: Resource = DataRegistry.get_commodity(cid)
 		var stock := GameState.ensure_stock(_pid(), cid, max_stock)
