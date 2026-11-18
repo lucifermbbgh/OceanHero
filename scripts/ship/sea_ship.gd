@@ -266,7 +266,10 @@ func _update_steering(delta: float) -> void:
 	# turn_rate 数据里是「度/秒」，这里必须转成弧度，否则转向快 57 倍（船头会疯狂抽搐）
 	heading += clampf(desired_turn, -1.0, 1.0) * deg_to_rad(turn_rate) * turn_mult * delta
 	rotation = heading
-	var target_speed := base_speed_px * speed_mult * clampf(desired_throttle, 0.0, 1.0)
+	var mod_bonus := 1.0
+	if is_player and GameState != null:
+		mod_bonus = 1.0 + GameState.ship_sail_bonus()
+	var target_speed := base_speed_px * speed_mult * mod_bonus * clampf(desired_throttle, 0.0, 1.0)
 	# 岛屿软约束：斥力来自 sea_scene 每帧写入的 external_push
 	velocity = Vector2(target_speed, 0).rotated(heading) * terrain_slow + external_push
 	external_push = Vector2.ZERO

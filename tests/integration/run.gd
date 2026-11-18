@@ -731,6 +731,21 @@ func _test_v110_core() -> void:
 	var poor: Dictionary = GameState.gear_upgrade(gid)
 	_ok(not bool(poor.get("ok", true)), "金币不足时拒绝")
 
+	# 船只改装
+	GameState.reset_new_game()
+	GameState.add_gold(60000)
+	_ok(GameState.ship_sail_bonus() == 0.0, "初始无帆具加成")
+	var m1: Dictionary = GameState.mod_sail()
+	_ok(bool(m1.get("ok", false)), "可以改装帆具")
+	_ok(is_equal_approx(GameState.ship_sail_bonus(), 0.06), "一级帆具 +6% 航速",
+		str(GameState.ship_sail_bonus()))
+	var m2: Dictionary = GameState.mod_cannon()
+	_ok(bool(m2.get("ok", false)), "可以改装火炮位")
+	_ok(GameState.ship_cannon_bonus() == 2, "一级火炮位 +2")
+	GameState.mod_sail()
+	var m3: Dictionary = GameState.mod_sail()
+	_ok(not bool(m3.get("ok", true)), "帆具最多两级")
+
 	# 任务类型扩展
 	GameState.reset_new_game()
 	GameState.quests_available.clear()

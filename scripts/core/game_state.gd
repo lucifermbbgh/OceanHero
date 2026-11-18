@@ -1020,6 +1020,44 @@ func price_change_pct(port_key: String, cid: StringName) -> float:
 	var prev := float(price_drift.get(key + "|prev", cur))
 	return EconMath.change_pct(prev, cur)
 
+# ---------------- 船只改装（1.1） ----------------
+
+## 改装记录：{cannon_slots: int, sail_tier: int}
+var ship_mods: Dictionary = {"cannon_slots": 0, "sail_tier": 0}
+
+const MOD_CANNON_COST := [0, 8000, 20000]
+const MOD_SAIL_COST := [0, 6000, 15000]
+
+func ship_cannon_bonus() -> int:
+	return int(ship_mods.get("cannon_slots", 0)) * 2
+
+func ship_sail_bonus() -> float:
+	return float(ship_mods.get("sail_tier", 0)) * 0.06
+
+## 改装火炮位（提升可装炮数与射速）
+func mod_cannon() -> Dictionary:
+	var lv := int(ship_mods.get("cannon_slots", 0))
+	if lv >= 2:
+		return {"ok": false, "reason": "火炮位已满"}
+	var cost := int(MOD_CANNON_COST[lv + 1])
+	if gold < cost:
+		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
+	add_gold(-cost)
+	ship_mods["cannon_slots"] = lv + 1
+	return {"ok": true, "level": lv + 1, "cost": cost}
+
+## 改装帆具（提升航速）
+func mod_sail() -> Dictionary:
+	var lv := int(ship_mods.get("sail_tier", 0))
+	if lv >= 2:
+		return {"ok": false, "reason": "帆具已满"}
+	var cost := int(MOD_SAIL_COST[lv + 1])
+	if gold < cost:
+		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
+	add_gold(-cost)
+	ship_mods["sail_tier"] = lv + 1
+	return {"ok": true, "level": lv + 1, "cost": cost}
+
 # ---------------- 船员职级与装备强化（1.1） ----------------
 
 const CREW_RANKS := ["水手", "舵手", "炮长", "大副"]
@@ -1897,6 +1935,7 @@ func to_dict() -> Dictionary:
 		"port_registry": port_registry.duplicate(true),
 		"contraband": contraband.duplicate(),
 		"crew_xp": crew_xp.duplicate(),
+		"ship_mods": ship_mods.duplicate(),
 		"gear_level": gear_level.duplicate(),
 		"build_submitted": build_submitted.duplicate(true),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
@@ -2026,6 +2065,10 @@ func from_dict(d: Dictionary) -> void:
 	var cxp: Dictionary = d.get("crew_xp", {})
 	for k0 in cxp.keys():
 		crew_xp[StringName(k0)] = int(cxp[k0])
+	ship_mods = {"cannon_slots": 0, "sail_tier": 0}
+	var sm: Dictionary = d.get("ship_mods", {})
+	for k3 in sm.keys():
+		ship_mods[String(k3)] = int(sm[k3])
 	gear_level.clear()
 	var glv: Dictionary = d.get("gear_level", {})
 	for k1 in glv.keys():
