@@ -588,6 +588,7 @@ func _toggle_market_target(t: String) -> void:
 
 func _rebuild_market() -> void:
 	for c in market_list.get_children():
+		market_list.remove_child(c)
 		c.queue_free()
 	var port: Resource = DataRegistry.get_port(_pid())
 	var max_stock := GameState.visit_port_max_stock()
@@ -1105,6 +1106,7 @@ func _buy_license_legal() -> void:
 
 func _rebuild_rep() -> void:
 	for c in rep_list.get_children():
+		rep_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(rep_list, "声望与战功 —— 战功 %d · 通缉度 %d" % [GameState.commendation, GameState.notoriety()])
 
@@ -1221,6 +1223,7 @@ func _toggle_help() -> void:
 
 func _rebuild_help() -> void:
 	for c in help_list.get_children():
+		help_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(help_list, "帮助 —— 操作与机制")
 	var lines := [
@@ -1249,6 +1252,7 @@ func _show_victory_if_needed() -> void:
 		return
 	victory_shown = true
 	for c in victory_root.get_children():
+		victory_root.remove_child(c)
 		c.queue_free()
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 8)
@@ -1299,6 +1303,7 @@ func _cancel_quest(index: int) -> void:
 
 func _rebuild_quests() -> void:
 	for c in quest_list.get_children():
+		quest_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(quest_list, "任务板 —— 进行中 %d · 可接 %d · 通缉度 %d" % [
 		GameState.quests_active.size(), GameState.quests_available.size(), GameState.notoriety()])
@@ -1368,6 +1373,7 @@ func _toggle_exchange() -> void:
 
 func _rebuild_exchange() -> void:
 	for c in ex_list.get_children():
+		ex_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(ex_list, "交易所 Lv%d —— 金币 %d" % [GameState.exchange_level(), GameState.gold])
 
@@ -1604,6 +1610,7 @@ func _start_parallel_upgrade(bid: StringName) -> void:
 
 func _rebuild_build() -> void:
 	for c in build_list.get_children():
+		build_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(build_list, "基地建设 —— " + _res_line())
 	var prod: Dictionary = GameState.total_production()
@@ -1737,6 +1744,7 @@ func _toggle_tavern() -> void:
 
 func _rebuild_tavern() -> void:
 	for c in tavern_list.get_children():
+		tavern_list.remove_child(c)
 		c.queue_free()
 	var slots := GameState.crew_slots()
 	_yard_title_to(tavern_list, "酒馆 —— 上阵 %d/%d" % [GameState.crew_assigned.size(), slots])
@@ -1938,6 +1946,7 @@ func _bs_rows(cash: int, deposit: int, cargo: int, wh: int, gear: int, ship: int
 
 func _rebuild_overview() -> void:
 	for c in overview_list.get_children():
+		overview_list.remove_child(c)
 		c.queue_free()
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
@@ -2016,6 +2025,7 @@ func _close_goods() -> void:
 
 func _rebuild_goods() -> void:
 	for c in goods_list.get_children():
+		goods_list.remove_child(c)
 		c.queue_free()
 	var c: Resource = DataRegistry.get_commodity(goods_cid)
 	if c == null:
@@ -2223,6 +2233,7 @@ func _toggle_crew_panel() -> void:
 
 func _rebuild_crew_panel() -> void:
 	for c in crew_list.get_children():
+		crew_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(crew_list, "船员名单 —— 在岗 %d 人" % GameState.crew_roster.size())
 	var head := HBoxContainer.new()
@@ -2254,6 +2265,7 @@ func _toggle_gear() -> void:
 
 func _rebuild_gear() -> void:
 	for c in gear_list.get_children():
+		gear_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(gear_list, "装备强化与合成 —— 铁矿 %d" % int(GameState.warehouse.get(&"iron_ore", 0)))
 	var head := HBoxContainer.new()
@@ -2320,6 +2332,7 @@ func _toggle_mod() -> void:
 
 func _rebuild_mod() -> void:
 	for c in mod_list.get_children():
+		mod_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(mod_list, "船只改装 —— 现金 %d" % GameState.gold)
 	var head := HBoxContainer.new()
@@ -2382,6 +2395,7 @@ func _toggle_invest() -> void:
 
 func _rebuild_invest() -> void:
 	for c in invest_list.get_children():
+		invest_list.remove_child(c)
 		c.queue_free()
 	var key := String(GameState.visit_port_id)
 	var invested := int(GameState.island_investment.get(key, 0))
@@ -2439,6 +2453,7 @@ func _toggle_store() -> void:
 
 func _rebuild_store() -> void:
 	for c in store_list.get_children():
+		store_list.remove_child(c)
 		c.queue_free()
 	var cap_ship := GameState.cargo_capacity()
 	var cap_wh: int = GameState.warehouse_capacity()
@@ -2529,6 +2544,7 @@ func _toggle_construct() -> void:
 
 func _rebuild_construct() -> void:
 	for c in construct_list.get_children():
+		construct_list.remove_child(c)
 		c.queue_free()
 	var tier := GameState.home_port_tier
 	var tp = load("res://scripts/ui/town_panel.gd")
@@ -2726,6 +2742,7 @@ func _building_output_line(name: String, level: int, exponent: float) -> String:
 
 func _rebuild_finance() -> void:
 	for c in finance_list.get_children():
+		finance_list.remove_child(c)
 		c.queue_free()
 	var up: Dictionary = GameState.weekly_upkeep()
 	_yard_title_to(finance_list, "财政 —— 现金 %d · 本周维护 %d" % [GameState.gold, int(up.get("total", 0))])
@@ -2766,11 +2783,13 @@ func _toggle_bank() -> void:
 	bank_root.visible = true
 
 func _rebuild_bank() -> void:
-	for c in bank_list.get_children():
-		c.queue_free()
 	_rebuild_bank_rows()
 
 func _rebuild_bank_rows() -> void:
+	# 先彻底摘除旧节点：queue_free 是延迟删除，紧接着 add_child 会叠出多套内容
+	for c in bank_list.get_children():
+		bank_list.remove_child(c)
+		c.queue_free()
 	_yard_title_to(bank_list, "银行 —— 现金 %d · 全城通存通取" % GameState.gold)
 	_yard_title_to(bank_list, "存款 %d（周息 0.1%%，每月结算）" % GameState.bank_deposited())
 	var hb := HBoxContainer.new()
@@ -2886,6 +2905,7 @@ func _toggle_black() -> void:
 
 func _rebuild_black() -> void:
 	for c in black_list.get_children():
+		black_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(black_list, "黑市 —— 现金 %d · 通缉度 %d" % [GameState.gold, GameState.notoriety()])
 	if not GameState.black_market_open():
@@ -3015,6 +3035,7 @@ func _yard_title(text: String) -> void:
 
 func _rebuild_yard() -> void:
 	for c in yard_list.get_children():
+		yard_list.remove_child(c)
 		c.queue_free()
 	var def: Resource = GameState.ship_def()
 	var st: Dictionary = GameState.stats()
@@ -3313,6 +3334,7 @@ func _toggle_save() -> void:
 
 func _rebuild_save() -> void:
 	for c in save_list.get_children():
+		save_list.remove_child(c)
 		c.queue_free()
 	_yard_title_to(save_list, "存档 —— 点击保存 / 读取")
 	for slot in SaveManager.all_slot_ids():

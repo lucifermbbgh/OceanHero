@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1213_dup()
 	await _test_v1212_island_panels()
 	await _test_v1211_recipes()
 	await _test_v1210_stats()
@@ -652,6 +653,51 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.13 面板重复叠加修复 ----------------
+func _test_v1213_dup() -> void:
+	print("\n[1.2.13 面板重复修复]")
+	GameState.reset_new_game()
+	GameState.add_gold(50000)
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	s._toggle_bank()
+	await _frames(1)
+	var n0: int = s.bank_list.get_child_count()
+	_ok(n0 > 0, "银行面板有内容", str(n0))
+	# 连续操作三次，行数不应累加
+	s._bank_deposit(1000)
+	await _frames(1)
+	var n1: int = s.bank_list.get_child_count()
+	s._bank_deposit(1000)
+	await _frames(1)
+	var n2: int = s.bank_list.get_child_count()
+	s._bank_deposit(1000)
+	await _frames(1)
+	var n3: int = s.bank_list.get_child_count()
+	_ok(n1 == n0 and n2 == n0 and n3 == n0, "多次存款不叠加内容",
+		"%d/%d/%d/%d" % [n0, n1, n2, n3])
+	s._close_all_panels()
+	await _frames(1)
+	# 黑市、仓库同样验证一次
+	s._toggle_black()
+	await _frames(1)
+	var b0: int = s.black_list.get_child_count()
+	s._rebuild_black()
+	await _frames(1)
+	_ok(s.black_list.get_child_count() == b0, "黑市重建不叠加",
+		"%d vs %d" % [b0, s.black_list.get_child_count()])
+	s._close_all_panels()
+	await _frames(1)
+	s._toggle_store()
+	await _frames(1)
+	var st0: int = s.store_list.get_child_count()
+	s._rebuild_store()
+	await _frames(1)
+	_ok(s.store_list.get_child_count() == st0, "仓库重建不叠加")
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 1.2.12 岛屿高级面板 ----------------
 func _test_v1212_island_panels() -> void:
