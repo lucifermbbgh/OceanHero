@@ -1881,10 +1881,10 @@ func interact_prompt() -> String:
 	if pi != null:
 		var isl: Array = islands[int(pi)]
 		return "按 E 停靠 %s（%s）" % [String(isl[3]), String(ISLAND_TIERS.get(int(isl[2]), "港口"))]
-	if _nearest_salvage_dist() < 250.0:
-		return "按 E 打捞沉船残骸"
 	if player.global_position.distance_to(BACK_GATE) < 240.0:
 		return "按 E 返回母港"
+	if _nearest_salvage_dist() < 250.0:
+		return "按 E 打捞沉船残骸"
 	if player.global_position.distance_to(FORWARD_GATE) < 240.0:
 		if map_index >= 9:
 			return "已是航道尽头"

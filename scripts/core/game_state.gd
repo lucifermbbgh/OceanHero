@@ -1220,18 +1220,39 @@ func visit_port_tier() -> int:
 	var meta2: Dictionary = port_registry.get(String(visit_port_id), {})
 	return int(meta2.get("tier", 1))
 
-## 确保该岛屿有建筑数据（首次访问按其等级下发全套）
+## 岛屿初始建筑方案：按城镇等级下发（1.2.4）
+const ISLAND_BUILDING_PLAN := {
+	1: {&"governor": 1, &"warehouse": 1, &"tavern": 1},
+	2: {&"governor": 2, &"warehouse": 2, &"tavern": 2, &"sailmaker": 1, &"watchtower": 1},
+	3: {&"governor": 3, &"warehouse": 3, &"tavern": 3, &"sailmaker": 2,
+		&"watchtower": 2, &"drydock": 2, &"foundry": 2, &"exchange": 3},
+}
+
+## 确保该岛屿有建筑数据（首次访问按等级方案下发）
 func ensure_island_buildings(pid: StringName) -> void:
 	var key := String(pid)
 	if port_buildings.has(key) and not port_buildings[key].is_empty():
 		return
 	var tier := visit_port_tier() if String(visit_port_id) == key else int(port_registry.get(key, {}).get("tier", 1))
+	var plan: Dictionary = ISLAND_BUILDING_PLAN.get(tier, ISLAND_BUILDING_PLAN[1])
 	var dict: Dictionary = {}
-	for b in TownPanelLib.buildings_for_tier(tier):
-		dict[StringName(String(b.id))] = maxi(1, tier - 1)
+	for bid in plan.keys():
+		dict[bid] = int(plan[bid])
 	port_buildings[key] = dict
 	if String(visit_port_id) == key:
 		buildings = dict
+
+## 当前港口是否提供某服务（按等级，1.2.5）
+func visit_has(service: String) -> bool:
+	var tier := visit_port_tier()
+	match service:
+		"shipyard", "yard":
+			return tier >= 2
+		"exchange", "reputation", "bank", "black":
+			return tier >= 3
+		"build":
+			return is_home_visit()
+	return true
 
 ## 当前港口库存上限（按等级）
 const PORT_STOCK_BY_TIER := {1: 40, 2: 90, 3: 160}

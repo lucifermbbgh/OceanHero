@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v124_125()
 	await _test_v123_port_buildings()
 	await _test_v122_town()
 	await _test_v121_gate()
@@ -646,6 +647,45 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.2.4 / 1.2.5 初始建筑与等级门禁 ----------------
+func _test_v124_125() -> void:
+	print("\n[1.2.4/1.2.5 初始建筑与门禁]")
+	GameState.reset_new_game()
+	# 1.2.4：港村岛初始 3 座
+	GameState.register_port("m1_v", GameState.town_name("白沙", 1), 0, 1)
+	GameState.visit_port_id = &"m1_v"
+	GameState.ensure_island_buildings(&"m1_v")
+	var lv: Dictionary = GameState.port_buildings["m1_v"]
+	_ok(lv.size() == 3, "港村岛初始 3 座建筑", str(lv.size()))
+	_ok(int(lv.get(&"governor", 0)) == 1, "港村总督府 Lv1")
+	# 港镇岛 5 座
+	GameState.register_port("m2_t", GameState.town_name("望潮", 2), 0, 2)
+	GameState.visit_port_id = &"m2_t"
+	GameState.ensure_island_buildings(&"m2_t")
+	_ok(GameState.port_buildings["m2_t"].size() == 5, "港镇岛初始 5 座",
+		str(GameState.port_buildings["m2_t"].size()))
+	# 港城岛 8 座
+	GameState.register_port("m3_c", GameState.town_name("青礁", 3), 0, 3)
+	GameState.visit_port_id = &"m3_c"
+	GameState.ensure_island_buildings(&"m3_c")
+	_ok(GameState.port_buildings["m3_c"].size() == 8, "港城岛初始 8 座",
+		str(GameState.port_buildings["m3_c"].size()))
+
+	# 1.2.5：等级门禁
+	_ok(GameState.visit_port_tier() == 3, "当前为港城")
+	_ok(GameState.visit_has("exchange"), "港城有交易所")
+	_ok(GameState.visit_has("bank"), "港城有银行")
+	_ok(GameState.visit_has("black"), "港城有黑市")
+	_ok(not GameState.visit_has("build"), "非母港不能建造")
+	GameState.visit_port_id = &"m1_v"
+	_ok(not GameState.visit_has("exchange"), "港村无交易所")
+	_ok(not GameState.visit_has("yard"), "港村无船厂")
+	GameState.visit_port_id = &"m2_t"
+	_ok(GameState.visit_has("yard"), "港镇有船厂")
+	_ok(not GameState.visit_has("bank"), "港镇无银行")
+	GameState.visit_port_id = &"jadehaven"
+	_ok(GameState.visit_has("build"), "母港可建造")
 
 # ---------------- 1.2.3 建筑按港口隔离 ----------------
 func _test_v123_port_buildings() -> void:

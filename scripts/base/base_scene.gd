@@ -137,13 +137,13 @@ func _build_ui() -> void:
 	_action_button(vb, "市场交易", _toggle_market)
 	_action_button(vb, "酒馆招募", _toggle_tavern)
 	_action_button(vb, "任务板", _toggle_quests)
-	if GameState.home_has("shipyard"):
+	if GameState.visit_has("yard"):
 		_action_button(vb, "船厂与装备", _toggle_yard)
-	if GameState.home_has("building"):
+	if GameState.visit_has("build"):
 		_action_button(vb, "基地建设", _toggle_build)
-	if GameState.home_has("exchange"):
+	if GameState.visit_has("exchange"):
 		_action_button(vb, "交易所", _toggle_exchange)
-	if GameState.home_has("reputation"):
+	if GameState.visit_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
 
 	_action_button(vb, "船员名单", _toggle_crew_panel)
@@ -155,8 +155,9 @@ func _build_ui() -> void:
 		_action_button(vb, "经济总览", _toggle_overview)
 	else:
 		_action_button(vb, "投资", _toggle_invest)
-	if GameState.home_port_tier >= 3:
+	if GameState.visit_has("bank"):
 		_action_button(vb, "银行", _toggle_bank)
+	if GameState.visit_has("black"):
 		_action_button(vb, "黑市", _toggle_black)
 
 	if GameState.is_home_visit():
