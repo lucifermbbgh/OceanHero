@@ -268,6 +268,44 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 六国与分国声望（1.3.0） ----------------
+
+const NATIONS := ["lan", "chilin", "shuangyu", "xuanjiao", "baijing", "cangwu"]
+const NATION_NAMES := {
+	"lan": "澜国", "chilin": "赤鳞", "shuangyu": "霜屿",
+	"xuanjiao": "玄礁", "baijing": "白鲸", "cangwu": "苍梧",
+}
+
+var nation_rep: Dictionary = {}
+
+func _init_nation_rep() -> void:
+	if nation_rep.is_empty():
+		for n in NATIONS:
+			nation_rep[n] = 1000
+
+func nation_rep_of(nation: String) -> int:
+	_init_nation_rep()
+	return int(nation_rep.get(nation, 1000))
+
+func add_nation_rep(nation: String, amount: int) -> void:
+	_init_nation_rep()
+	if not NATIONS.has(nation):
+		return
+	nation_rep[nation] = clampi(nation_rep_of(nation) + amount, 0, 10000)
+
+## 关系称呼
+func nation_relation(nation: String) -> String:
+	var v := nation_rep_of(nation)
+	if v < 500:
+		return "敌视"
+	if v < 2000:
+		return "冷淡"
+	if v < 5000:
+		return "中立"
+	if v < 8000:
+		return "友好"
+	return "盟友"
+
 # ---------------- 通缉 ----------------
 
 func post_bail(amount: int = 5000) -> Dictionary:
@@ -2351,6 +2389,7 @@ func to_dict() -> Dictionary:
 		"port_registry": port_registry.duplicate(true),
 		"contraband": contraband.duplicate(),
 		"crew_xp": crew_xp.duplicate(),
+		"nation_rep": nation_rep.duplicate(),
 		"ship_mods": ship_mods.duplicate(),
 		"building_upgrades": building_upgrades.duplicate(true),
 		"gear_level": gear_level.duplicate(),
@@ -2478,6 +2517,11 @@ func from_dict(d: Dictionary) -> void:
 			"left": int(bk.get("left", 12)), "itotal": int(bk.get("itotal", 0)),
 			"ipaid": int(bk.get("ipaid", 0)), "month": int(bk.get("month", 0)),
 		})
+	nation_rep.clear()
+	_init_nation_rep()
+	var nrep: Dictionary = d.get("nation_rep", {})
+	for nk in nrep.keys():
+		nation_rep[String(nk)] = int(nrep[nk])
 	crew_xp.clear()
 	var cxp: Dictionary = d.get("crew_xp", {})
 	for k0 in cxp.keys():

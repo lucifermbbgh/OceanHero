@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v130_nations()
 	await _test_v1213_dup()
 	await _test_v1212_island_panels()
 	await _test_v1211_recipes()
@@ -654,6 +655,29 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.0 六国声望 ----------------
+func _test_v130_nations() -> void:
+	print("\n[1.3.0 六国声望]")
+	GameState.reset_new_game()
+	_ok(GameState.NATIONS.size() == 6, "六国定义", str(GameState.NATIONS.size()))
+	for n in GameState.NATIONS:
+		_ok(GameState.nation_rep_of(n) == 1000, "初始声望 1000：%s" % n, str(GameState.nation_rep_of(n)))
+	_ok(GameState.NATION_NAMES["lan"] == "澜国", "澜国名称正确")
+	# 关系分档
+	_ok(GameState.nation_relation("lan") == "冷淡", "1000 为冷淡", GameState.nation_relation("lan"))
+	GameState.add_nation_rep("lan", 1500)
+	_ok(GameState.nation_rep_of("lan") == 2500, "声望可增加", str(GameState.nation_rep_of("lan")))
+	_ok(GameState.nation_relation("lan") == "中立", "2500 为中立")
+	GameState.add_nation_rep("lan", 6000)
+	_ok(GameState.nation_relation("lan") == "盟友", "8500 为盟友")
+	GameState.add_nation_rep("lan", -9999)
+	_ok(GameState.nation_rep_of("lan") == 0, "声望下限 0", str(GameState.nation_rep_of("lan")))
+	_ok(GameState.nation_relation("lan") == "敌视", "0 为敌视")
+	# 独立记录
+	_ok(GameState.nation_rep_of("chilin") == 1000, "其他国家不受影响")
+	# 旧三阵营不受影响
+	_ok(GameState.rep_of("royal_navy") >= 0, "旧阵营声望仍可用")
 
 # ---------------- 1.2.13 面板重复叠加修复 ----------------
 func _test_v1213_dup() -> void:

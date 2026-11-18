@@ -1114,6 +1114,27 @@ func _rebuild_rep() -> void:
 		hint.add_theme_color_override("font_color", Color(0.65, 0.7, 0.72))
 		rep_list.add_child(hint)
 
+	_yard_title_to(rep_list, "六国声望")
+	var nhead := HBoxContainer.new()
+	nhead.add_theme_constant_override("separation", 0)
+	rep_list.add_child(nhead)
+	for spec in [["国家", 160], ["声望", 140], ["关系", 120], ["说明", 360]]:
+		nhead.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	for nation in GameState.NATIONS:
+		var nrow := HBoxContainer.new()
+		nrow.add_theme_constant_override("separation", 0)
+		rep_list.add_child(nrow)
+		var rel := GameState.nation_relation(nation)
+		var rel_col := Color(0.55, 0.9, 0.6)
+		if rel == "敌视" or rel == "冷淡":
+			rel_col = Color(0.92, 0.55, 0.45)
+		elif rel == "中立":
+			rel_col = Color(0.85, 0.82, 0.6)
+		nrow.add_child(_cell_box(String(GameState.NATION_NAMES.get(nation, nation)), 160))
+		nrow.add_child(_cell_box(str(GameState.nation_rep_of(nation)), 140, Color(0.95, 0.9, 0.55)))
+		nrow.add_child(_cell_box(rel, 120, rel_col))
+		nrow.add_child(_cell_box("1.3.1 起用于港口归属与关税", 360, Color(0.66, 0.72, 0.7)))
+
 	_yard_title_to(rep_list, "三阵营声望（0~10000）")
 	for fac in GameState.FACTIONS:
 		var hb := HBoxContainer.new()
