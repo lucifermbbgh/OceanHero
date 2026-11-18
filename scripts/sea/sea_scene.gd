@@ -553,10 +553,14 @@ func _rebuild_port() -> void:
 			inv_hb.add_child(dep_btn)
 		inv_hb.add_child(ab)
 
-	var max_stock := int(TIER_STOCK.get(tier, 40))
-	var goods: Array = [&"grain", &"timber"]
-	if sp_res != null:
-		goods.append(sp_id)
+	var max_stock := 400
+	# 岛屿市场：展示全部商品（特产价另有加成）
+	var goods: Array = []
+	for cat in GameState.CATEGORIES:
+		for gid2 in GameState.commodities_of(cat):
+			goods.append(gid2)
+	if goods.is_empty():
+		goods = [&"grain", &"timber"]
 	for cid in goods:
 		var c: Resource = DataRegistry.get_commodity(cid)
 		var stock := GameState.ensure_stock(pid, cid, max_stock)

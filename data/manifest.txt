@@ -33,6 +33,7 @@ res://data/commodities/fruit.tres
 res://data/commodities/gem.tres
 res://data/commodities/goldb.tres
 res://data/commodities/grain.tres
+res://data/commodities/iron_ore.tres
 res://data/commodities/meat.tres
 res://data/commodities/musket.tres
 res://data/commodities/potato.tres

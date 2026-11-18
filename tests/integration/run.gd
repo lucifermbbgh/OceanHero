@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v114_fixes()
 	await _test_v113_polish()
 	await _test_v112_parallel()
 	await _test_v111_ui()
@@ -639,6 +640,28 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.1.4 试玩反馈修复 ----------------
+func _test_v114_fixes() -> void:
+	print("\n[1.1.4 修复]")
+	GameState.reset_new_game()
+	# 铁矿商品存在
+	var iron: Resource = DataRegistry.get_commodity(&"iron_ore")
+	_ok(iron != null, "铁矿商品已存在")
+	if iron != null:
+		_ok(String(iron.display_name) == "铁矿", "铁矿名称正确", String(iron.display_name))
+	# 商品总数（27 + 铁矿 = 28）
+	_ok(GameState.all_commodities().size() >= 28, "商品总数 ≥ 28",
+		str(GameState.all_commodities().size()))
+	# 建造需求里的材料都能查到名字
+	var need: Dictionary = GameState.build_need(1)
+	var all_named := true
+	for m in need.keys():
+		if String(m) == "gold":
+			continue
+		if DataRegistry.get_commodity(m) == null:
+			all_named = false
+	_ok(all_named, "建造材料均有商品定义")
 
 # ---------------- 1.1.3 打磨与平衡 ----------------
 func _test_v113_polish() -> void:

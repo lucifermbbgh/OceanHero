@@ -133,7 +133,7 @@ func _build_ui() -> void:
 	if GameState.home_port_tier >= 3:
 		_action_button(vb, "银行", _toggle_bank)
 		_action_button(vb, "黑市", _toggle_black)
-	_action_button(vb, _port_upgrade_label(), _do_upgrade_port)
+
 	_action_button(vb, "出航", _set_sail)
 	_action_button(vb, "存档", _toggle_save)
 	_action_button(vb, "帮助", _toggle_help)
@@ -565,26 +565,6 @@ func _rebuild_market() -> void:
 		_rebuild_events_tab()
 		return
 
-	# 交易目标页签：买入存到哪 / 卖出从哪拿
-	var tab_row := HBoxContainer.new()
-	tab_row.add_theme_constant_override("separation", 8)
-	market_list.add_child(tab_row)
-	var tl := Label.new()
-	tl.text = "交易目标："
-	tl.custom_minimum_size = Vector2(84, 0)
-	tab_row.add_child(tl)
-	var b_ship := Button.new()
-	b_ship.text = "装船" if market_target == "ship" else "装船"
-	b_ship.custom_minimum_size = Vector2(96, 34)
-	b_ship.modulate = Color(1.0, 0.92, 0.6) if market_target == "ship" else Color(1, 1, 1)
-	b_ship.pressed.connect(func(): _toggle_market_target("ship"))
-	tab_row.add_child(b_ship)
-	var b_wh := Button.new()
-	b_wh.text = "存仓"
-	b_wh.custom_minimum_size = Vector2(96, 34)
-	b_wh.modulate = Color(1.0, 0.92, 0.6) if market_target == "warehouse" else Color(1, 1, 1)
-	b_wh.pressed.connect(func(): _toggle_market_target("warehouse"))
-	tab_row.add_child(b_wh)
 	# 商品大类页签
 	var catrow := HBoxContainer.new()
 	catrow.add_theme_constant_override("separation", 8)
@@ -1570,6 +1550,38 @@ func _rebuild_build() -> void:
 		int(prod.get("grain", 0)), int(prod.get("saltpeter", 0)),
 	], 520, Color(0.6, 0.8, 0.65)))
 
+	# 工坊生产
+	var lv_ws := GameState.building_level(&"sawmill")
+	_yard_title_to(build_list, "工坊生产（每周上限 %d 批）" % maxi(1, lv_ws))
+	var head_prod := HBoxContainer.new()
+	head_prod.add_theme_constant_override("separation", 8)
+	build_list.add_child(head_prod)
+	for spec in [["产成品", 160], ["配方", 320], ["仓库成品", 120], ["状态", 160]]:
+		head_prod.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	for cid3 in GameState.RECIPES.keys():
+		var rec3: Dictionary = GameState.RECIPES[cid3]
+		var cd3: Resource = DataRegistry.get_commodity(cid3)
+		if cd3 == null:
+			continue
+		var in_parts: Array = []
+		var can_make := true
+		for m3 in rec3.get("in", {}).keys():
+			var md3: Resource = DataRegistry.get_commodity(m3)
+			var nm3: String = String(md3.display_name) if md3 != null else String(m3)
+			var need3 := int(rec3["in"][m3])
+			var have3 := int(GameState.warehouse.get(m3, 0))
+			in_parts.append("%s×%d（有%d）" % [nm3, need3, have3])
+			if have3 < need3:
+				can_make = false
+		var row3 := HBoxContainer.new()
+		row3.add_theme_constant_override("separation", 8)
+		build_list.add_child(row3)
+		row3.add_child(_cell_box(String(cd3.display_name), 160))
+		row3.add_child(_cell_box(" + ".join(in_parts), 320, Color(0.75, 0.8, 0.72)))
+		row3.add_child(_cell_box(str(int(GameState.warehouse.get(cid3, 0))), 120))
+		row3.add_child(_cell_box("可生产" if can_make else "原料不足", 160,
+			Color(0.55, 0.9, 0.6) if can_make else Color(0.9, 0.55, 0.5)))
+
 	# 并行升级（独立计时）
 	_yard_title_to(build_list, "并行升级（每座独立计时）")
 	var parallel_row := HBoxContainer.new()
@@ -2297,7 +2309,7 @@ func _rebuild_construct() -> void:
 	for c in construct_list.get_children():
 		c.queue_free()
 	var tier := GameState.home_port_tier
-	var prefix := "翡翠港"
+	var prefix := "翡翠"
 	var next_tier := mini(3, tier + 1)
 	_yard_title_to(construct_list, "建造 · %s → %s" % [
 		GameState.town_name(prefix, tier), GameState.town_name(prefix, next_tier)])
@@ -2374,15 +2386,18 @@ func _open_submit(mat: String, need: int, in_ship: int, in_wh: int) -> void:
 	var row1 := HBoxContainer.new()
 	vb.add_child(row1)
 	row1.add_child(_lbl("船上提交", 110))
+	# 自动分配：船上优先，不足部分由仓库补足，且都不超过各自可用量
+	var auto_ship := mini(in_ship, need)
+	var auto_wh := mini(in_wh, maxi(0, need - auto_ship))
 	var e1 := LineEdit.new()
-	e1.text = str(mini(in_ship, need))
+	e1.text = str(auto_ship)
 	e1.custom_minimum_size = Vector2(120, 30)
 	row1.add_child(e1)
 	var row2 := HBoxContainer.new()
 	vb.add_child(row2)
 	row2.add_child(_lbl("仓库提交", 110))
 	var e2 := LineEdit.new()
-	e2.text = "0"
+	e2.text = str(auto_wh)
 	e2.custom_minimum_size = Vector2(120, 30)
 	row2.add_child(e2)
 	add_child(dlg)
