@@ -125,6 +125,7 @@ func _build_ui() -> void:
 	if GameState.home_has("reputation"):
 		_action_button(vb, "声望与战功", _toggle_rep)
 
+	_action_button(vb, "建造", _toggle_construct)
 	_action_button(vb, "经济总览", _toggle_overview)
 	if GameState.home_port_tier >= 3:
 		_action_button(vb, "银行", _toggle_bank)
@@ -249,6 +250,22 @@ func _build_ui() -> void:
 	goods_list.add_theme_constant_override("separation", 6)
 	goods_list.custom_minimum_size = Vector2(1510, 0)
 	gscroll.add_child(goods_list)
+
+	# 建造面板（材料提交）
+	construct_root = PanelContainer.new()
+	construct_root.position = Vector2(16, 72)
+	construct_root.custom_minimum_size = Vector2(1568, 812)
+	construct_root.add_theme_stylebox_override("panel", _panel_style())
+	construct_root.visible = false
+	root.add_child(construct_root)
+	var cscroll := ScrollContainer.new()
+	cscroll.custom_minimum_size = Vector2(1530, 780)
+	cscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	construct_root.add_child(cscroll)
+	construct_list = VBoxContainer.new()
+	construct_list.add_theme_constant_override("separation", 6)
+	construct_list.custom_minimum_size = Vector2(1510, 0)
+	cscroll.add_child(construct_list)
 
 	# 经济总览面板
 	overview_root = PanelContainer.new()
@@ -446,6 +463,7 @@ func _toggle_market() -> void:
 
 var market_target := "ship"   # ship = 装船，warehouse = 存仓
 var market_tab := "local"     # local = 本地市场，world = 世界市场
+var market_cat := "food"      # 商品大类页签，默认食物
 var expanded_cid: StringName = &""   # 展开明细的商品
 var bank_root: PanelContainer = null
 var bank_list: VBoxContainer = null
@@ -516,6 +534,18 @@ func _rebuild_market() -> void:
 	b_wh.modulate = Color(1.0, 0.92, 0.6) if market_target == "warehouse" else Color(1, 1, 1)
 	b_wh.pressed.connect(func(): _toggle_market_target("warehouse"))
 	tab_row.add_child(b_wh)
+	# 商品大类页签
+	var catrow := HBoxContainer.new()
+	catrow.add_theme_constant_override("separation", 8)
+	market_list.add_child(catrow)
+	for cat in ["food", "raw", "consumer", "military", "precious"]:
+		var cb := Button.new()
+		cb.text = String(GameState.CATEGORY_NAMES.get(cat, cat))
+		cb.custom_minimum_size = Vector2(120, 30)
+		cb.modulate = Color(1.0, 0.92, 0.6) if market_cat == cat else Color(1, 1, 1)
+		var cv := String(cat)
+		cb.pressed.connect(func(): market_cat = cv; _rebuild_market())
+		catrow.add_child(cb)
 	# 表头
 	var head_row := HBoxContainer.new()
 	head_row.add_theme_constant_override("separation", 8)
@@ -524,7 +554,7 @@ func _rebuild_market() -> void:
 			["库存", 130], ["船上", 120], ["仓库", 120]]:
 		head_row.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
 
-	for id in [&"grain", &"timber", &"rum", &"spice"]:
+	for id in GameState.commodities_of(market_cat):
 		var c: Resource = DataRegistry.get_commodity(id)
 		if c == null:
 			continue
@@ -921,7 +951,7 @@ func _sell(cid: StringName, amount: int, price: int) -> void:
 	var gross := price * amount
 	var tax := 0
 	if String(PORT_ID) != "jadehaven":
-		tax = int(round(float(gross) * 0.05))
+		tax = int(round(float(gross) * GameState.tariff_rate()))
 		GameState.record_expense("关税", tax)
 	GameState.add_gold(gross - tax)
 	if tax > 0:
@@ -2004,13 +2034,139 @@ func _chart_data(cid: StringName, base_price: int, stock: int, max_stock: int) -
 	d["vol"] = [40, 90, 160]
 	return d
 
+# ---------------- 建造与投资（1.1） ----------------
+
+
+func _toggle_construct() -> void:
+	if construct_root.visible:
+		construct_root.visible = false
+		return
+	_rebuild_construct()
+	construct_root.visible = true
+
+func _rebuild_construct() -> void:
+	for c in construct_list.get_children():
+		c.queue_free()
+	var tier := GameState.home_port_tier
+	var prefix := "翡翠港"
+	var next_tier := mini(3, tier + 1)
+	_yard_title_to(construct_list, "建造 · %s → %s" % [
+		GameState.town_name(prefix, tier), GameState.town_name(prefix, next_tier)])
+	if tier >= 3:
+		construct_list.add_child(_lbl("　已是最高等级（港城）", 500, Color(0.75, 0.85, 0.7)))
+		return
+	var prog: Dictionary = GameState.build_progress("jadehaven", tier)
+	var need: Dictionary = prog["need"]
+	var have: Dictionary = prog["have"]
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	construct_list.add_child(head)
+	for spec in [["项目", 200], ["需求", 140], ["船上", 140], ["仓库", 140], ["已提交", 140], ["操作", 160]]:
+		head.add_child(_cell_box(String(spec[0]), int(spec[1]), Color(0.62, 0.78, 0.85), true))
+	for m in need.keys():
+		var mat := String(m)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		construct_list.add_child(row)
+		var nm := "金币" if mat == "gold" else mat
+		if mat != "gold":
+			var cd: Resource = DataRegistry.get_commodity(StringName(mat))
+			if cd != null:
+				nm = String(cd.display_name)
+		var in_ship := 0
+		var in_wh := 0
+		if mat == "gold":
+			in_ship = GameState.gold
+			in_wh = GameState.bank_deposited()
+		else:
+			in_ship = int(GameState.cargo.get(StringName(mat), 0))
+			in_wh = int(GameState.warehouse.get(StringName(mat), 0))
+		row.add_child(_cell_box(nm, 200))
+		row.add_child(_cell_box(str(int(need[m])), 140, Color(0.95, 0.9, 0.55)))
+		row.add_child(_cell_box(str(in_ship), 140))
+		row.add_child(_cell_box(str(in_wh), 140))
+		row.add_child(_cell_box(str(int(have.get(m, 0))), 140, Color(0.6, 0.85, 0.7)))
+		var btn_box := PanelContainer.new()
+		btn_box.custom_minimum_size = Vector2(160, 30)
+		var sub := Button.new()
+		sub.text = "提交"
+		sub.custom_minimum_size = Vector2(120, 26)
+		var mv := String(mat)
+		var need_v := int(need[m])
+		sub.pressed.connect(func(): _open_submit(mv, need_v, in_ship, in_wh))
+		btn_box.add_child(sub)
+		row.add_child(btn_box)
+	var ready := bool(prog["ready"])
+	var up := Button.new()
+	up.text = "确认升级"
+	up.custom_minimum_size = Vector2(180, 34)
+	up.disabled = not ready
+	up.pressed.connect(func(): _do_build_upgrade())
+	construct_list.add_child(up)
+
+func _do_build_upgrade() -> void:
+	if GameState.home_port_tier >= 3:
+		return
+	GameState.home_port_tier += 1
+	GameState.build_submitted.clear()
+	_log("建造完成：白帆%s" % GameState.town_suffix(GameState.home_port_tier))
+	_rebuild_construct()
+
+## 提交弹窗：船上 / 仓库 两个输入框
+func _open_submit(mat: String, need: int, in_ship: int, in_wh: int) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "提交材料"
+	dlg.ok_button_text = "提交"
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	dlg.add_child(vb)
+	vb.add_child(Label.new())
+	((vb.get_child(0)) as Label).text = "需求 %d　船上可用 %d　仓库可用 %d" % [need, in_ship, in_wh]
+	var row1 := HBoxContainer.new()
+	vb.add_child(row1)
+	row1.add_child(_lbl("船上提交", 110))
+	var e1 := LineEdit.new()
+	e1.text = str(mini(in_ship, need))
+	e1.custom_minimum_size = Vector2(120, 30)
+	row1.add_child(e1)
+	var row2 := HBoxContainer.new()
+	vb.add_child(row2)
+	row2.add_child(_lbl("仓库提交", 110))
+	var e2 := LineEdit.new()
+	e2.text = "0"
+	e2.custom_minimum_size = Vector2(120, 30)
+	row2.add_child(e2)
+	add_child(dlg)
+	dlg.confirmed.connect(func():
+		var a := clampi(int(e1.text), 0, in_ship)
+		var b := clampi(int(e2.text), 0, in_wh)
+		_apply_submit(mat, a, b)
+		dlg.queue_free()
+		_rebuild_construct())
+	dlg.popup_centered()
+
+func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
+	if mat == "gold":
+		if from_ship > 0:
+			GameState.add_gold(-from_ship)
+		GameState.build_submit("jadehaven", &"gold", from_ship + from_wh)
+		return
+	var cid := StringName(mat)
+	if from_ship > 0:
+		GameState.remove_cargo(cid, from_ship)
+	if from_wh > 0:
+		GameState.warehouse_remove(cid, from_wh)
+	GameState.build_submit("jadehaven", cid, from_ship + from_wh)
+
 # ---------------- 面板统一规范（0.19） ----------------
 
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root", "ex_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
-	"save_root", "rep_root", "help_root", "victory_root"]
+	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root"]
 
 var close_btn: Button = null
+var construct_root: PanelContainer = null
+var construct_list: VBoxContainer = null
 
 func _apply_fullscreen_layout() -> void:
 	for pname in FULL_PANELS:

@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v110_core()
 	await _test_ui_panels_v019()
 	await _test_finance_v018()
 	await _test_cost_scale_v015()
@@ -635,6 +636,43 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.1.0 商品分类 / 关税 / 建造 ----------------
+func _test_v110_core() -> void:
+	print("\n[1.1.0 核心]")
+	GameState.reset_new_game()
+	# 商品分类
+	_ok(GameState.CATEGORIES.size() == 5, "五大类商品")
+	var food: Array = GameState.commodities_of("food")
+	var mil: Array = GameState.commodities_of("military")
+	_ok(food.size() >= 5, "食物类至少 5 种", str(food.size()))
+	_ok(mil.size() >= 3, "军用品至少 3 种", str(mil.size()))
+	_ok(GameState.all_commodities().size() >= 20, "商品总数 ≥ 20", str(GameState.all_commodities().size()))
+	# 生产配方
+	_ok(GameState.RECIPES.has(&"beer"), "啤酒有配方")
+	_ok(String(GameState.RECIPES[&"beer"]["in"].keys()[0]) == "wheat", "啤酒由小麦酿造")
+	_ok(GameState.RECIPES.has(&"ammo_goods"), "弹药有配方")
+	# 关税分档
+	GameState.reputation["royal_navy"] = 0
+	_ok(is_equal_approx(GameState.tariff_rate(), 0.10), "敌对关税 10%", str(GameState.tariff_rate()))
+	GameState.reputation["royal_navy"] = 2500
+	_ok(is_equal_approx(GameState.tariff_rate(), 0.05), "中立关税 5%")
+	GameState.reputation["royal_navy"] = 6000
+	_ok(is_equal_approx(GameState.tariff_rate(), 0.03), "友好关税 3%")
+	GameState.reputation["royal_navy"] = 9000
+	_ok(is_equal_approx(GameState.tariff_rate(), 0.01), "盟友关税 1%")
+	# 命名标准化
+	_ok(GameState.town_name("白沙", 1) == "白沙港村", "港村命名")
+	_ok(GameState.town_name("白沙", 2) == "白沙港镇", "港镇命名")
+	_ok(GameState.town_name("白沙", 3) == "白沙港城", "港城命名")
+	# 建造需求与提交
+	var need: Dictionary = GameState.build_need(1)
+	_ok(need.has(&"timber") and need.has("gold"), "一级建造需要木材与金币")
+	GameState.build_submitted.clear()
+	GameState.build_submit("jadehaven", &"timber", 100)
+	var prog: Dictionary = GameState.build_progress("jadehaven", 1)
+	_ok(not bool(prog["ready"]), "材料不足时不可升级")
+	_ok(int(prog["have"].get(&"timber", 0)) == 100, "提交量被记录")
 
 # ---------------- 面板规范（0.19.0） ----------------
 func _test_ui_panels_v019() -> void:

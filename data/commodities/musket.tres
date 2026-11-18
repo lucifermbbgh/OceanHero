@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/commodity_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"musket"
+display_name = "火枪"
+category = &"military"
+base_price = 120
+volume = 0.2
+legal = true

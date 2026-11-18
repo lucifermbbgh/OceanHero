@@ -1009,6 +1009,90 @@ func price_change_pct(port_key: String, cid: StringName) -> float:
 	var prev := float(price_drift.get(key + "|prev", cur))
 	return EconMath.change_pct(prev, cur)
 
+# ---------------- 商品分类与建造（1.1） ----------------
+
+const CATEGORIES := ["food", "raw", "consumer", "military", "precious"]
+const CATEGORY_NAMES := {
+	"food": "食物", "raw": "原材料", "consumer": "消费品",
+	"military": "军用品", "precious": "贵金属",
+}
+
+## 按大类返回商品 id 列表
+func commodities_of(cat: String) -> Array:
+	var out: Array = []
+	for k in DataRegistry.commodities.keys():
+		var c: Resource = DataRegistry.commodities[k]
+		if c != null and String(c.category) == cat:
+			out.append(k)
+	return out
+
+## 全部商品 id
+func all_commodities() -> Array:
+	return DataRegistry.commodities.keys()
+
+## 生产配方：成品 -> {输入:{材料:数量}, 设施}
+const RECIPES := {
+	&"cloth": {"in": {&"cotton": 2}, "facility": "工坊"},
+	&"pottery": {"in": {&"clay": 2}, "facility": "工坊"},
+	&"tools": {"in": {&"iron_ore": 2, &"timber": 1}, "facility": "工坊"},
+	&"beer": {"in": {&"wheat": 3}, "facility": "工坊"},
+	&"rum": {"in": {&"sugarcane": 3}, "facility": "工坊"},
+	&"musket": {"in": {&"iron_ore": 2, &"timber": 2}, "facility": "工坊（军械）"},
+	&"cannon_goods": {"in": {&"iron_ore": 3, &"copper": 2}, "facility": "工坊（军械）"},
+	&"ammo_goods": {"in": {&"iron_ore": 1, &"saltpeter": 1}, "facility": "工坊（军械）"},
+}
+
+## 关税分档（按最高阵营声望）
+func tariff_rate() -> float:
+	var r := best_rep()
+	if r < 2000:
+		return 0.10
+	if r < 5000:
+		return 0.05
+	if r < 8000:
+		return 0.03
+	return 0.01
+
+## 城镇命名：前缀 + 等级后缀
+func town_suffix(tier: int) -> String:
+	match tier:
+		1: return "港村"
+		2: return "港镇"
+		3: return "港城"
+	return "港村"
+
+func town_name(prefix: String, tier: int) -> String:
+	return prefix + town_suffix(tier)
+
+## 建造需求（材料 + 金币）
+const BUILD_COSTS := {
+	1: {&"timber": 200, &"stone": 120, &"iron_ore": 80, "gold": 5000},
+	2: {&"timber": 500, &"stone": 400, &"iron_ore": 300, &"cloth": 100, "gold": 20000},
+}
+
+## 已提交的建造材料：{港口: {材料: 数量}}
+var build_submitted: Dictionary = {}
+
+func build_need(tier: int) -> Dictionary:
+	return BUILD_COSTS.get(tier, {})
+
+func build_submit(port_key: String, mat: StringName, amount: int) -> void:
+	if amount <= 0:
+		return
+	if not build_submitted.has(port_key):
+		build_submitted[port_key] = {}
+	var cur := int(build_submitted[port_key].get(mat, 0))
+	build_submitted[port_key][mat] = cur + amount
+
+func build_progress(port_key: String, tier: int) -> Dictionary:
+	var need := build_need(tier)
+	var have: Dictionary = build_submitted.get(port_key, {})
+	var ok := true
+	for m in need.keys():
+		if int(have.get(m, 0)) < int(need[m]):
+			ok = false
+	return {"need": need, "have": have, "ready": ok}
+
 # ---------------- 银行（0.12 / 0.12.1 多笔贷款） ----------------
 
 const DEPOSIT_RATE := 0.001

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/commodity_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"cannon_goods"
+display_name = "火炮"
+category = &"military"
+base_price = 260
+volume = 0.2
+legal = true

@@ -64,7 +64,7 @@ const FACTION_ENEMIES := {
 const AI_TICK := 0.6
 ## 刷新与密度控制
 ## 岛屿三级：1 村 / 2 镇 / 3 城
-const ISLAND_TIERS := {1: "渔港村落", 2: "乡镇", 3: "港口城市"}
+const ISLAND_TIERS := {1: "港村", 2: "港镇", 3: "港城"}
 const ISLAND_RADIUS := {1: Vector2(240, 320), 2: Vector2(360, 450), 3: Vector2(500, 620)}
 const TIER_STOCK := {1: 40, 2: 90, 3: 160}          # 市场存货按等级
 const SPECIALTIES := [&"iron", &"spice", &"rum"]    # 特产（谷物/木材永远有）
@@ -158,10 +158,19 @@ func _generate_islands() -> void:
 	rng.seed = int(map_def.island_seed) * 7919 + map_index * 131
 	var n := mini(8, 4 + (map_index % 3))
 	var safe_center := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5 + 300)
+	# 母港所在海图：前两座固定为近港的港城与港镇
+	var fixed_spots := {
+		0: Vector2(safe_center.x + 1200.0, safe_center.y - 700.0),
+		1: Vector2(safe_center.x - 1300.0, safe_center.y + 600.0),
+	}
 	for i in range(n):
-		var pos := Vector2(rng.randf_range(1500.0, 6500.0), rng.randf_range(1500.0, 6500.0))
-		if pos.distance_to(safe_center) < 900.0:
-			pos = pos.lerp(Vector2(6600, 6600), 0.6)
+		var pos: Vector2
+		if map_index == 0 and fixed_spots.has(i):
+			pos = fixed_spots[i]
+		else:
+			pos = Vector2(rng.randf_range(1500.0, 6500.0), rng.randf_range(1500.0, 6500.0))
+			if pos.distance_to(safe_center) < 900.0:
+				pos = pos.lerp(Vector2(6600, 6600), 0.6)
 		var tier := 1
 		if i == 0:
 			tier = 3

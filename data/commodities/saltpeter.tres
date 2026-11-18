@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/commodity_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"saltpeter"
+display_name = "硝石"
+category = &"raw"
+base_price = 22
+volume = 0.4
+legal = true

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/commodity_def.gd" id="1_x"]
+
+[resource]
+script = ExtResource("1_x")
+id = &"meat"
+display_name = "肉类"
+category = &"food"
+base_price = 14
+volume = 0.5
+legal = true
