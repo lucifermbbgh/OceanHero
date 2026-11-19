@@ -2237,6 +2237,12 @@ func _on_enemy_died(ship, info: Dictionary) -> void:
 		hud.ticker(LootSystem.describe(result))
 	else:
 		hud.ticker("%s 被击沉" % String(ship.get("display_name")))
+	# 1.3.8：击沉结算势力声望（阵营 → 势力 id，等级取船只等级）
+	var fid: String = GameState.faction_for_kill(map_index, String(ship.get("faction")))
+	var shp_level := clampi(int(ceil(float(map_index) / 3.0)), 1, 10)
+	GameState.apply_ship_rep(fid, shp_level)
+	if by_player:
+		hud.ticker("%s 声望 %+d" % [String(GameState.FACTION_V2_NAMES.get(fid, fid)), -shp_level])
 	var eid_raw: Variant = ship.get("enemy_id")
 	var eid := StringName(eid_raw) if eid_raw != null else &""
 	if String(eid) != "":

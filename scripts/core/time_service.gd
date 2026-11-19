@@ -55,7 +55,8 @@ func day_of_week() -> int:
 	return total_days % DAYS_PER_WEEK + 1
 
 func date_text() -> String:
-	return "第 %d 年 · %d 月 · 第 %d 周" % [year(), month(), week_of_month()]
+	return "第 %d 年 · %d 月 · 第 %d 周 · 第 %d 日" % [
+		year(), month(), week_of_month(), day_of_week()]
 
 func speed_text() -> String:
 	if paused:

@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v138_kill_rep()
 	await _test_v136_faction_rep()
 	await _test_v135_patrols()
 	await _test_v134_license()
@@ -659,6 +660,24 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.8 击沉接入势力声望 ----------------
+func _test_v138_kill_rep() -> void:
+	print("\n[1.3.8 击沉归属]")
+	GameState.reset_new_game()
+	_ok(GameState.faction_for_kill(1, "navy") == "yunlan", "1 号图海军属云澜",
+		GameState.faction_for_kill(1, "navy"))
+	_ok(GameState.faction_for_kill(1, "pirate") == "youming", "海盗属幽溟")
+	_ok(GameState.faction_for_kill(6, "navy") == "yunlan", "交界图取首个势力",
+		GameState.faction_for_kill(6, "navy"))
+	_ok(GameState.faction_for_kill(15, "navy") == "xuanjiao", "15 号图属玄礁",
+		GameState.faction_for_kill(15, "navy"))
+	# 击沉扣对应势力声望
+	GameState.rep_for_sinking("yunlan", 4)
+	_ok(GameState.faction_rep_of("yunlan") == -4, "击沉云澜船扣 4 点")
+	# 日期显示含「日」
+	_ok(TimeService.date_text().contains("日"), "日期显示含日单位", TimeService.date_text())
+	GameState.reset_new_game()
 
 # ---------------- 1.3.6 势力声望面板 ----------------
 func _test_v136_faction_rep() -> void:

@@ -705,6 +705,30 @@ func _quest_check() -> void:
 func apply_ship_rep(fid: String, ship_level: int) -> void:
 	rep_for_sinking(fid, ship_level)
 
+## 海图国家 id → 新势力 id（1.3.6 起澜国改名为云澜）
+const NATION_TO_FACTION := {
+	"lan": "yunlan", "chilin": "chilin", "shuangyu": "shuangyu",
+	"xuanjiao": "xuanjiao", "baijing": "baijing", "cangwu": "cangwu",
+	"youming": "youming",
+}
+
+func faction_id_of(nation: String) -> String:
+	return String(NATION_TO_FACTION.get(nation, nation))
+
+## 1.3.8：击沉时归属哪个势力（海盗 → 幽溟；各国 → 所在海图国家；交界图取首个）
+func faction_for_kill(map_index: int, ship_faction: String) -> String:
+	if ship_faction == "pirate":
+		return "youming"
+	var md: Resource = DataRegistry.get_map(map_index)
+	if md != null:
+		var n := String(md.get("nation"))
+		if n != "":
+			return faction_id_of(n)
+		var arr: Array = md.get("nations")
+		if arr != null and arr.size() > 0:
+			return faction_id_of(String(arr[0]))
+	return "yunlan"
+
 func on_enemy_killed(kind: String, is_boss: bool, target_nation: String = "") -> void:
 	# 通缉度
 	var noto := int(reputation.get("notoriety", 0))
