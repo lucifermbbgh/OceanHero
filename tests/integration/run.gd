@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1312_exchange()
 	await _test_v1311_tables()
 	await _test_v139_license_rules()
 	await _test_v138_kill_rep()
@@ -662,6 +663,38 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.12 兑换结算 ----------------
+func _test_v1312_exchange() -> void:
+	print("\n[1.3.12 兑换入库]")
+	GameState.reset_new_game()
+	# 声望不足拒绝
+	GameState.faction_rep["yunlan"] = 0
+	var r0: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_sail")
+	_ok(not bool(r0.get("ok", true)), "声望不足不能兑换", str(r0.get("reason", "")))
+	# 金币不足拒绝
+	GameState.faction_rep["yunlan"] = 80
+	GameState.gold = 10
+	var r1: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_sail")
+	_ok(not bool(r1.get("ok", true)), "金币不足不能兑换", str(r1.get("reason", "")))
+	# 成功兑换装备
+	GameState.gold = 100000
+	GameState.gear_owned.clear()
+	var gear_before: int = GameState.gear_owned.size()
+	var r2: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_sail")
+	_ok(bool(r2.get("ok", false)), "兑换装备成功", str(r2.get("reason", "")))
+	_ok(GameState.gear_owned.size() == gear_before + 1, "装备入库",
+		str(GameState.gear_owned.size()))
+	_ok(GameState.gold == 88000, "扣除金币 12000", str(GameState.gold))
+	# 稀有物品扣声望
+	var gold2: int = GameState.gold
+	var r3: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_clipper")
+	_ok(bool(r3.get("ok", false)), "兑换船只成功", str(r3.get("reason", "")))
+	_ok(GameState.gold == gold2 - 45000, "扣除金币 45000", str(GameState.gold))
+	_ok(GameState.faction_rep_of("yunlan") == 70, "稀有扣声望 10",
+		str(GameState.faction_rep_of("yunlan")))
+	_ok(GameState.ships_owned.size() >= 1, "船只入库", str(GameState.ships_owned.size()))
+	GameState.reset_new_game()
 
 # ---------------- 1.3.11 物品表与兑换所 ----------------
 func _test_v1311_tables() -> void:

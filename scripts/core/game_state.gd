@@ -268,6 +268,67 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 兑换结算（1.3.12） ----------------
+
+## 兑换：校验声望/金币 → 扣款 → 发放物品
+func exchange_item(faction: String, item_id: String) -> Dictionary:
+	var row: Dictionary = {}
+	for r in exchange_offers(faction):
+		if String(r["item"]) == item_id:
+			row = r
+			break
+	if row.is_empty():
+		# 专属物品不在随机池时，从商店表直接找
+		for r2 in shop_rows:
+			if String(r2["item"]) == item_id and String(r2["shop"]) in ["exchange_" + faction, "shared"]:
+				row = r2
+				break
+	if row.is_empty():
+		return {"ok": false, "reason": "该物品不在兑换列表"}
+	var need := int(row["rep_need"])
+	if faction_rep_of(faction) < need:
+		return {"ok": false, "reason": "声望不足（需要 %d）" % need}
+	var price := int(row["gold"])
+	if gold < price:
+		return {"ok": false, "reason": "金币不足（需要 %d）" % price}
+	var def: Dictionary = item_def(item_id)
+	if def.is_empty():
+		return {"ok": false, "reason": "物品定义缺失"}
+	add_gold(-price)
+	var rep_cost := int(row["rep_cost"])
+	if rep_cost > 0:
+		add_faction_rep(faction, -rep_cost)
+	var granted := _grant_item(def)
+	if not granted:
+		# 发放失败则退款
+		add_gold(price)
+		if rep_cost > 0:
+			add_faction_rep(faction, rep_cost)
+		return {"ok": false, "reason": "发放失败"}
+	return {"ok": true, "name": String(def["name"]), "gold": price, "rep": rep_cost}
+
+func _grant_item(def: Dictionary) -> bool:
+	var kind := String(def["kind"])
+	var ref := StringName(String(def["ref"]))
+	match kind:
+		"gear":
+			if DataRegistry.get_gear(ref) == null:
+				return false
+			if not gear_owned.has(ref):
+				gear_owned.append(ref)
+			return true
+		"ship":
+			if DataRegistry.get_ship(ref) == null:
+				return false
+			for s in ships_owned:
+				if StringName(String(s.get("def_id"))) == ref:
+					return true
+			ships_owned.append({"def_id": ref, "variant": &"standard",
+				"station_port": &"jadehaven", "hull_hp": -1.0,
+				"sail_pct": 1.0, "rudder_pct": 1.0, "crew_pct": 1.0, "equipped": {}})
+			return true
+	return false
+
 # ---------------- 物品表与商店表（1.3.11） ----------------
 
 var item_defs: Dictionary = {}   # id -> {name, kind, ref, rarity, price, desc}

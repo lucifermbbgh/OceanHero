@@ -2311,19 +2311,12 @@ func _show_exchange_detail(item_id: String, faction: String) -> void:
 	add_child(dlg)
 	dlg.popup_centered()
 
-func _do_exchange(item_id: String, faction: String, gold_need: int, rep_cost: int, dlg: Node) -> void:
-	if GameState.gold < gold_need:
-		_log("金币不足")
-		dlg.queue_free()
-		return
-	if GameState.faction_rep_of(faction) < 0:
-		_log("声望不足")
-		dlg.queue_free()
-		return
-	GameState.add_gold(-gold_need)
-	if rep_cost > 0:
-		GameState.add_faction_rep(faction, -rep_cost)
-	_log("兑换成功：%s" % String(GameState.item_def(item_id).get("name", item_id)))
+func _do_exchange(item_id: String, faction: String, _gold_need: int, _rep_cost: int, dlg: Node) -> void:
+	var r: Dictionary = GameState.exchange_item(faction, item_id)
+	if bool(r.get("ok", false)):
+		_log("兑换成功：%s" % String(r.get("name", item_id)))
+	else:
+		_log(String(r.get("reason", "兑换失败")))
 	dlg.queue_free()
 	_rebuild_exchange(faction)
 	_refresh()
