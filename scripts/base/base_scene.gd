@@ -2232,6 +2232,17 @@ func _do_invest_deposit(key: String) -> void:
 var exch_root: PanelContainer = null
 var exch_list: VBoxContainer = null
 
+## 声望条着色：正绿、负红、零灰
+func _tint_rep_bar(bar: ProgressBar, value: int) -> void:
+	var sb := StyleBoxFlat.new()
+	if value > 0:
+		sb.bg_color = Color(0.35, 0.78, 0.45)
+	elif value < 0:
+		sb.bg_color = Color(0.85, 0.35, 0.32)
+	else:
+		sb.bg_color = Color(0.55, 0.58, 0.55)
+	bar.add_theme_stylebox_override("fill", sb)
+
 func _open_exchange(faction: String) -> void:
 	_close_all_panels()
 	_rebuild_exchange(faction)
@@ -2260,6 +2271,8 @@ func _rebuild_exchange(faction: String) -> void:
 		cell.custom_minimum_size = Vector2(250, 110)
 		cell.text = "%s\n\n声望 %d" % [String(def["name"]), need]
 		cell.add_theme_color_override("font_color", Color(0.55, 0.95, 0.6) if ok else Color(0.95, 0.45, 0.4))
+		if not ok:
+			cell.tooltip_text = "声望不足，暂时无法兑换"
 		cell.add_theme_font_size_override("font_size", 15)
 		var item_id := String(row["item"])
 		cell.pressed.connect(func(): _show_exchange_detail(item_id, faction))
@@ -2296,9 +2309,13 @@ func _show_exchange_detail(item_id: String, faction: String) -> void:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 10)
 	vb.add_child(hb)
+	var can_claim := GameState.faction_rep_of(faction) >= int(row["rep_need"])
+	if not can_claim:
+		vb.add_child(_lbl("声望不足，无法兑换", 360, Color(0.95, 0.45, 0.4)))
 	var ok := Button.new()
 	ok.text = "确认"
 	ok.custom_minimum_size = Vector2(110, 30)
+	ok.disabled = not can_claim
 	var gold_need := int(row["gold"])
 	var rep_cost := int(row["rep_cost"])
 	ok.pressed.connect(func(): _do_exchange(item_id, faction, gold_need, rep_cost, dlg))
@@ -2315,11 +2332,21 @@ func _do_exchange(item_id: String, faction: String, _gold_need: int, _rep_cost: 
 	var r: Dictionary = GameState.exchange_item(faction, item_id)
 	if bool(r.get("ok", false)):
 		_log("兑换成功：%s" % String(r.get("name", item_id)))
+		dlg.queue_free()
 	else:
-		_log(String(r.get("reason", "兑换失败")))
-	dlg.queue_free()
+		dlg.queue_free()
+		_show_message("兑换失败", String(r.get("reason", "兑换失败")))
 	_rebuild_exchange(faction)
 	_refresh()
+
+## 通用提示弹窗（确定 / ESC 关闭）
+func _show_message(title: String, body: String) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = title
+	dlg.dialog_text = body
+	dlg.ok_button_text = "确定"
+	add_child(dlg)
+	dlg.popup_centered()
 
 # ---------------- 势力声望面板（1.3.6） ----------------
 
@@ -2370,6 +2397,7 @@ func _rebuild_factions() -> void:
 			bar0.value = GameState.faction_rep_of(fid0)
 			bar0.custom_minimum_size = Vector2(420, 20)
 			bar0.show_percentage = false
+			_tint_rep_bar(bar0, GameState.faction_rep_of(fid0))
 			row0.add_child(bar0)
 			row0.add_child(_lbl("%d（%s）" % [GameState.faction_rep_of(fid0),
 				GameState.faction_tier_name(fid0)], 180, Color(0.9, 0.82, 0.45)))
@@ -2399,6 +2427,7 @@ func _rebuild_factions() -> void:
 	bar.value = v
 	bar.custom_minimum_size = Vector2(720, 26)
 	bar.show_percentage = false
+	_tint_rep_bar(bar, v)
 	fac_list.add_child(bar)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 0)

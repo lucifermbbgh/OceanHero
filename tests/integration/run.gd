@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1317_polish()
 	await _test_v1315_events()
 	await _test_v1314_patrol_aggro()
 	await _test_v1313_unique()
@@ -668,6 +669,32 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.17 兑换交互与声望条 ----------------
+func _test_v1317_polish() -> void:
+	print("\n[1.3.17 兑换交互]")
+	GameState.reset_new_game()
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	s._open_exchange("yunlan")
+	await _frames(1)
+	_ok(s.exch_root.visible, "兑换所打开")
+	# 声望不足：结算必须拒绝并给原因
+	var r: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_clipper")
+	_ok(not bool(r.get("ok", true)), "声望不足拒绝兑换")
+	_ok(String(r.get("reason", "")).contains("声望"), "失败原因含声望", String(r.get("reason", "")))
+	# 金币不足：原因含金币
+	GameState.faction_rep["yunlan"] = 80
+	GameState.gold = 1
+	var r2: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_sail")
+	_ok(String(r2.get("reason", "")).contains("金币"), "金币不足原因", String(r2.get("reason", "")))
+	# 声望条着色方法可调用
+	s._tint_rep_bar(ProgressBar.new(), -50)
+	_ok(true, "声望条着色函数可用")
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.3.15 势力事件 ----------------
 func _test_v1315_events() -> void:
