@@ -308,10 +308,10 @@ const FACTION_TIERS := [
 	{"min": -75, "max": -51, "name": "敌对"},
 	{"min": -50, "max": -26, "name": "敌视"},
 	{"min": -25, "max": -1, "name": "冷漠"},
-	{"min": 0, "max": 24, "name": "中立"},
-	{"min": 25, "max": 49, "name": "友善"},
-	{"min": 50, "max": 74, "name": "友好"},
-	{"min": 75, "max": 100, "name": "盟友"},
+	{"min": 0, "max": 25, "name": "中立"},
+	{"min": 26, "max": 50, "name": "友善"},
+	{"min": 51, "max": 75, "name": "友好"},
+	{"min": 76, "max": 100, "name": "盟友"},
 ]
 
 func faction_tier_index(fid: String) -> int:

@@ -682,8 +682,12 @@ func _test_v136_faction_rep() -> void:
 	GameState.add_faction_rep("yunlan", 200)
 	_ok(GameState.faction_rep_of("yunlan") == 100, "回到 100")
 	_ok(GameState.faction_tier_name("yunlan") == "盟友", "100 为盟友")
-	GameState.faction_rep["yunlan"] = 30
-	_ok(GameState.faction_tier_name("yunlan") == "友善", "30 为友善")
+	GameState.faction_rep["yunlan"] = 25
+	_ok(GameState.faction_tier_name("yunlan") == "中立", "25 仍为中立")
+	GameState.faction_rep["yunlan"] = 26
+	_ok(GameState.faction_tier_name("yunlan") == "友善", "26 为友善")
+	GameState.faction_rep["yunlan"] = 76
+	_ok(GameState.faction_tier_name("yunlan") == "盟友", "76 为盟友")
 	GameState.faction_rep["yunlan"] = -60
 	_ok(GameState.faction_tier_name("yunlan") == "敌对", "-60 为敌对")
 	# 按船只等级扣声望：3 级船 = 3 点

@@ -1882,10 +1882,15 @@ func interact_prompt() -> String:
 	if pi != null:
 		var isl: Array = islands[int(pi)]
 		return "按 E 停靠 %s（%s）" % [String(isl[3]), String(ISLAND_TIERS.get(int(isl[2]), "港口"))]
-	if player.global_position.distance_to(BACK_GATE) < 240.0:
+	# 航门与打捞点重叠时，取更近的那个
+	var gate_d: float = player.global_position.distance_to(BACK_GATE)
+	var salv_d: float = _nearest_salvage_dist()
+	if gate_d < 240.0 and gate_d <= salv_d:
 		return "按 E 返回母港"
-	if _nearest_salvage_dist() < 250.0:
+	if salv_d < 250.0:
 		return "按 E 打捞沉船残骸"
+	if gate_d < 240.0:
+		return "按 E 返回母港"
 	if player.global_position.distance_to(FORWARD_GATE) < 240.0:
 		if map_index >= 9:
 			return "已是航道尽头"
