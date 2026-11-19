@@ -2342,6 +2342,12 @@ func _rebuild_factions() -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 6)
 	fac_list.add_child(tabs)
+	var ov := Button.new()
+	ov.text = "总览"
+	ov.custom_minimum_size = Vector2(104, 32)
+	ov.modulate = Color(1.0, 0.92, 0.55) if fac_current == "" else Color(1, 1, 1)
+	ov.pressed.connect(func(): fac_current = ""; _rebuild_factions())
+	tabs.add_child(ov)
 	for fid in GameState.FACTIONS_V2:
 		var tb := Button.new()
 		tb.text = String(GameState.FACTION_V2_NAMES.get(fid, fid))
@@ -2350,6 +2356,28 @@ func _rebuild_factions() -> void:
 		var fv := String(fid)
 		tb.pressed.connect(func(): fac_current = fv; _rebuild_factions())
 		tabs.add_child(tb)
+	if fac_current == "":
+		_yard_title_to(fac_list, "七大势力总览")
+		for fid0 in GameState.FACTIONS_V2:
+			var row0 := HBoxContainer.new()
+			row0.add_theme_constant_override("separation", 10)
+			fac_list.add_child(row0)
+			row0.add_child(_lbl(String(GameState.FACTION_V2_NAMES.get(fid0, fid0)), 120,
+				Color(0.85, 0.88, 0.85)))
+			var bar0 := ProgressBar.new()
+			bar0.min_value = -100
+			bar0.max_value = 100
+			bar0.value = GameState.faction_rep_of(fid0)
+			bar0.custom_minimum_size = Vector2(420, 20)
+			bar0.show_percentage = false
+			row0.add_child(bar0)
+			row0.add_child(_lbl("%d（%s）" % [GameState.faction_rep_of(fid0),
+				GameState.faction_tier_name(fid0)], 180, Color(0.9, 0.82, 0.45)))
+		var lic_txt := "无"
+		if GameState.has_privateer_license and GameState.privateer_nation != "":
+			lic_txt = "%s私掠证" % String(GameState.FACTION_V2_NAMES.get(GameState.privateer_nation, GameState.privateer_nation))
+		_yard_title_to(fac_list, "当前持有私掠证：%s" % lic_txt)
+		return
 	var v := GameState.faction_rep_of(fac_current)
 	_yard_title_to(fac_list, "%s · 声望 %d（%s）" % [
 		String(GameState.FACTION_V2_NAMES.get(fac_current, fac_current)),

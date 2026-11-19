@@ -133,3 +133,17 @@ res://data/ships/third_rate.tres
 res://data/towns/layout_1.tres
 res://data/towns/layout_2.tres
 res://data/towns/layout_3.tres
+res://data/gear/fx_gear_yunlan_sail.tres
+res://data/gear/fx_gear_chilin_hold.tres
+res://data/gear/fx_gear_shuangyu_rudder.tres
+res://data/gear/fx_gear_xuanjiao_armor.tres
+res://data/gear/fx_gear_baijing_ram.tres
+res://data/gear/fx_gear_cangwu_sail.tres
+res://data/gear/fx_gear_youming_sail.tres
+res://data/ships/fx_ship_yunlan_clipper.tres
+res://data/ships/fx_ship_chilin_merchant.tres
+res://data/ships/fx_ship_shuangyu_breaker.tres
+res://data/ships/fx_ship_xuanjiao_night.tres
+res://data/ships/fx_ship_baijing_whale.tres
+res://data/ships/fx_ship_cangwu_hunter.tres
+res://data/ships/fx_ship_youming_ghost.tres

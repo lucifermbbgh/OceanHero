@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/ship_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"fx_ship_chilin_merchant"
+variant = &"standard"
+display_name = "赤鳞商船"
+tier = 4
+ship_class = "纵帆船"
+base_hp = 600
+base_speed = 4.2
+turn_rate = 34.0
+cargo_capacity = 1400
+crew_capacity = 70
+cannon_slots = 12
+guns_per_side = 6
+max_cannon_weight = 5
+armor_base = 20
+price = 46000
+description = "速帆快船，适合追击与侦察。"

@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1313_unique()
 	await _test_v1312_exchange()
 	await _test_v1311_tables()
 	await _test_v139_license_rules()
@@ -248,9 +249,11 @@ func _test_monster() -> void:
 func _test_shipyard() -> void:
 	print("\n[船厂与装备]")
 	GameState.reset_new_game()
-	_ok(DataRegistry.ships.size() == 40, "40 个船体（10 基准 × 3 变体 + 10 基准）", "实得 %d" % DataRegistry.ships.size())
-	_ok(DataRegistry.ship_bases.size() == 10, "10 个基准模板（I~X）")
-	_ok(DataRegistry.gear.size() == 20, "20 件装备（11 常规 + 9 独有）", "实得 %d" % DataRegistry.gear.size())
+	_ok(DataRegistry.ships.size() == 68, "68 个船体（17 基准 × 4）", "实得 %d" % DataRegistry.ships.size())
+	_ok(DataRegistry.ship_bases.size() == 17, "17 个基准模板（含 7 艘势力专属）",
+		str(DataRegistry.ship_bases.size()))
+	_ok(DataRegistry.gear.size() == 27, "27 件装备（含 7 件势力专属）",
+		"实得 %d" % DataRegistry.gear.size())
 	_ok(DataRegistry.get_ship(&"brig_navy") != null, "变体船 id 可查")
 
 	var s = load("res://scenes/base/base_scene.tscn").instantiate()
@@ -663,6 +666,36 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.13 专属物与总览 ----------------
+func _test_v1313_unique() -> void:
+	print("\n[1.3.13 专属物/总览]")
+	GameState.reset_new_game()
+	# 专属资源已注册
+	_ok(DataRegistry.get_gear(&"fx_gear_yunlan_sail") != null, "云澜军帆资源存在")
+	_ok(DataRegistry.get_ship(&"fx_ship_yunlan_clipper") != null, "云澜快帆资源存在")
+	var g: Resource = DataRegistry.get_gear(&"fx_gear_youming_sail")
+	_ok(g != null and is_equal_approx(float(g.speed_pct), 0.15), "幽溟黑帆航速 +15%",
+		str(g.speed_pct if g != null else -1))
+	var s: Resource = DataRegistry.get_ship(&"fx_ship_shuangyu_breaker")
+	_ok(s != null and int(s.base_hp) == 780, "破冰舰船体 780", str(s.base_hp if s != null else -1))
+	# 兑换专属船入库
+	GameState.faction_rep["yunlan"] = 100
+	GameState.gold = 200000
+	var r: Dictionary = GameState.exchange_item("yunlan", "fx_yunlan_clipper")
+	_ok(bool(r.get("ok", false)), "专属船兑换成功", str(r.get("reason", "")))
+	_ok(GameState.ships_owned.size() >= 1, "专属船入库")
+	# 总览页可渲染
+	var sc = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(sc)
+	await _frames(3)
+	sc.fac_current = ""
+	sc._toggle_factions()
+	await _frames(1)
+	_ok(sc.fac_list.get_child_count() > 0, "总览页有内容")
+	sc.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.3.12 兑换结算 ----------------
 func _test_v1312_exchange() -> void:

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"fx_gear_youming_sail"
+display_name = "幽溟黑帆"
+slot = &"sail"
+rarity = 3
+speed_pct = 0.15
+turn_pct = 0.00
+armor_add = 0
+boarding_add = 0
+price = 12000
+description = "势力专属"
