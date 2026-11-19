@@ -2038,6 +2038,13 @@ func _edge_prompt() -> String:
 func _try_edge_travel() -> void:
 	if not SceneRouter.has_host():
 		return
+	# 只有靠近前进航门才弹航线选择（否则每帧都会弹）
+	if player == null or not is_instance_valid(player):
+		return
+	if player.global_position.distance_to(FORWARD_GATE) > 240.0:
+		return
+	if travel_panel != null and is_instance_valid(travel_panel):
+		return
 	# 1.3.2：邻接图航行，前进门打开航线选择
 	var opts: Array = GameState.travel_options()
 	var usable: Array = []
@@ -2108,7 +2115,7 @@ func _spawn_patrols() -> void:
 	patrols.clear()
 	var cfg: Array = GameState.patrol_config_for_map(map_index)
 	for entry in cfg:
-		var nation: String = String(entry["nation"])
+		var nation: String = GameState.faction_id_of(String(entry["nation"]))
 		var count: int = int(entry["count"])
 		var col: Color = GameState.NATION_COLORS.get(nation, Color(0.7, 0.7, 0.7))
 		for i in range(count):
