@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v139_license_rules()
 	await _test_v138_kill_rep()
 	await _test_v136_faction_rep()
 	await _test_v135_patrols()
@@ -660,6 +661,57 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.9 私掠证规则 ----------------
+func _test_v139_license_rules() -> void:
+	print("\n[1.3.9 私掠证]")
+	GameState.reset_new_game()
+	GameState.add_gold(200000)
+	# 正规购证需该国声望 51
+	_ok(not bool(GameState.buy_license_legal("yunlan").get("ok", false)), "声望不足不能购证")
+	GameState.faction_rep["yunlan"] = 60
+	var r1: Dictionary = GameState.buy_license_legal("yunlan")
+	_ok(bool(r1.get("ok", false)), "声望 60 可购云澜私掠证", str(r1.get("reason", "")))
+	_ok(GameState.privateer_nation == "yunlan", "证绑定云澜")
+	# 幽溟不发证
+	GameState.has_privateer_license = false
+	_ok(not bool(GameState.buy_license_legal("youming").get("ok", true)), "幽溟不发私掠证")
+
+	# 结算四档
+	GameState.reset_new_game()
+	GameState.has_privateer_license = true
+	GameState.privateer_nation = "yunlan"
+	GameState.faction_rep["yunlan"] = 0
+	# 敌国（玄礁）：云澜 +L
+	GameState.rep_for_sinking("xuanjiao", 4)
+	_ok(GameState.faction_rep_of("yunlan") == 4, "劫掠敌国：持证国 +L",
+		str(GameState.faction_rep_of("yunlan")))
+	# 中立国（赤鳞）：云澜不扣
+	GameState.faction_rep["yunlan"] = 0
+	GameState.rep_for_sinking("chilin", 4)
+	_ok(GameState.faction_rep_of("yunlan") == 0, "劫掠中立国：持证国不扣",
+		str(GameState.faction_rep_of("yunlan")))
+	# 盟国（霜屿）：云澜 −L/2
+	GameState.faction_rep["yunlan"] = 0
+	GameState.rep_for_sinking("shuangyu", 4)
+	_ok(GameState.faction_rep_of("yunlan") == -2, "劫掠盟国：持证国 −L/2",
+		str(GameState.faction_rep_of("yunlan")))
+	# 本国：−2L
+	GameState.faction_rep["yunlan"] = 0
+	GameState.rep_for_sinking("yunlan", 4)
+	_ok(GameState.faction_rep_of("yunlan") == -8, "叛旗：本国 −2L",
+		str(GameState.faction_rep_of("yunlan")))
+
+	# 出售
+	GameState.faction_rep["yunlan"] = 50
+	var gold0: int = GameState.gold
+	var rs: Dictionary = GameState.sell_license()
+	_ok(bool(rs.get("ok", false)), "可出售私掠证")
+	_ok(GameState.gold > gold0, "出售返还金币")
+	_ok(not GameState.has_privateer_license, "出售后不再持有")
+	_ok(GameState.faction_rep_of("yunlan") == 45, "出售后持证国 −5",
+		str(GameState.faction_rep_of("yunlan")))
+	GameState.reset_new_game()
 
 # ---------------- 1.3.8 击沉接入势力声望 ----------------
 func _test_v138_kill_rep() -> void:
@@ -1939,10 +1991,10 @@ func _test_black_market_v011() -> void:
 	# 正规途径需要声望
 	GameState.reset_new_game()
 	GameState.add_gold(100000)
-	_ok(not bool(GameState.buy_license_legal().get("ok", true)), "声望不足时不能买正规私掠证")
-	GameState.reputation["royal_navy"] = int(GameState.LEGAL_LICENSE_REP)
-	var lr: Dictionary = GameState.buy_license_legal()
-	_ok(bool(lr.get("ok", false)), "声望达标后可买正规私掠证")
+	_ok(not bool(GameState.buy_license_legal("yunlan").get("ok", true)), "声望不足时不能买正规私掠证")
+	GameState.faction_rep["yunlan"] = 60
+	var lr: Dictionary = GameState.buy_license_legal("yunlan")
+	_ok(bool(lr.get("ok", false)), "声望达标后可买正规私掠证", str(lr.get("reason", "")))
 	_ok(GameState.license_is_legal, "标记为正规途径")
 
 	# 持证劫掠商船：不额外降海军声望

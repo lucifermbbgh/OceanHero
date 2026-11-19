@@ -1091,7 +1091,7 @@ func _toggle_rep() -> void:
 	rep_root.visible = true
 
 func _buy_license_legal() -> void:
-	var r: Dictionary = GameState.buy_license_legal()
+	var r: Dictionary = GameState.buy_license_legal(fac_current if fac_current != "youming" else "yunlan")
 	if bool(r.get("ok", false)):
 		_log("取得正规私掠许可证")
 		_rebuild_rep()
@@ -1115,14 +1115,14 @@ func _rebuild_rep() -> void:
 		lhb.add_theme_constant_override("separation", 10)
 		rep_list.add_child(lhb)
 		lhb.add_child(_lbl("正规私掠证", 140))
-		lhb.add_child(_lbl("需海军声望 %d" % int(GameState.LEGAL_LICENSE_REP), 200,
+		lhb.add_child(_lbl("需 %s 声望 51" % String(GameState.FACTION_V2_NAMES.get(fac_current, "云澜")), 220,
 			Color(0.8, 0.85, 0.8)))
 		var lprice := int(GameState.LEGAL_LICENSE_REP) * 2
 		lhb.add_child(_lbl("%d 金" % lprice, 120, Color(0.9, 0.82, 0.45)))
 		var lb := Button.new()
 		lb.text = "购买"
 		lb.custom_minimum_size = Vector2(80, 26)
-		lb.disabled = GameState.rep_of("royal_navy") < int(GameState.LEGAL_LICENSE_REP) or GameState.gold < lprice
+		lb.disabled = GameState.faction_rep_of(fac_current) < 51 or GameState.gold < lprice
 		lb.pressed.connect(func(): _buy_license_legal())
 		lhb.add_child(lb)
 		var hint := Label.new()
@@ -2790,6 +2790,41 @@ func _toggle_black() -> void:
 	_rebuild_black()
 	black_root.visible = true
 
+func _sell_license() -> void:
+	var r: Dictionary = GameState.sell_license()
+	if bool(r.get("ok", false)):
+		_log("出售私掠证，返还 %d 金" % int(r.get("gold", 0)))
+	else:
+		_log(String(r.get("reason", "出售失败")))
+	_rebuild_black()
+	_refresh()
+
+func _buy_license_black_prompt() -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "选择国家"
+	var vb := VBoxContainer.new()
+	dlg.add_child(vb)
+	for fid in GameState.FACTIONS_V2:
+		if fid == "youming":
+			continue
+		var btn := Button.new()
+		btn.text = String(GameState.FACTION_V2_NAMES.get(fid, fid))
+		btn.custom_minimum_size = Vector2(200, 30)
+		var fv := String(fid)
+		btn.pressed.connect(func(): _do_buy_black(fv))
+		vb.add_child(btn)
+	add_child(dlg)
+	dlg.popup_centered()
+
+func _do_buy_black(nation: String) -> void:
+	var r: Dictionary = GameState.buy_license_black(nation)
+	if bool(r.get("ok", false)):
+		_log("取得%s私掠证（黑市）" % String(GameState.FACTION_V2_NAMES.get(nation, nation)))
+	else:
+		_log(String(r.get("reason", "购买失败")))
+	_rebuild_black()
+	_refresh()
+
 func _rebuild_black() -> void:
 	for c in black_list.get_children():
 		black_list.remove_child(c)
@@ -2798,6 +2833,27 @@ func _rebuild_black() -> void:
 	if not GameState.black_market_open():
 		black_list.add_child(_lbl("　通缉度过高，黑市本周关闭", 500, Color(0.9, 0.5, 0.45)))
 		return
+	# 1.3.9：私掠证买卖
+	_yard_title_to(black_list, "私掠证")
+	var lic_row := HBoxContainer.new()
+	lic_row.add_theme_constant_override("separation", 10)
+	black_list.add_child(lic_row)
+	if GameState.has_privateer_license:
+		lic_row.add_child(_lbl("持有：%s私掠证" % String(GameState.FACTION_V2_NAMES.get(GameState.privateer_nation, GameState.privateer_nation)), 300,
+			Color(0.7, 0.9, 0.7)))
+		var sell_b := Button.new()
+		sell_b.text = "出售（返还 30%）"
+		sell_b.custom_minimum_size = Vector2(160, 28)
+		sell_b.pressed.connect(func(): _sell_license())
+		lic_row.add_child(sell_b)
+	else:
+		lic_row.add_child(_lbl("　尚未持有私掠证", 240, Color(0.6, 0.65, 0.62)))
+		var buy_b := Button.new()
+		buy_b.text = "黑市购买（需指定国家）"
+		buy_b.custom_minimum_size = Vector2(220, 28)
+		buy_b.pressed.connect(func(): _buy_license_black_prompt())
+		lic_row.add_child(buy_b)
+
 	_yard_title_to(black_list, "销赃（合法价 60%）")
 	for cid in [&"grain", &"timber", &"rum", &"spice"]:
 		var have := int(GameState.cargo.get(cid, 0))

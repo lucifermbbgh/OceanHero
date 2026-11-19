@@ -327,21 +327,36 @@ func faction_tier_name(fid: String) -> String:
 ## 击沉某势力舰船：按船只等级扣声望（1 级 = 1 点）
 func rep_for_sinking(fid: String, ship_level: int) -> void:
 	var lv := clampi(ship_level, 1, 10)
+	# 持证规则（1.3.9）：叛旗加倍；敌国 +L；中立不扣；盟国 −L/2
+	var licensed := has_privateer_license and privateer_nation != ""
+	if licensed and fid == privateer_nation:
+		add_faction_rep(fid, -lv * 2)
+		return
 	add_faction_rep(fid, -lv)
-	# 该势力的敌国获得一半声望
 	for other in FACTIONS_V2:
 		if other == fid:
 			continue
-		if nation_relation_between_v2(fid, other) == "hostile":
+		var rel := nation_relation_between_v2(fid, other)
+		if licensed and other == privateer_nation:
+			if rel == "hostile":
+				add_faction_rep(other, lv)
+			elif rel == "ally":
+				add_faction_rep(other, -maxi(1, int(lv / 2)))
+			continue
+		if rel == "hostile":
 			add_faction_rep(other, maxi(1, int(lv / 2)))
 
 ## 势力关系（v2）：幽溟与所有六国敌对；六国之间沿用 1.3.3 表
+const FACTION_TO_NATION := {"yunlan": "lan"}
+
 func nation_relation_between_v2(a: String, b: String) -> String:
 	if a == b or a == "" or b == "":
 		return "neutral"
 	if a == "youming" or b == "youming":
 		return "hostile"
-	return nation_relation_between(a, b)
+	var na := String(FACTION_TO_NATION.get(a, a))
+	var nb := String(FACTION_TO_NATION.get(b, b))
+	return nation_relation_between(na, nb)
 
 ## 每档效果说明（面板逐行展示，当前档高亮）
 const FACTION_TIER_EFFECTS := [
@@ -2178,18 +2193,36 @@ func buy_license_black(nation: String = "") -> Dictionary:
 	return {"ok": true, "price": price}
 
 ## 购买私掠许可证（正规途径：声望交易）
-func buy_license_legal() -> Dictionary:
+## 出售私掠证：返还 30%，持证国声望 −5（1.3.9）
+func sell_license() -> Dictionary:
+	if not has_privateer_license:
+		return {"ok": false, "reason": "没有私掠证可出售"}
+	var base_price := int(round(float(LEGAL_LICENSE_REP) * BLACK_LICENSE_MULT * 10.0))
+	var refund := int(round(float(base_price) * 0.3))
+	add_gold(refund)
+	if privateer_nation != "":
+		add_faction_rep(privateer_nation, -5)
+	var old_nation := privateer_nation
+	has_privateer_license = false
+	privateer_nation = ""
+	license_is_legal = false
+	return {"ok": true, "gold": refund, "nation": old_nation}
+
+func buy_license_legal(nation: String = "") -> Dictionary:
 	if has_privateer_license:
 		return {"ok": false, "reason": "已经持有私掠许可证"}
-	if rep_of("royal_navy") < LEGAL_LICENSE_REP:
-		return {"ok": false, "reason": "海军声望不足（需要 %d）" % LEGAL_LICENSE_REP}
+	if nation == "" or not FACTIONS_V2.has(nation) or nation == "youming":
+		return {"ok": false, "reason": "必须指定有效国家"}
+	if faction_rep_of(nation) < 51:
+		return {"ok": false, "reason": "该国声望不足（需要 51）"}
 	var price := LEGAL_LICENSE_REP * 2
 	if gold < price:
 		return {"ok": false, "reason": "金币不足，需要 %d" % price}
 	add_gold(-price)
 	has_privateer_license = true
+	privateer_nation = nation
 	license_is_legal = true
-	return {"ok": true, "price": price}
+	return {"ok": true, "price": price, "nation": nation}
 
 # ---------------- 拍卖行 ----------------
 
