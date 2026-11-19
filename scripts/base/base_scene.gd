@@ -145,6 +145,7 @@ func _build_ui() -> void:
 	_action_button(vb, "船员名单", _toggle_crew_panel)
 	_action_button(vb, "装备强化", _toggle_gear)
 	_action_button(vb, "船只改装", _toggle_mod)
+	_action_button(vb, "势力声望", _toggle_factions)
 	_action_button(vb, "仓库", _toggle_store)
 	if GameState.is_home_visit():
 		_action_button(vb, "建造", _toggle_construct)
@@ -326,6 +327,22 @@ func _build_ui() -> void:
 	invest_list.add_theme_constant_override("separation", 6)
 	invest_list.custom_minimum_size = Vector2(1510, 0)
 	invscroll.add_child(invest_list)
+
+	# 势力声望面板
+	fac_root = PanelContainer.new()
+	fac_root.position = Vector2(16, 72)
+	fac_root.custom_minimum_size = Vector2(1568, 812)
+	fac_root.add_theme_stylebox_override("panel", _panel_style())
+	fac_root.visible = false
+	root.add_child(fac_root)
+	var facscroll := ScrollContainer.new()
+	facscroll.custom_minimum_size = Vector2(1530, 780)
+	facscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	fac_root.add_child(facscroll)
+	fac_list = VBoxContainer.new()
+	fac_list.add_theme_constant_override("separation", 6)
+	fac_list.custom_minimum_size = Vector2(1510, 0)
+	facscroll.add_child(fac_list)
 
 	# 仓库面板
 	store_root = PanelContainer.new()
@@ -2211,6 +2228,67 @@ func _do_invest_deposit(key: String) -> void:
 		_rebuild_invest()
 		_refresh()
 
+# ---------------- 势力声望面板（1.3.6） ----------------
+
+var fac_root: PanelContainer = null
+var fac_list: VBoxContainer = null
+var fac_current: String = "yunlan"
+
+func _toggle_factions() -> void:
+	if fac_root.visible:
+		fac_root.visible = false
+		return
+	_rebuild_factions()
+	fac_root.visible = true
+
+func _rebuild_factions() -> void:
+	for c in fac_list.get_children():
+		fac_list.remove_child(c)
+		c.queue_free()
+	_yard_title_to(fac_list, "势力声望")
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	fac_list.add_child(tabs)
+	for fid in GameState.FACTIONS_V2:
+		var tb := Button.new()
+		tb.text = String(GameState.FACTION_V2_NAMES.get(fid, fid))
+		tb.custom_minimum_size = Vector2(104, 32)
+		tb.modulate = Color(1.0, 0.92, 0.55) if fid == fac_current else Color(1, 1, 1)
+		var fv := String(fid)
+		tb.pressed.connect(func(): fac_current = fv; _rebuild_factions())
+		tabs.add_child(tb)
+	var v := GameState.faction_rep_of(fac_current)
+	_yard_title_to(fac_list, "%s · 声望 %d（%s）" % [
+		String(GameState.FACTION_V2_NAMES.get(fac_current, fac_current)),
+		v, GameState.faction_tier_name(fac_current)])
+	var bar := ProgressBar.new()
+	bar.min_value = -100
+	bar.max_value = 100
+	bar.value = v
+	bar.custom_minimum_size = Vector2(720, 26)
+	bar.show_percentage = false
+	fac_list.add_child(bar)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 0)
+	fac_list.add_child(head)
+	head.add_child(_cell_box("声望等级", 180, Color(0.62, 0.78, 0.85), true))
+	head.add_child(_cell_box("效果说明", 900, Color(0.62, 0.78, 0.85), true))
+	var active_idx := GameState.faction_tier_index(fac_current)
+	for i in range(GameState.FACTION_TIER_EFFECTS.size()):
+		var row: Dictionary = GameState.FACTION_TIER_EFFECTS[i]
+		var rrow := HBoxContainer.new()
+		rrow.add_theme_constant_override("separation", 0)
+		fac_list.add_child(rrow)
+		var is_active := i == active_idx
+		var col := Color(0.55, 0.95, 0.6) if is_active else Color(0.55, 0.58, 0.55)
+		var nm_label := _cell_box(String(row["name"]), 180, col)
+		var ef_label := _cell_box(String(row["effect"]), 900, col)
+		if is_active:
+			nm_label.add_theme_font_size_override("font_size", 19)
+			ef_label.add_theme_font_size_override("font_size", 19)
+		rrow.add_child(nm_label)
+		rrow.add_child(ef_label)
+
 # ---------------- 仓库面板（1.2.1） ----------------
 
 var store_root: PanelContainer = null
@@ -2456,7 +2534,7 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
 	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
-	"crew_root", "gear_root", "mod_root", "store_root", "invest_root"]
+	"crew_root", "gear_root", "mod_root", "store_root", "invest_root", "fac_root"]
 
 var close_btn: Button = null
 var construct_root: PanelContainer = null

@@ -268,6 +268,109 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 势力声望（1.3.6 重做） ----------------
+
+## 七大势力：6 国 + 1 海盗
+const FACTIONS_V2 := ["yunlan", "chilin", "shuangyu", "xuanjiao", "baijing", "cangwu", "youming"]
+const FACTION_V2_NAMES := {
+	"yunlan": "云澜", "chilin": "赤鳞", "shuangyu": "霜屿",
+	"xuanjiao": "玄礁", "baijing": "白鲸", "cangwu": "苍梧",
+	"youming": "幽溟",
+}
+const FACTION_V2_COLORS := {
+	"yunlan": Color(0.35, 0.55, 0.85), "chilin": Color(0.85, 0.4, 0.35),
+	"shuangyu": Color(0.6, 0.8, 0.9), "xuanjiao": Color(0.55, 0.45, 0.65),
+	"baijing": Color(0.85, 0.85, 0.9), "cangwu": Color(0.45, 0.7, 0.5),
+	"youming": Color(0.45, 0.35, 0.5),
+}
+
+## 声望 -100 ~ 100，初始 0
+var faction_rep: Dictionary = {}
+
+func _init_faction_rep() -> void:
+	for f in FACTIONS_V2:
+		if not faction_rep.has(f):
+			faction_rep[f] = 0
+
+func faction_rep_of(fid: String) -> int:
+	_init_faction_rep()
+	return int(faction_rep.get(fid, 0))
+
+func add_faction_rep(fid: String, amount: int) -> void:
+	if not FACTIONS_V2.has(fid):
+		return
+	_init_faction_rep()
+	faction_rep[fid] = clampi(faction_rep_of(fid) + amount, -100, 100)
+
+## 每 25 点一档：-100~-76, -75~-51, -50~-26, -25~-1, 0~24, 25~49, 50~74, 75~100
+const FACTION_TIERS := [
+	{"min": -100, "max": -76, "name": "死敌"},
+	{"min": -75, "max": -51, "name": "敌对"},
+	{"min": -50, "max": -26, "name": "敌视"},
+	{"min": -25, "max": -1, "name": "冷漠"},
+	{"min": 0, "max": 24, "name": "中立"},
+	{"min": 25, "max": 49, "name": "友善"},
+	{"min": 50, "max": 74, "name": "友好"},
+	{"min": 75, "max": 100, "name": "盟友"},
+]
+
+func faction_tier_index(fid: String) -> int:
+	var v := faction_rep_of(fid)
+	for i in range(FACTION_TIERS.size()):
+		if v >= int(FACTION_TIERS[i]["min"]) and v <= int(FACTION_TIERS[i]["max"]):
+			return i
+	return 4
+
+func faction_tier_name(fid: String) -> String:
+	return String(FACTION_TIERS[faction_tier_index(fid)]["name"])
+
+## 击沉某势力舰船：按船只等级扣声望（1 级 = 1 点）
+func rep_for_sinking(fid: String, ship_level: int) -> void:
+	var lv := clampi(ship_level, 1, 10)
+	add_faction_rep(fid, -lv)
+	# 该势力的敌国获得一半声望
+	for other in FACTIONS_V2:
+		if other == fid:
+			continue
+		if nation_relation_between_v2(fid, other) == "hostile":
+			add_faction_rep(other, maxi(1, int(lv / 2)))
+
+## 势力关系（v2）：幽溟与所有六国敌对；六国之间沿用 1.3.3 表
+func nation_relation_between_v2(a: String, b: String) -> String:
+	if a == b or a == "" or b == "":
+		return "neutral"
+	if a == "youming" or b == "youming":
+		return "hostile"
+	return nation_relation_between(a, b)
+
+## 每档效果说明（面板逐行展示，当前档高亮）
+const FACTION_TIER_EFFECTS := [
+	{"name": "死敌", "effect": "巡逻队主动攻击 · 关税 +15% · 拒绝停靠 · 无法接任务"},
+	{"name": "敌对", "effect": "巡逻队主动攻击 · 关税 +12% · 无法接任务"},
+	{"name": "敌视", "effect": "关税 +10% · 无法接任务"},
+	{"name": "冷漠", "effect": "关税 +6% · 任务奖励 -20%"},
+	{"name": "中立", "effect": "关税 +3% · 任务正常"},
+	{"name": "友善", "effect": "关税 +1% · 可接本国任务"},
+	{"name": "友好", "effect": "关税 0% · 任务奖励 +20% · 商店折扣 5%"},
+	{"name": "盟友", "effect": "关税 -2% · 任务奖励 +40% · 可购本国军舰"},
+]
+
+## 势力声望对应的关税（叠加在基础关税上）
+func faction_tariff(fid: String) -> float:
+	var idx := faction_tier_index(fid)
+	var table := [0.15, 0.12, 0.10, 0.06, 0.03, 0.01, 0.0, -0.02]
+	return float(table[clampi(idx, 0, 7)])
+
+## 势力声望对应的任务奖励倍率
+func faction_quest_mult(fid: String) -> float:
+	var idx := faction_tier_index(fid)
+	var table := [0.0, 0.0, 0.0, 0.8, 1.0, 1.0, 1.2, 1.4]
+	return float(table[clampi(idx, 0, 7)])
+
+## 该势力是否允许玩家接任务
+func faction_accepts_quests(fid: String) -> bool:
+	return faction_tier_index(fid) >= 4
+
 # ---------------- 势力巡逻队（1.3.5） ----------------
 
 ## 该海图应出现的巡逻队配置：[{nation, count}]
@@ -597,6 +700,10 @@ func _quest_check() -> void:
 			_quest_finish(i)
 		else:
 			i += 1
+
+## 1.3.6：按船只等级结算势力声望（敌方/友方方向由调用方决定）
+func apply_ship_rep(fid: String, ship_level: int) -> void:
+	rep_for_sinking(fid, ship_level)
 
 func on_enemy_killed(kind: String, is_boss: bool, target_nation: String = "") -> void:
 	# 通缉度
@@ -2536,6 +2643,7 @@ func to_dict() -> Dictionary:
 		"contraband": contraband.duplicate(),
 		"crew_xp": crew_xp.duplicate(),
 		"nation_rep": nation_rep.duplicate(),
+		"faction_rep": faction_rep.duplicate(),
 		"ship_mods": ship_mods.duplicate(),
 		"building_upgrades": building_upgrades.duplicate(true),
 		"gear_level": gear_level.duplicate(),
@@ -2664,6 +2772,11 @@ func from_dict(d: Dictionary) -> void:
 			"left": int(bk.get("left", 12)), "itotal": int(bk.get("itotal", 0)),
 			"ipaid": int(bk.get("ipaid", 0)), "month": int(bk.get("month", 0)),
 		})
+	faction_rep.clear()
+	_init_faction_rep()
+	var frep: Dictionary = d.get("faction_rep", {})
+	for fk in frep.keys():
+		faction_rep[String(fk)] = int(frep[fk])
 	nation_rep.clear()
 	_init_nation_rep()
 	var nrep: Dictionary = d.get("nation_rep", {})
@@ -2847,6 +2960,8 @@ func reset_new_game() -> void:
 	gold = START_GOLD
 	nation_rep.clear()
 	_init_nation_rep()
+	faction_rep.clear()
+	_init_faction_rep()
 	commendation = 0
 	level = 1
 	xp = 0

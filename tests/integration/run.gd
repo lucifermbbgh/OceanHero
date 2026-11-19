@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v136_faction_rep()
 	await _test_v135_patrols()
 	await _test_v134_license()
 	await _test_v133_relations()
@@ -658,6 +659,50 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.6 势力声望面板 ----------------
+func _test_v136_faction_rep() -> void:
+	print("\n[1.3.6 势力声望]")
+	GameState.reset_new_game()
+	_ok(GameState.FACTIONS_V2.size() == 7, "七大势力", str(GameState.FACTIONS_V2.size()))
+	_ok(GameState.FACTION_V2_NAMES["yunlan"] == "云澜", "首个势力为云澜")
+	_ok(GameState.FACTION_V2_NAMES["youming"] == "幽溟", "末个势力为幽溟")
+	var all_zero := true
+	for f in GameState.FACTIONS_V2:
+		if GameState.faction_rep_of(f) != 0:
+			all_zero = false
+	_ok(all_zero, "初始声望均为 0")
+	_ok(GameState.faction_tier_name("yunlan") == "中立", "0 点为中立")
+	# 范围钳制
+	GameState.add_faction_rep("yunlan", 500)
+	_ok(GameState.faction_rep_of("yunlan") == 100, "上限 100", str(GameState.faction_rep_of("yunlan")))
+	GameState.add_faction_rep("yunlan", -500)
+	_ok(GameState.faction_rep_of("yunlan") == -100, "下限 -100")
+	# 分档
+	GameState.add_faction_rep("yunlan", 200)
+	_ok(GameState.faction_rep_of("yunlan") == 100, "回到 100")
+	_ok(GameState.faction_tier_name("yunlan") == "盟友", "100 为盟友")
+	GameState.faction_rep["yunlan"] = 30
+	_ok(GameState.faction_tier_name("yunlan") == "友善", "30 为友善")
+	GameState.faction_rep["yunlan"] = -60
+	_ok(GameState.faction_tier_name("yunlan") == "敌对", "-60 为敌对")
+	# 按船只等级扣声望：3 级船 = 3 点
+	GameState.reset_new_game()
+	GameState.rep_for_sinking("chilin", 3)
+	_ok(GameState.faction_rep_of("chilin") == -3, "击沉 3 级船扣 3 点",
+		str(GameState.faction_rep_of("chilin")))
+	GameState.reset_new_game()
+	GameState.rep_for_sinking("youming", 10)
+	_ok(GameState.faction_rep_of("youming") == -10, "击沉 10 级船扣 10 点")
+	# 关税与任务倍率
+	GameState.faction_rep["yunlan"] = 0
+	_ok(is_equal_approx(GameState.faction_tariff("yunlan"), 0.03), "中立关税 3%")
+	GameState.faction_rep["yunlan"] = 80
+	_ok(is_equal_approx(GameState.faction_tariff("yunlan"), -0.02), "盟友关税 -2%")
+	_ok(GameState.faction_accepts_quests("yunlan"), "盟友可接任务")
+	GameState.faction_rep["yunlan"] = -80
+	_ok(not GameState.faction_accepts_quests("yunlan"), "死敌不可接任务")
+	GameState.reset_new_game()
 
 # ---------------- 1.3.5 势力巡逻队 ----------------
 func _test_v135_patrols() -> void:
