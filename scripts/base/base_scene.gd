@@ -1152,24 +1152,7 @@ func _rebuild_rep() -> void:
 		nrow.add_child(_cell_box(rel, 120, rel_col))
 		nrow.add_child(_cell_box("1.3.1 起用于港口归属与关税", 360, Color(0.66, 0.72, 0.7)))
 
-	_yard_title_to(rep_list, "三阵营声望（0~10000）")
-	for fac in GameState.FACTIONS:
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 8)
-		rep_list.add_child(hb)
-		hb.add_child(_lbl(String(GameState.FACTION_NAMES[fac]), 110, Color(0.8, 0.85, 0.8)))
-		hb.add_child(_lbl("%d（%s）" % [GameState.rep_of(fac), GameState.rep_level_name(fac)], 180,
-			Color(0.9, 0.82, 0.45)))
-		var used := int(GameState.donated_week.get(fac, 0))
-		var b := Button.new()
-		b.text = "捐赠 1000 金"
-		b.disabled = GameState.gold < 1000 or used >= 5000
-		b.custom_minimum_size = Vector2(130, 26)
-		var fac_v := String(fac)
-		b.pressed.connect(func(): _do_donate(fac_v))
-		hb.add_child(b)
-		hb.add_child(_lbl("本周额度 %d/5000" % used, 150, Color(0.6, 0.65, 0.6)))
-
+	_yard_title_to(rep_list, "势力声望请在左侧「势力声望」面板查看")
 	_yard_title_to(rep_list, "通缉度（>50 会被海军赏金猎人追捕）")
 	var nb := Button.new()
 	nb.text = "缴纳保释金 5000 金（通缉度 -20）"

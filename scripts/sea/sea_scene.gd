@@ -833,9 +833,12 @@ func _rebuild_port() -> void:
 			Color(0.8, 0.85, 0.7)))
 	if GameState.port_service_unlocked(tier, "reputation"):
 		_p_title("声望与战功（城市开放）")
-		port_list.add_child(_p_lbl("　海军 %d · 商会 %d · 黑帆 %d · 战功 %d" % [
-			GameState.rep_of("royal_navy"), GameState.rep_of("merchant"),
-			GameState.rep_of("black_sail"), GameState.commendation], 600, Color(0.8, 0.85, 0.7)))
+		var rep_parts: Array = []
+		for fid_hud in GameState.FACTIONS_V2:
+			rep_parts.append("%s %d" % [String(GameState.FACTION_V2_NAMES.get(fid_hud, fid_hud)),
+				GameState.faction_rep_of(fid_hud)])
+		port_list.add_child(_p_lbl("　%s" % " · ".join(rep_parts), 700, Color(0.8, 0.85, 0.7)))
+		port_list.add_child(_p_lbl("　战功 %d" % GameState.commendation, 300, Color(0.8, 0.85, 0.7)))
 
 	_p_title("任务（交付 / 进度）")
 	var any_q := false

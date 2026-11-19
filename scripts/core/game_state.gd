@@ -692,6 +692,18 @@ func refresh_quests() -> void:
 				q["reward_gold"] = 1500 + level * 150
 		quests_available.append(q)
 
+## 旧阵营 id → 新势力 id
+func _quest_faction_id(fac: String) -> String:
+	match fac:
+		"royal_navy":
+			return faction_id_of(String(DataRegistry.get_map(current_map).get("nation"))) if DataRegistry.get_map(current_map) != null else "yunlan"
+		"merchant":
+			return "chilin"
+		"black_sail":
+			return "youming"
+		_:
+			return faction_id_of(fac)
+
 func _quest_finish(index: int) -> void:
 	var q: Dictionary = quests_active[index]
 	add_gold(int(q.get("reward_gold", 0)))
@@ -700,9 +712,13 @@ func _quest_finish(index: int) -> void:
 	while xp >= CRes.xp_to_next(level):
 		xp -= CRes.xp_to_next(level)
 		level += 1
+	# 1.3.10：任务奖励改为势力声望（旧阵营 id 映射到新势力）
 	var fac := String(q.get("faction", ""))
 	if fac != "":
-		add_rep(fac, 120)
+		var fid := _quest_faction_id(fac)
+		if fid != "":
+			add_faction_rep(fid, 6)
+			EventBus.ticker.emit("%s 声望 +6" % String(FACTION_V2_NAMES.get(fid, fid)))
 	quests_active.remove_at(index)
 	EventBus.ticker.emit("任务完成：%s（+%d 金%s）" % [String(q.get("title", "")), int(q.get("reward_gold", 0)),
 		"，%s +120" % FACTION_NAMES.get(fac, "") if fac != "" else ""])
@@ -751,21 +767,9 @@ func on_enemy_killed(kind: String, is_boss: bool, target_nation: String = "") ->
 		noto = maxi(-100, noto - (5 if is_boss else 2))
 	elif kind == "navy":
 		noto = mini(100, noto + 15)
-		add_rep("royal_navy", -30)
-		add_rep("black_sail", 15)
 	elif kind == "merchant":
 		noto = mini(100, noto + 8)
-		add_rep("merchant", -40)
-		add_rep("black_sail", 15)
-		# 1.3.4：持证劫掠该国敌对国为合法（未知国籍时按持证判断）
-		if is_legal_privateering(target_nation) or (target_nation == "" and has_privateer_license):
-			add_rep("royal_navy", 5)
 	reputation["notoriety"] = noto
-	if kind == "pirate":
-		add_rep("royal_navy", 8 if is_boss else 3)
-		add_rep("black_sail", -3)
-	elif kind == "monster":
-		add_rep("royal_navy", 5 if is_boss else 2)
 	stat_add_kill(is_boss)
 	# 讨伐任务进度
 	for q in quests_active:

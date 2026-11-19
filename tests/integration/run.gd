@@ -3137,10 +3137,11 @@ func _test_reputation() -> void:
 	# 击杀给声望
 	GameState.reset_new_game()
 	GameState.on_enemy_killed("pirate", false)
-	_ok(GameState.rep_of("royal_navy") == 3, "击沉海盗 海军 +3", "实得 %d" % GameState.rep_of("royal_navy"))
+	# 1.3.10：旧阵营声望不再变动，仅保留通缉度结算
+	_ok(GameState.rep_of("royal_navy") == 0, "击沉海盗不再改旧阵营声望",
+		str(GameState.rep_of("royal_navy")))
 	GameState.on_enemy_killed("navy", false)
-	_ok(GameState.rep_of("royal_navy") == 0, "击沉海军 海军声望扣到 0")
-	_ok(GameState.rep_of("black_sail") == 15, "击沉海军 黑帆 +15")
+	_ok(GameState.notoriety() == 13, "击沉海军通缉度 +15（含海盗 −2）", str(GameState.notoriety()))
 
 	# 通缉：保释与衰减
 	GameState.reputation["notoriety"] = 80
@@ -3157,7 +3158,7 @@ func _test_reputation() -> void:
 		"amount": 1, "progress": 0, "title": "声望任务", "reward_gold": 10, "reward_xp": 0,
 		"reward_comm": 0, "faction": "black_sail"})
 	GameState.on_enemy_killed("pirate", false)
-	_ok(GameState.rep_of("black_sail") >= 120, "任务完成给对应阵营 +120",
+	_ok(GameState.faction_rep_of("youming") == 6, "任务完成给对应势力 +6",
 		"实得 %d" % GameState.rep_of("black_sail"))
 
 # ---------------- 战功 ----------------
