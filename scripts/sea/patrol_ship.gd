@@ -54,11 +54,22 @@ func _tick_move(delta: float) -> void:
 	else:
 		global_position += d.normalized() * speed * delta
 
+## 1.3.14：声望降到死敌/敌对时主动攻击玩家
+func _player_is_hostile() -> bool:
+	return GameState.faction_tier_index(nation_id) <= 1
+
 func _tick_combat(delta: float) -> void:
 	fire_cd -= delta
 	if fire_cd > 0.0:
 		return
 	fire_cd = RELOAD
+	# 优先处理玩家敌对
+	if _player_is_hostile():
+		var pl = get_tree().get_first_node_in_group("player")
+		if pl != null and pl.alive and global_position.distance_to(pl.global_position) < SIGHT:
+			target = pl
+			pl.take_damage({"hull": float(guns) * 3.0, "sail": 0.0, "rudder": 0.0, "crew": 0.0})
+			return
 	if target == null or not is_instance_valid(target) or not target.alive:
 		target = null
 		var best: Node = null

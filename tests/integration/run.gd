@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1314_patrol_aggro()
 	await _test_v1313_unique()
 	await _test_v1312_exchange()
 	await _test_v1311_tables()
@@ -666,6 +667,38 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.14 巡逻队敌对玩家 ----------------
+func _test_v1314_patrol_aggro() -> void:
+	print("\n[1.3.14 巡逻队敌对]")
+	GameState.reset_new_game()
+	var PatrolScript = load("res://scripts/sea/patrol_ship.gd")
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	GameState.current_map = 1
+	add_child(s)
+	await _frames(6)
+	_ok(s.player != null and s.player.is_in_group("player"), "玩家已入组")
+	var p = Node2D.new()
+	p.set_script(PatrolScript)
+	add_child(p)
+	p.setup("yunlan", [], Color.WHITE)
+	# 中立：不攻击
+	GameState.faction_rep["yunlan"] = 0
+	p.global_position = s.player.global_position + Vector2(60, 0)
+	var hp0: float = s.player.hull_hp
+	p.fire_cd = 0.0
+	p._tick_combat(1.0)
+	_ok(is_equal_approx(s.player.hull_hp, hp0), "中立时不攻击玩家")
+	# 死敌：攻击
+	GameState.faction_rep["yunlan"] = -80
+	p.fire_cd = 0.0
+	p._tick_combat(1.0)
+	_ok(s.player.hull_hp < hp0, "死敌时攻击玩家",
+		"%.0f → %.0f" % [hp0, s.player.hull_hp])
+	p.queue_free()
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.3.13 专属物与总览 ----------------
 func _test_v1313_unique() -> void:

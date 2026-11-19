@@ -366,6 +366,7 @@ func _spawn_player() -> void:
 	if GameState.sea_position != Vector2.ZERO:
 		player.position = GameState.sea_position
 	player.died.connect(_on_player_died)
+	player.add_to_group("player")
 	add_child(player)
 	player.obstacles = islands
 	player.world_bounds = Rect2(0, 0, SEA_SIZE, SEA_SIZE)
