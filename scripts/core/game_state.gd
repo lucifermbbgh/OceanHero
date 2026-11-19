@@ -268,6 +268,38 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 势力巡逻队（1.3.5） ----------------
+
+## 该海图应出现的巡逻队配置：[{nation, count}]
+func patrol_config_for_map(index: int) -> Array:
+	var md: Resource = DataRegistry.get_map(index)
+	if md == null:
+		return []
+	var out: Array = []
+	var present: Array = md.get("nations")
+	if present == null or present.is_empty():
+		var single := String(md.get("nation"))
+		if single == "":
+			return []
+		present = [single]
+	var count_per := 2
+	if present.size() >= 3:
+		count_per = 2
+	for n in present:
+		out.append({"nation": String(n), "count": count_per})
+	return out
+
+## 国家代表色（用于巡逻队绘制）
+const NATION_COLORS := {
+	"lan": Color(0.35, 0.55, 0.85),
+	"chilin": Color(0.85, 0.4, 0.35),
+	"shuangyu": Color(0.6, 0.8, 0.9),
+	"xuanjiao": Color(0.55, 0.45, 0.65),
+	"baijing": Color(0.85, 0.85, 0.9),
+	"cangwu": Color(0.45, 0.7, 0.5),
+}
+
+# ---------------- 私掠证绑定（1.3.4） ----------------
 ## 1.3.4：对目标国劫掠是否合法
 func is_legal_privateering(target_nation: String) -> bool:
 	if not has_privateer_license or privateer_nation == "":

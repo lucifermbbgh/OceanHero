@@ -19,3 +19,4 @@ tier = 2
 nation = &""
 contested = true
 neighbors = [1, 2, 3, 4, 5, 7, 8, 9]
+nations = ["lan", "chilin"]

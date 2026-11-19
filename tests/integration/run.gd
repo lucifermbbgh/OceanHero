@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v135_patrols()
 	await _test_v134_license()
 	await _test_v133_relations()
 	await _test_v132_adjacency()
@@ -657,6 +658,57 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.5 势力巡逻队 ----------------
+func _test_v135_patrols() -> void:
+	print("\n[1.3.5 巡逻队]")
+	GameState.reset_new_game()
+	# 腹地图：单国 2 队
+	var cfg1: Array = GameState.patrol_config_for_map(1)
+	_ok(cfg1.size() == 1, "腹地图只有一国", str(cfg1.size()))
+	_ok(int(cfg1[0]["count"]) == 2, "单国 2 队", str(cfg1[0]["count"]))
+	# 交界图：两国各 2 队
+	var cfg6: Array = GameState.patrol_config_for_map(6)
+	_ok(cfg6.size() == 2, "交界图两国", str(cfg6.size()))
+	var n6a := String(cfg6[0]["nation"])
+	var n6b := String(cfg6[1]["nation"])
+	_ok(n6a == "lan" and n6b == "chilin", "交界图国家正确", "%s/%s" % [n6a, n6b])
+	_ok(GameState.nation_relation_between(n6a, n6b) == "neutral", "两国关系为中立")
+	# 玄礁参与的图与他国敌对
+	var cfg30: Array = GameState.patrol_config_for_map(30)
+	_ok(cfg30.size() >= 1, "海盗水域有巡逻", str(cfg30.size()))
+	# 场景生成与销毁
+	GameState.current_map = 6
+	var s = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(6)
+	_ok(s.patrols.size() == 4, "交界图生成 4 队巡逻", "实得 %d" % s.patrols.size())
+	var nations := {}
+	for p in s.patrols:
+		nations[p.nation_id] = true
+	_ok(nations.size() == 2, "巡逻队来自两国", str(nations.keys()))
+	# 敌对关系才开战
+	var a = s.patrols[0]
+	var b = s.patrols[1]
+	_ok(GameState.nation_relation_between(a.nation_id, b.nation_id) == "neutral",
+		"同图中立两国不会开战")
+	# 手动让玄礁与澜国互打
+	a.nation_id = "xuanjiao"
+	b.nation_id = "lan"
+	a.target = b
+	var hp0: float = b.hp
+	a._tick_combat(1.0)
+	_ok(b.hp < hp0, "敌对势力互相造成伤害", "%.0f → %.0f" % [hp0, b.hp])
+	# 沉没后不产生战利品
+	var gold0: int = GameState.gold
+	var cargo0: int = GameState.cargo_used()
+	b.hp = 1.0
+	b.take_damage(999.0)
+	await _frames(2)
+	_ok(GameState.gold == gold0, "击沉巡逻队无金币掉落")
+	_ok(GameState.cargo_used() == cargo0, "击沉巡逻队无货物掉落")
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 1.3.4 私掠许可证绑定国家 ----------------
 func _test_v134_license() -> void:

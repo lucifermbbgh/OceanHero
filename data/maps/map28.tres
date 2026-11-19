@@ -19,3 +19,4 @@ tier = 10
 nation = &""
 contested = true
 neighbors = [25, 26, 27, 29, 30]
+nations = ["lan", "xuanjiao", "shuangyu"]

@@ -105,6 +105,7 @@ func _ready() -> void:
 	_build_hud()
 	EventBus.islands_upgraded.connect(_on_islands_upgraded)
 	_build_port_ui()
+	_spawn_patrols()
 	var pd: Resource = DataRegistry.get_port(OUTPOST_ID)
 	if pd != null:
 		outpost_pos = _anchor_port_to_island(pd.position)
@@ -2085,6 +2086,53 @@ func _do_travel(target: int) -> void:
 	hud.ticker("驶入 %s" % (String(nmd.display_name) if nmd != null else str(target)))
 	SceneRouter.goto(&"sea")
 
+# ---------------- 势力巡逻队（1.3.5） ----------------
+
+const PatrolShipScript = preload("res://scripts/sea/patrol_ship.gd")
+var patrols: Array = []
+
+## 按海图归属生成巡逻队（仅在当前海图存在，离图即销毁）
+func _spawn_patrols() -> void:
+	for p in patrols:
+		if is_instance_valid(p):
+			p.queue_free()
+	patrols.clear()
+	var cfg: Array = GameState.patrol_config_for_map(map_index)
+	for entry in cfg:
+		var nation: String = String(entry["nation"])
+		var count: int = int(entry["count"])
+		var col: Color = GameState.NATION_COLORS.get(nation, Color(0.7, 0.7, 0.7))
+		for i in range(count):
+			var ship := Node2D.new()
+			ship.set_script(PatrolShipScript)
+			add_child(ship)
+			var route := _patrol_route(i, count, nation)
+			ship.setup(nation, route, col)
+			ship.add_to_group("patrols")
+			patrols.append(ship)
+
+## 巡逻航线：本国沿海岸线绕行，交界图则穿越中央
+func _patrol_route(idx: int, total: int, nation: String) -> Array:
+	var cx := SEA_SIZE * 0.5
+	var cy := SEA_SIZE * 0.5
+	var side := 1.0 if idx % 2 == 0 else -1.0
+	var radius := 900.0 + float(idx) * 180.0
+	var points: Array = []
+	for k in range(4):
+		var ang := TAU * float(k) / 4.0 + side * 0.4
+		points.append(Vector2(cx + cos(ang) * radius * 1.6, cy + sin(ang) * radius))
+	return points
+
+func _tick_patrols(_delta: float) -> void:
+	if patrols.is_empty():
+		return
+	var alive_list: Array = []
+	for p in patrols:
+		if is_instance_valid(p) and p.alive:
+			alive_list.append(p)
+	patrols = alive_list
+
+# ---------------- 势力巡逻队生成结束 ----------------
 func _lock_target(enemy) -> void:
 	player.auto_fire = false
 	player.target = enemy
