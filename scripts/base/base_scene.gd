@@ -328,6 +328,22 @@ func _build_ui() -> void:
 	invest_list.custom_minimum_size = Vector2(1510, 0)
 	invscroll.add_child(invest_list)
 
+	# 声望兑换所面板
+	exch_root = PanelContainer.new()
+	exch_root.position = Vector2(16, 72)
+	exch_root.custom_minimum_size = Vector2(1568, 812)
+	exch_root.add_theme_stylebox_override("panel", _panel_style())
+	exch_root.visible = false
+	root.add_child(exch_root)
+	var exscroll := ScrollContainer.new()
+	exscroll.custom_minimum_size = Vector2(1530, 780)
+	exscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	exch_root.add_child(exscroll)
+	exch_list = VBoxContainer.new()
+	exch_list.add_theme_constant_override("separation", 8)
+	exch_list.custom_minimum_size = Vector2(1510, 0)
+	exscroll.add_child(exch_list)
+
 	# 势力声望面板
 	fac_root = PanelContainer.new()
 	fac_root.position = Vector2(16, 72)
@@ -2211,6 +2227,107 @@ func _do_invest_deposit(key: String) -> void:
 		_rebuild_invest()
 		_refresh()
 
+# ---------------- 声望兑换所（1.3.11） ----------------
+
+var exch_root: PanelContainer = null
+var exch_list: VBoxContainer = null
+
+func _open_exchange(faction: String) -> void:
+	_close_all_panels()
+	_rebuild_exchange(faction)
+	exch_root.visible = true
+
+func _rebuild_exchange(faction: String) -> void:
+	for c in exch_list.get_children():
+		exch_list.remove_child(c)
+		c.queue_free()
+	var rep := GameState.faction_rep_of(faction)
+	_yard_title_to(exch_list, "声望兑换所 · %s　　声望 %d（%s）　现金 %d" % [
+		String(GameState.FACTION_V2_NAMES.get(faction, faction)), rep,
+		GameState.faction_tier_name(faction), GameState.gold])
+	var grid := GridContainer.new()
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	exch_list.add_child(grid)
+	for row in GameState.exchange_offers(faction):
+		var def: Dictionary = GameState.item_def(String(row["item"]))
+		if def.is_empty():
+			continue
+		var need := int(row["rep_need"])
+		var ok := rep >= need
+		var cell := Button.new()
+		cell.custom_minimum_size = Vector2(250, 110)
+		cell.text = "%s\n\n声望 %d" % [String(def["name"]), need]
+		cell.add_theme_color_override("font_color", Color(0.55, 0.95, 0.6) if ok else Color(0.95, 0.45, 0.4))
+		cell.add_theme_font_size_override("font_size", 15)
+		var item_id := String(row["item"])
+		cell.pressed.connect(func(): _show_exchange_detail(item_id, faction))
+		grid.add_child(cell)
+	var back := Button.new()
+	back.text = "关闭"
+	back.custom_minimum_size = Vector2(140, 34)
+	back.pressed.connect(func(): exch_root.visible = false)
+	exch_list.add_child(back)
+
+func _show_exchange_detail(item_id: String, faction: String) -> void:
+	var def: Dictionary = GameState.item_def(item_id)
+	if def.is_empty():
+		return
+	var row: Dictionary = {}
+	for r in GameState.exchange_offers(faction):
+		if String(r["item"]) == item_id:
+			row = r
+			break
+	if row.is_empty():
+		return
+	var dlg := AcceptDialog.new()
+	dlg.title = String(def["name"])
+	var vb := VBoxContainer.new()
+	dlg.add_child(vb)
+	for line in [
+		"类型：%s" % String(def["kind"]),
+		"需求声望：%d（%s）" % [int(row["rep_need"]), GameState.faction_tier_name(faction)],
+		"声望消耗：%d" % int(row["rep_cost"]),
+		"金币价格：%d" % int(row["gold"]),
+		"效果：%s" % String(def["desc"]),
+	]:
+		vb.add_child(_lbl(line, 360, Color(0.85, 0.88, 0.85)))
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	vb.add_child(hb)
+	var ok := Button.new()
+	ok.text = "确认"
+	ok.custom_minimum_size = Vector2(110, 30)
+	var gold_need := int(row["gold"])
+	var rep_cost := int(row["rep_cost"])
+	ok.pressed.connect(func(): _do_exchange(item_id, faction, gold_need, rep_cost, dlg))
+	hb.add_child(ok)
+	var cancel := Button.new()
+	cancel.text = "取消"
+	cancel.custom_minimum_size = Vector2(110, 30)
+	cancel.pressed.connect(func(): dlg.queue_free())
+	hb.add_child(cancel)
+	add_child(dlg)
+	dlg.popup_centered()
+
+func _do_exchange(item_id: String, faction: String, gold_need: int, rep_cost: int, dlg: Node) -> void:
+	if GameState.gold < gold_need:
+		_log("金币不足")
+		dlg.queue_free()
+		return
+	if GameState.faction_rep_of(faction) < 0:
+		_log("声望不足")
+		dlg.queue_free()
+		return
+	GameState.add_gold(-gold_need)
+	if rep_cost > 0:
+		GameState.add_faction_rep(faction, -rep_cost)
+	_log("兑换成功：%s" % String(GameState.item_def(item_id).get("name", item_id)))
+	dlg.queue_free()
+	_rebuild_exchange(faction)
+	_refresh()
+
 # ---------------- 势力声望面板（1.3.6） ----------------
 
 var fac_root: PanelContainer = null
@@ -2271,6 +2388,13 @@ func _rebuild_factions() -> void:
 			ef_label.add_theme_font_size_override("font_size", 19)
 		rrow.add_child(nm_label)
 		rrow.add_child(ef_label)
+	if fac_current != "youming" or true:
+		var ex_btn := Button.new()
+		ex_btn.text = "声望兑换所"
+		ex_btn.custom_minimum_size = Vector2(180, 34)
+		var fcur := String(fac_current)
+		ex_btn.pressed.connect(func(): _open_exchange(fcur))
+		fac_list.add_child(ex_btn)
 
 # ---------------- 仓库面板（1.2.1） ----------------
 
@@ -2517,7 +2641,7 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
 	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
-	"crew_root", "gear_root", "mod_root", "store_root", "invest_root", "fac_root"]
+	"crew_root", "gear_root", "mod_root", "store_root", "invest_root", "fac_root", "exch_root"]
 
 var close_btn: Button = null
 var construct_root: PanelContainer = null

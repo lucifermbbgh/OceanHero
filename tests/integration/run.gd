@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1311_tables()
 	await _test_v139_license_rules()
 	await _test_v138_kill_rep()
 	await _test_v136_faction_rep()
@@ -661,6 +662,37 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.11 物品表与兑换所 ----------------
+func _test_v1311_tables() -> void:
+	print("\n[1.3.11 物品表/商店表]")
+	GameState.reset_new_game()
+	_ok(not GameState.item_defs.is_empty(), "物品表已载入", str(GameState.item_defs.size()))
+	_ok(GameState.item_defs.size() >= 22, "物品数 ≥22", str(GameState.item_defs.size()))
+	_ok(GameState.item_def("gear_sail_r")["name"] == "疾风帆", "物品名称正确",
+		str(GameState.item_def("gear_sail_r")))
+	_ok(not GameState.shop_rows.is_empty(), "商店表已载入", str(GameState.shop_rows.size()))
+	# 兑换所：10 件 = 2 专属 + 8 共享
+	var offers: Array = GameState.exchange_offers("yunlan")
+	_ok(offers.size() == 10, "云澜兑换所 10 件", str(offers.size()))
+	var uniq := 0
+	for o in offers:
+		if int(o["unique"]) == 1:
+			uniq += 1
+	_ok(uniq == 2, "其中 2 件专属", str(uniq))
+	# 各势力都能生成
+	for fid in GameState.FACTIONS_V2:
+		_ok(GameState.exchange_offers(fid).size() == 10, "%s 兑换所 10 件" % fid)
+	# 面板可打开
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	s._open_exchange("yunlan")
+	await _frames(1)
+	_ok(s.exch_root.visible, "兑换所面板可打开")
+	_ok(s.exch_list.get_child_count() > 0, "兑换所有内容")
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 1.3.9 私掠证规则 ----------------
 func _test_v139_license_rules() -> void:

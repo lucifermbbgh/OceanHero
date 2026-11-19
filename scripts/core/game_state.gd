@@ -268,6 +268,81 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 物品表与商店表（1.3.11） ----------------
+
+var item_defs: Dictionary = {}   # id -> {name, kind, ref, rarity, price, desc}
+var shop_rows: Array = []        # [{shop, item, gold, rep_cost, rep_need, unique}]
+
+func _load_shop_tables() -> void:
+	item_defs.clear()
+	shop_rows.clear()
+	_load_items_csv("res://data/defs/items.csv")
+	_load_shops_csv("res://data/defs/shops.csv")
+
+func _read_lines(path: String) -> Array:
+	if not FileAccess.file_exists(path):
+		return []
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return []
+	var out: Array = []
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if line != "" and not line.begins_with("#"):
+			out.append(line)
+	f.close()
+	return out
+
+func _load_items_csv(path: String) -> void:
+	var lines: Array = _read_lines(path)
+	if lines.size() < 2:
+		return
+	for i in range(1, lines.size()):
+		var cols: PackedStringArray = String(lines[i]).split(",")
+		if cols.size() < 7:
+			continue
+		item_defs[cols[0]] = {"name": cols[1], "kind": cols[2], "ref": cols[3],
+			"rarity": int(cols[4]), "price": int(cols[5]), "desc": cols[6]}
+
+func _load_shops_csv(path: String) -> void:
+	var lines: Array = _read_lines(path)
+	if lines.size() < 2:
+		return
+	for i in range(1, lines.size()):
+		var cols: PackedStringArray = String(lines[i]).split(",")
+		if cols.size() < 6:
+			continue
+		shop_rows.append({"shop": cols[0], "item": cols[1], "gold": int(cols[2]),
+			"rep_cost": int(cols[3]), "rep_need": int(cols[4]), "unique": int(cols[5])})
+
+func item_def(id: String) -> Dictionary:
+	return item_defs.get(id, {})
+
+## 某势力的兑换所上架物品（2 专属 + 8 共享随机，按月刷新）
+func exchange_offers(faction: String) -> Array:
+	var shop_key := "exchange_" + faction
+	var uniques: Array = []
+	var shared: Array = []
+	for row in shop_rows:
+		if String(row["shop"]) == shop_key:
+			uniques.append(row)
+		elif String(row["shop"]) == "shared":
+			shared.append(row)
+	var out: Array = []
+	for u in uniques:
+		out.append(u)
+	# 共享池按「月 + 势力」稳定抽样 8 件
+	var pool: Array = shared.duplicate()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(faction) + TimeService.month() * 977 + TimeService.year() * 131
+	var picked := 0
+	while picked < 8 and not pool.is_empty():
+		var idx := rng.randi_range(0, pool.size() - 1)
+		out.append(pool[idx])
+		pool.remove_at(idx)
+		picked += 1
+	return out
+
 # ---------------- 势力声望（1.3.6 重做） ----------------
 
 ## 七大势力：6 国 + 1 海盗
@@ -1522,6 +1597,7 @@ func gear_combine(slot: StringName, rarity: int) -> Dictionary:
 ## 返回全部数据问题；空数组表示通过
 func _ready() -> void:
 	_load_recipes()
+	_load_shop_tables()
 
 func validate_defs() -> Array:
 	var errors: Array = []
