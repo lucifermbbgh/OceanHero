@@ -106,9 +106,13 @@ func _ready() -> void:
 	EventBus.islands_upgraded.connect(_on_islands_upgraded)
 	_build_port_ui()
 	_spawn_patrols()
-	var pd: Resource = DataRegistry.get_port(OUTPOST_ID)
-	if pd != null:
-		outpost_pos = _anchor_port_to_island(pd.position)
+	if map_index == 1:
+		var pd: Resource = DataRegistry.get_port(OUTPOST_ID)
+		if pd != null:
+			outpost_pos = _anchor_port_to_island(pd.position)
+	else:
+		# 其他海图没有哨站，移到屏幕外避免绘制与交互
+		outpost_pos = Vector2(-8000, -8000)
 	_apply_contraband_effects()
 	_spawn_map_contents()
 	_spawn_salvages()
