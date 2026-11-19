@@ -55,6 +55,10 @@ func _on_week_advanced(week_index: int) -> void:
 		var new_events: Array = GameState.tick_market(week_index)
 		for ev in new_events:
 			EventBus.ticker.emit("市场事件：%s · %s" % [String(ev.get("name", "")), String(ev.get("desc", ""))])
+		# 势力事件推进
+		var ev_msg: String = GameState.tick_faction_events()
+		if ev_msg != "":
+			EventBus.ticker.emit(ev_msg)
 		# 商品随机补货
 		var appeared: int = GameState.tick_supply()
 		if appeared > 0:

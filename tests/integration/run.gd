@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1315_events()
 	await _test_v1314_patrol_aggro()
 	await _test_v1313_unique()
 	await _test_v1312_exchange()
@@ -667,6 +668,36 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.3.15 势力事件 ----------------
+func _test_v1315_events() -> void:
+	print("\n[1.3.15 势力事件]")
+	GameState.reset_new_game()
+	GameState.faction_events.clear()
+	# 事件覆盖关系
+	GameState.start_faction_event("yunlan", "chilin", "war", 6)
+	_ok(GameState.nation_relation_between_v2("yunlan", "chilin") == "hostile",
+		"宣战事件使两国敌对")
+	_ok(GameState.nation_relation_between_v2("chilin", "yunlan") == "hostile", "关系对称")
+	# 结盟覆盖
+	GameState.faction_events.clear()
+	GameState.start_faction_event("shuangyu", "baijing", "alliance", 4)
+	_ok(GameState.nation_relation_between_v2("shuangyu", "baijing") == "ally", "结盟事件")
+	# 停战覆盖
+	GameState.faction_events.clear()
+	GameState.start_faction_event("lan", "xuanjiao", "peace", 3)
+	_ok(GameState.nation_relation_between_v2("lan", "xuanjiao") == "neutral", "停战事件")
+	# 禁运
+	GameState.faction_events.clear()
+	GameState.start_faction_event("chilin", "", "embargo", 4)
+	_ok(GameState.faction_embargo("chilin"), "禁运生效")
+	# 到期移除
+	GameState.faction_events.clear()
+	GameState.start_faction_event("yunlan", "cangwu", "war", 1)
+	var msg: String = GameState.tick_faction_events()
+	_ok(GameState.faction_events.is_empty(), "事件到期移除")
+	_ok(msg.contains("结束"), "结束播报", msg)
+	GameState.reset_new_game()
 
 # ---------------- 1.3.14 巡逻队敌对玩家 ----------------
 func _test_v1314_patrol_aggro() -> void:

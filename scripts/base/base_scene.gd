@@ -2373,6 +2373,17 @@ func _rebuild_factions() -> void:
 			row0.add_child(bar0)
 			row0.add_child(_lbl("%d（%s）" % [GameState.faction_rep_of(fid0),
 				GameState.faction_tier_name(fid0)], 180, Color(0.9, 0.82, 0.45)))
+		if not GameState.faction_events.is_empty():
+			var ev_lines: Array = []
+			for e in GameState.faction_events:
+				var kname: String = {"war": "宣战", "peace": "停战", "alliance": "结盟", "embargo": "禁运"}.get(String(e["kind"]), String(e["kind"]))
+				ev_lines.append("%s ⇄ %s %s（剩 %d 周）" % [
+					String(GameState.FACTION_V2_NAMES.get(String(e["a"]), String(e["a"]))),
+					String(GameState.FACTION_V2_NAMES.get(String(e["b"]), String(e["b"]))),
+					kname, int(e["weeks_left"])])
+			_yard_title_to(fac_list, "进行中的势力事件")
+			for line in ev_lines:
+				fac_list.add_child(_lbl("　%s" % String(line), 700, Color(0.9, 0.75, 0.5)))
 		var lic_txt := "无"
 		if GameState.has_privateer_license and GameState.privateer_nation != "":
 			lic_txt = "%s私掠证" % String(GameState.FACTION_V2_NAMES.get(GameState.privateer_nation, GameState.privateer_nation))

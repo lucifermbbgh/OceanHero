@@ -268,6 +268,90 @@ func reset_donations() -> void:
 	for f in FACTIONS:
 		donated_week[f] = 0
 
+# ---------------- 势力事件（1.3.15） ----------------
+
+## 进行中的事件：[{a, b, kind, weeks_left}]，kind = war / peace / alliance / embargo
+var faction_events: Array = []
+
+## 事件对两国关系的覆盖（无事件返回空串）
+func event_relation(a: String, b: String) -> String:
+	for e in faction_events:
+		var ea := String(e["a"])
+		var eb := String(e["b"])
+		if (ea == a and eb == b) or (ea == b and eb == a):
+			match String(e["kind"]):
+				"war":
+					return "hostile"
+				"alliance":
+					return "ally"
+				"peace":
+					return "neutral"
+	return ""
+
+func start_faction_event(a: String, b: String, kind: String, weeks: int = 6) -> void:
+	if a == "" or a == b:
+		return
+	if b == "" and kind != "embargo":
+		return
+	faction_events.append({"a": a, "b": b, "kind": kind,
+		"weeks_left": maxi(1, weeks)})
+
+func faction_embargo(a: String) -> bool:
+	for e in faction_events:
+		if String(e["kind"]) == "embargo" and String(e["a"]) == a:
+			return true
+	return false
+
+## 每周推进：到期移除 + 概率生成新事件
+func tick_faction_events() -> String:
+	var msg := ""
+	var kept: Array = []
+	for e in faction_events:
+		e["weeks_left"] = int(e["weeks_left"]) - 1
+		if int(e["weeks_left"]) > 0:
+			kept.append(e)
+		else:
+			msg = "%s 与 %s 的%s结束" % [
+				String(FACTION_V2_NAMES.get(String(e["a"]), String(e["a"]))),
+				String(FACTION_V2_NAMES.get(String(e["b"]), String(e["b"]))),
+				_event_name(String(e["kind"]))]
+	faction_events = kept
+	if not RngService.chance(0.08):
+		return msg
+	# 随机挑两国（不含幽溟与随机的组合以外的情况）
+	var pool: Array = FACTIONS_V2.duplicate()
+	pool.erase("youming")
+	if pool.size() < 2:
+		return msg
+	var ia := RngService.randi_range(0, pool.size() - 1)
+	var a := String(pool[ia])
+	var b := a
+	for other in pool:
+		if String(other) != a:
+			b = String(other)
+			break
+	var kinds := ["war", "peace", "alliance", "embargo"]
+	var kind: String = kinds[RngService.randi_range(0, kinds.size() - 1)]
+	start_faction_event(a, b, kind, RngService.randi_range(4, 8))
+	if msg != "":
+		msg += "；"
+	msg += "%s 对 %s %s" % [
+		String(FACTION_V2_NAMES.get(a, a)), String(FACTION_V2_NAMES.get(b, b)),
+		_event_name(kind)]
+	return msg
+
+func _event_name(kind: String) -> String:
+	match kind:
+		"war":
+			return "宣战"
+		"peace":
+			return "停战"
+		"alliance":
+			return "结盟"
+		"embargo":
+			return "禁运"
+	return kind
+
 # ---------------- 兑换结算（1.3.12） ----------------
 
 ## 兑换：校验声望/金币 → 扣款 → 发放物品
@@ -490,6 +574,9 @@ func nation_relation_between_v2(a: String, b: String) -> String:
 		return "neutral"
 	if a == "youming" or b == "youming":
 		return "hostile"
+	var ev := event_relation(a, b)
+	if ev != "":
+		return ev
 	var na := String(FACTION_TO_NATION.get(a, a))
 	var nb := String(FACTION_TO_NATION.get(b, b))
 	return nation_relation_between(na, nb)
