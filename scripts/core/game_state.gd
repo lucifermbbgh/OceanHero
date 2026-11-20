@@ -821,11 +821,13 @@ func upgrade_module(mid: String, layer: int = 0) -> Dictionary:
 	if gold < int(cost["gold"]):
 		return {"ok": false, "reason": "金币不足（需要 %d）" % int(cost["gold"])}
 	for mat in ["timber", "iron"]:
-		if int(warehouse.get(mat, 0)) < int(cost[mat]):
+		var wkey := &"iron_ore" if mat == "iron" else StringName(mat)
+		if int(warehouse.get(wkey, 0)) < int(cost[mat]):
 			return {"ok": false, "reason": "%s不足（需要 %d）" % ["木材" if mat == "timber" else "铁矿", int(cost[mat])]}
 	add_gold(-int(cost["gold"]))
 	for mat2 in ["timber", "iron"]:
-		warehouse[mat2] = maxi(0, int(warehouse.get(mat2, 0)) - int(cost[mat2]))
+		var wkey2 := &"iron_ore" if mat2 == "iron" else StringName(mat2)
+		warehouse[wkey2] = maxi(0, int(warehouse.get(wkey2, 0)) - int(cost[mat2]))
 	set_module_level(mid, layer, lv + 1)
 	return {"ok": true, "level": lv + 1, "cost": cost}
 
@@ -2181,7 +2183,7 @@ const TownPanelLib = preload("res://scripts/ui/town_panel.gd")
 
 ## 开局启动资源（够建两三座建筑）
 const START_RES = {
-	"gold": 8000, "timber": 300, "iron": 120, "stone": 150, "grain": 100,
+	"gold": 8000, "timber": 300, "iron_ore": 120, "stone": 150, "grain": 100,
 }
 
 ## 按城镇规则初始化建筑等级
@@ -2204,7 +2206,7 @@ func grant_start_resources() -> void:
 		if key == "timber":
 			amount = int(START_RES["timber"])
 		elif key == "iron_ore":
-			amount = int(START_RES["iron"])
+			amount = int(START_RES["iron_ore"])
 		elif key == "stone":
 			amount = int(START_RES["stone"])
 		else:

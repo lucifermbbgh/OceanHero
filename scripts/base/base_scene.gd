@@ -2446,15 +2446,20 @@ func _open_ship_slot(mid: String, layer: int) -> void:
 		var ub := Button.new()
 		ub.text = "强化"
 		ub.custom_minimum_size = Vector2(120, 30)
+		var err_lbl := _lbl("", 520, Color(0.95, 0.55, 0.45))
 		var midu := mid
 		var lvu := layer
 		ub.pressed.connect(func():
 			var r: Dictionary = GameState.upgrade_module(midu, lvu)
-			_log("强化成功：Lv%d" % int(r.get("level", 0)) if bool(r.get("ok", false)) else String(r.get("reason", "强化失败")))
-			dlg.queue_free()
-			_rebuild_ship_panel()
-			_refresh())
+			if bool(r.get("ok", false)):
+				_log("强化成功：Lv%d" % int(r.get("level", 0)))
+				dlg.queue_free()
+				_rebuild_ship_panel()
+				_refresh()
+			else:
+				err_lbl.text = "强化失败：" + String(r.get("reason", "未知原因")))
 		vb.add_child(ub)
+		vb.add_child(err_lbl)
 	vb.add_child(HSeparator.new())
 	if ship_tab == "gear":
 		_add_gear_options(vb, mid, layer)

@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1417_upgrade_runtime()
 	await _test_v1415_balance()
 	await _test_v1414_ui_save()
 	await _test_v1412_sails()
@@ -682,6 +683,24 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 1.4.17 强化运行时路径 ----------------
+func _test_v1417_upgrade_runtime() -> void:
+	print("\n[1.4.17 强化运行时]")
+	GameState.reset_new_game()
+	# 完全走开局状态：不额外设置仓库，只用 grant_start_resources 的物资
+	var r: Dictionary = GameState.upgrade_module("sails", 0)
+	_ok(bool(r.get("ok", false)), "开局直接强化风帆成功", str(r.get("reason", "")))
+	_ok(GameState.module_level("sails", 0) == 1, "风帆等级变为 1",
+		str(GameState.module_level("sails", 0)))
+	# 仓库键类型核查
+	_ok(int(GameState.warehouse.get(&"timber", -1)) >= 0, "仓库木材使用 StringName 键")
+	# 第二次强化：1 级船应已达上限
+	GameState.reset_new_game()
+	GameState.upgrade_module("sails", 0)
+	var r2: Dictionary = GameState.upgrade_module("sails", 0)
+	_ok(not bool(r2.get("ok", true)), "1 级船第二次强化被上限拒绝", str(r2.get("reason", "")))
+	GameState.reset_new_game()
+
 # ---------------- 1.4.15 基线平衡 ----------------
 func _test_v1415_balance() -> void:
 	print("\n[1.4.15 基线平衡]")
@@ -936,7 +955,7 @@ func _test_v145_module_upgrade() -> void:
 	_ok(not bool(r_mat.get("ok", true)), "材料不足拒绝", str(r_mat.get("reason", "")))
 	# 成功强化
 	GameState.warehouse[&"timber"] = 9999
-	GameState.warehouse[&"iron"] = 9999
+	GameState.warehouse[&"iron_ore"] = 9999
 	var gold0: int = GameState.gold
 	var r_ok: Dictionary = GameState.upgrade_module("sails", 0)
 	_ok(bool(r_ok.get("ok", false)), "资源充足强化成功", str(r_ok.get("reason", "")))
@@ -1743,7 +1762,7 @@ func _test_v1210_stats() -> void:
 	# 模块强化生效（原改装/装备强化已合并）
 	GameState.add_gold(100000)
 	GameState.warehouse[&"timber"] = 9999
-	GameState.warehouse[&"iron"] = 9999
+	GameState.warehouse[&"iron_ore"] = 9999
 	_ok(bool(GameState.upgrade_module("gundeck", 0).get("ok", false)), "强化炮门模块")
 	var st1: Dictionary = GameState.stats()
 	_ok(int(st1.get("guns_per_side", 0)) == base_guns + 1, "炮门强化 +1 门",
@@ -2203,7 +2222,7 @@ func _test_v110_core() -> void:
 	GameState.reset_new_game()
 	GameState.add_gold(50000)
 	GameState.warehouse[&"timber"] = 999
-	GameState.warehouse[&"iron"] = 999
+	GameState.warehouse[&"iron_ore"] = 999
 	_ok(GameState.module_level("gundeck", 0) == 0, "初始模块 0 级")
 	var gup: Dictionary = GameState.upgrade_module("gundeck", 0)
 	_ok(bool(gup.get("ok", false)), "可以强化模块", str(gup))
