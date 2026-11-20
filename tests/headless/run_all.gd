@@ -161,23 +161,23 @@ func _mk_crew(role: StringName, stat: int) -> Resource:
 func _test_crew() -> void:
 	_sec("船员加成")
 	var gunner := _mk_crew(&"gunner", 10)
-	var helmsman := _mk_crew(&"helmsman", 10)
-	var cb: Dictionary = StatsLib.crew_bonus([gunner, helmsman])
+	var mate := _mk_crew(&"mate", 10)
+	var cb: Dictionary = StatsLib.crew_bonus([gunner, mate])
 	_ok(_near(float(cb.accuracy), 0.30, 0.001), "炮手 10 技能 → 命中 +0.30", "%.3f" % cb.accuracy)
-	_ok(_near(float(cb.turn_pct), 0.06, 0.001), "舵手 10 技能 → 转向 +6%", "%.3f" % cb.turn_pct)
+	_ok(_near(float(cb.turn_pct), 0.06, 0.001), "大副 10 技能 → 转向 +6%", "%.3f" % cb.turn_pct)
 
 	var big := _mk_crew(&"gunner", 20)
 	_ok(_near(float(StatsLib.crew_bonus([big]).accuracy), 0.35, 0.001), "命中加成封顶 0.35")
 
-	var raider := _mk_crew(&"raider", 5)
-	_ok(_near(float(StatsLib.crew_bonus([raider]).boarding_pct), 0.25, 0.001), "突击队长 → 接舷 +25%")
+	var sailor := _mk_crew(&"sailor", 10)
+	_ok(_near(float(StatsLib.crew_bonus([sailor]).speed_pct), 0.03, 0.001), "水手 10 技能 → 航速 +3%")
 
 	_ok(_near(float(StatsLib.crew_bonus([]).turn_pct), 0.0, 0.0001), "无船员无加成")
 
 	var sloop: Resource = load("res://data/ships/fishing_sloop.tres")
 	var base_turn: float = float(StatsLib.compute(sloop, &"standard", {}).turn_rate)
-	var with_turn: float = float(StatsLib.compute(sloop, &"standard", {}, [helmsman]).turn_rate)
-	_ok(with_turn > base_turn, "舵手让转向变快", "%.1f -> %.1f" % [base_turn, with_turn])
+	var with_turn: float = float(StatsLib.compute(sloop, &"standard", {}, [mate]).turn_rate)
+	_ok(with_turn > base_turn, "大副让转向变快", "%.1f -> %.1f" % [base_turn, with_turn])
 
 # ---------------- 热参数 ----------------
 func _test_balance_config() -> void:
