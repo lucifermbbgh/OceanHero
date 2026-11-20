@@ -17,3 +17,6 @@ docs/经济学参考文档/
 
 # Godot 生成的导入旁注
 *.import
+
+# Godot 4.4+ 脚本 UID 旁注
+*.uid
