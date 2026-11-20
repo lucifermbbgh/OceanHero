@@ -2318,7 +2318,9 @@ func _rebuild_ship_panel() -> void:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(38, 38)
 		btn.size = btn.custom_minimum_size
-		btn.position = Vector2(anchor.x * ship_area_size.x, anchor.y * ship_area_size.y) - btn.size * 0.5
+		var layer_dy := float(layer) * 34.0 if mid in ["deck", "gundeck"] else 0.0
+		btn.position = Vector2(anchor.x * ship_area_size.x,
+			anchor.y * ship_area_size.y + layer_dy) - btn.size * 0.5
 		btn.text = _ship_slot_text(mid, layer)
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.add_theme_color_override("font_color", Color(0.15, 0.12, 0.05))
@@ -2335,7 +2337,7 @@ func _rebuild_ship_panel() -> void:
 	# 右侧属性
 	var stt: Dictionary = GameState.stats()
 	for pair in [
-		["船体", "%d / %d" % [int(GameState.hull_hp if GameState.hull_hp >= 0.0 else float(stt.get("hull_max", 0.0))), int(stt.get("hull_max", 0.0))]],
+		["船体", "%d / %d" % [int(minf(GameState.hull_hp, float(stt.get("hull_max", 0.0))) if GameState.hull_hp >= 0.0 else float(stt.get("hull_max", 0.0))), int(stt.get("hull_max", 0.0))]],
 		["航速", "%.0f" % float(stt.get("base_speed_px", 0.0))],
 		["转向", "%.0f" % float(stt.get("turn_rate", 0.0))],
 		["装甲", str(int(stt.get("armor", 0)))],
