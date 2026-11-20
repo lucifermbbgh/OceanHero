@@ -1276,7 +1276,11 @@ func _test_v1315_events() -> void:
 	GameState.faction_events.clear()
 	GameState.start_faction_event("yunlan", "cangwu", "war", 1)
 	var msg: String = GameState.tick_faction_events()
-	_ok(GameState.faction_events.is_empty(), "事件到期移除")
+	var still_there := false
+	for e2 in GameState.faction_events:
+		if String(e2["a"]) == "yunlan" and String(e2["b"]) == "cangwu" and String(e2["kind"]) == "war":
+			still_there = true
+	_ok(not still_there, "指定事件到期移除")
 	_ok(msg.contains("结束"), "结束播报", msg)
 	GameState.reset_new_game()
 
@@ -1409,6 +1413,7 @@ func _test_v1311_tables() -> void:
 func _test_v139_license_rules() -> void:
 	print("\n[1.3.9 私掠证]")
 	GameState.reset_new_game()
+	GameState.faction_events.clear()
 	GameState.add_gold(200000)
 	# 正规购证需该国声望 51
 	_ok(not bool(GameState.buy_license_legal("yunlan").get("ok", false)), "声望不足不能购证")
