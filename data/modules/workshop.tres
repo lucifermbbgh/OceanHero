@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/module_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"workshop"
+display_name = "工坊"
+kind = "single"
+gear_slots = []
+crew_posts = []
+max_level = 5
+anchor = Vector2(0.615, 0.748)
+stat_key = "repair"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/module_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"flagpole"
+display_name = "旗杆"
+kind = "single"
+gear_slots = [&"flag"]
+crew_posts = []
+max_level = 5
+anchor = Vector2(0.857, 0.514)
+stat_key = "rep_gain"

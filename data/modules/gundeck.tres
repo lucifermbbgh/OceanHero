@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/module_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"gundeck"
+display_name = "炮门"
+kind = "gundeck"
+gear_slots = [&"cannon"]
+crew_posts = [&"gunner"]
+max_level = 5
+anchor = Vector2(0.375, 0.528)
+stat_key = "guns"

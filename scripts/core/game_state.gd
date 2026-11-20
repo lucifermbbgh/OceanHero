@@ -732,6 +732,58 @@ func can_travel_to(target: int) -> bool:
 			return bool(o["unlocked"])
 	return false
 
+# ---------------- 舰船模块（1.4.1） ----------------
+
+## 岗位（简化 4 类）
+const CREW_POSTS := ["mate", "gunner", "surgeon", "sailor"]
+const POST_NAMES := {"mate": "大副", "gunner": "炮手", "surgeon": "船医", "sailor": "水手"}
+
+## 船级 → 甲板层数 / 炮门层数 / 可用模块
+const MODULE_TIER_TABLE := {
+	1: {"deck": 0, "gundeck": 1},
+	2: {"deck": 0, "gundeck": 1},
+	3: {"deck": 1, "gundeck": 2},
+	4: {"deck": 1, "gundeck": 2},
+	5: {"deck": 2, "gundeck": 2},
+	6: {"deck": 2, "gundeck": 2},
+	7: {"deck": 2, "gundeck": 3},
+	8: {"deck": 2, "gundeck": 3},
+	9: {"deck": 3, "gundeck": 4},
+	10: {"deck": 3, "gundeck": 4},
+}
+
+## 基础模块（所有船都有）
+const BASE_MODULES := ["rudder", "sails", "lookout", "flagpole", "cabin", "quarters", "hold", "galley", "workshop"]
+
+## 每艘船的模块实例：{module_id, layer, level}
+var ship_module_levels: Dictionary = {}
+
+func deck_layers(tier: int) -> int:
+	return int(MODULE_TIER_TABLE.get(clampi(tier, 1, 10), {}).get("deck", 0))
+
+func gundeck_layers(tier: int) -> int:
+	return int(MODULE_TIER_TABLE.get(clampi(tier, 1, 10), {}).get("gundeck", 1))
+
+## 当前船的模块实例列表
+func ship_modules() -> Array:
+	var tier := int(ship_def().get("tier")) if ship_def() != null else 1
+	var out: Array = []
+	for mid in BASE_MODULES:
+		out.append({"module_id": mid, "layer": 0})
+	for i in range(deck_layers(tier)):
+		out.append({"module_id": "deck", "layer": i})
+	for j in range(gundeck_layers(tier)):
+		out.append({"module_id": "gundeck", "layer": j})
+	out.append({"module_id": "infirmary", "layer": 0})
+	return out
+
+## 模块强化等级（默认 0）
+func module_level(mid: String, layer: int = 0) -> int:
+	return int(ship_module_levels.get("%s#%d" % [mid, layer], 0))
+
+func set_module_level(mid: String, layer: int, lv: int) -> void:
+	ship_module_levels["%s#%d" % [mid, layer]] = clampi(lv, 0, 5)
+
 # ---------------- 六国与分国声望（1.3.0） ----------------
 
 const NATIONS := ["lan", "chilin", "shuangyu", "xuanjiao", "baijing", "cangwu"]

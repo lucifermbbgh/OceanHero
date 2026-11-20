@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/module_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"rudder"
+display_name = "舵轮"
+kind = "single"
+gear_slots = [&"rudder"]
+crew_posts = [&"mate"]
+max_level = 5
+anchor = Vector2(0.655, 0.505)
+stat_key = "turn"

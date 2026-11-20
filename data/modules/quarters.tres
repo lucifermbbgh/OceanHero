@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/module_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"quarters"
+display_name = "宿舍"
+kind = "single"
+gear_slots = []
+crew_posts = [&"sailor"]
+max_level = 5
+anchor = Vector2(0.609, 0.636)
+stat_key = "crew_max"

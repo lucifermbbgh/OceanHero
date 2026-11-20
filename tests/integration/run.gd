@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v141_modules()
 	await _test_v140_fixes()
 	await _test_v1317_polish()
 	await _test_v1315_events()
@@ -670,6 +671,50 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.1 模块数据模型 ----------------
+func _test_v141_modules() -> void:
+	print("\n[1.4.1 舰船模块]")
+	GameState.reset_new_game()
+	_ok(DataRegistry.modules.size() == 12, "12 类模块已载入", str(DataRegistry.modules.size()))
+	var rudder: Resource = DataRegistry.modules.get("rudder")
+	_ok(rudder != null and String(rudder.display_name) == "舵轮", "舵轮模块存在")
+	_ok(rudder.gear_slots.has(&"rudder"), "舵轮可装舵")
+	_ok(rudder.crew_posts.has(&"mate"), "舵轮可置大副")
+	var flagpole: Resource = DataRegistry.modules.get("flagpole")
+	_ok(flagpole.crew_posts.is_empty(), "旗杆不设岗位")
+	_ok(flagpole.gear_slots.has(&"flag"), "旗杆可挂旗帜")
+	var hold: Resource = DataRegistry.modules.get("hold")
+	_ok(hold.gear_slots.is_empty(), "仓库不设装备")
+	# 分层规则
+	_ok(GameState.deck_layers(1) == 0, "1 级船无甲板")
+	_ok(GameState.deck_layers(9) == 3, "9 级船 3 层甲板")
+	_ok(GameState.gundeck_layers(1) == 1, "1 级船 1 层炮门")
+	_ok(GameState.gundeck_layers(10) == 4, "10 级船 4 层炮门")
+	# 模块实例数
+	GameState.ship_def_id = &"fishing_sloop"
+	var m1: Array = GameState.ship_modules()
+	_ok(m1.size() >= 6, "1 级船模块数 ≥6", str(m1.size()))
+	GameState.ship_def_id = &"first_rate"
+	var m10: Array = GameState.ship_modules()
+	var deck_cnt := 0
+	for m in m10:
+		if String(m["module_id"]) == "deck":
+			deck_cnt += 1
+	_ok(deck_cnt == GameState.deck_layers(int(GameState.ship_def().tier)), "甲板层数与船级一致",
+		str(deck_cnt))
+	# 岗位与锚点
+	_ok(GameState.CREW_POSTS.size() == 4, "岗位简化为 4 类")
+	_ok(GameState.POST_NAMES["mate"] == "大副", "大副岗位名称")
+	var a: Vector2 = rudder.anchor
+	_ok(a.x >= 0.0 and a.x <= 1.0 and a.y >= 0.0 and a.y <= 1.0, "锚点在 0~1 范围", str(a))
+	# 强化等级
+	GameState.set_module_level("gundeck", 0, 3)
+	_ok(GameState.module_level("gundeck", 0) == 3, "模块等级可设置")
+	_ok(GameState.module_level("gundeck", 1) == 0, "不同层等级独立")
+	GameState.set_module_level("gundeck", 0, 99)
+	_ok(GameState.module_level("gundeck", 0) == 5, "等级上限 5")
+	GameState.reset_new_game()
 
 # ---------------- 1.4.0 遗留修复 ----------------
 func _test_v140_fixes() -> void:

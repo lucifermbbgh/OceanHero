@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/module_def.gd" id="1_m"]
+
+[resource]
+script = ExtResource("1_m")
+id = &"lookout"
+display_name = "瞭望台"
+kind = "single"
+gear_slots = [&"telescope"]
+crew_posts = [&"sailor"]
+max_level = 5
+anchor = Vector2(0.462, 0.066)
+stat_key = "view"

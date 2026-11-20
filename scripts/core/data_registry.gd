@@ -19,6 +19,7 @@ var commodities: Dictionary = {}
 var enemies: Dictionary = {}
 var ports: Dictionary = {}
 var ammo: Dictionary = {}
+var modules: Dictionary = {}
 
 func _ready() -> void:
 	_reload()
@@ -35,6 +36,7 @@ func _reload() -> void:
 	enemies = _load_dir("res://data/enemies")
 	ports = _load_dir("res://data/ports")
 	ammo = _load_dir("res://data/ammo")
+	modules = _load_dir("res://data/modules")
 	print("[DataRegistry] ships=%d(基准 %d) gear=%d cannons=%d ammo=%d commodities=%d enemies=%d ports=%d buildings=%d maps=%d" % [
 		ships.size(), ship_bases.size(), gear.size(), cannons.size(), ammo.size(),
 		commodities.size(), enemies.size(), ports.size(), buildings.size(), maps.size(),
