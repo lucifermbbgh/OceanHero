@@ -2480,12 +2480,19 @@ func _add_gear_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 		return
 	var current := String(GameState.equipped.get(slot, ""))
 	vb.add_child(_lbl("当前：%s" % ("无" if current == "" else current), 420, Color(0.85, 0.88, 0.85)))
+	# 帆按桅使用 sail0..2，装备本体槽位仍是 sail
+	var filter_slot := "sail" if slot.begins_with("sail") else slot
+	var owned_count := 0
 	for k in DataRegistry.gear.keys():
 		var g: Resource = DataRegistry.gear[k]
-		if g == null or String(g.slot) != slot:
+		if g == null or String(g.slot) != filter_slot:
 			continue
-		if not GameState.slot_allows(slot, String(g.id)):
+		if not GameState.slot_allows(filter_slot, String(g.id)):
 			continue
+		# 只列出已拥有的装备（未拥有需先去船厂购买）
+		if not GameState.has_gear(g.id):
+			continue
+		owned_count += 1
 		var btn := Button.new()
 		var mark := "（已装）" if String(g.id) == current else ""
 		btn.text = "%s%s  %s" % [String(g.display_name), mark, String(g.bonus_text())]
@@ -2498,6 +2505,8 @@ func _add_gear_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 			_rebuild_ship_panel()
 			_refresh())
 		vb.add_child(btn)
+	if owned_count == 0:
+		vb.add_child(_lbl("　没有可用装备（先去船厂购买）", 420, Color(0.8, 0.72, 0.55)))
 	var off := Button.new()
 	off.text = "卸下"
 	off.custom_minimum_size = Vector2(120, 28)
