@@ -368,6 +368,11 @@ func _build_ui() -> void:
 	ship_stats_box = VBoxContainer.new()
 	ship_stats_box.add_theme_constant_override("separation", 8)
 	ship_right.add_child(ship_stats_box)
+	var ship_swap := Button.new()
+	ship_swap.text = "更换船只"
+	ship_swap.custom_minimum_size = Vector2(160, 32)
+	ship_swap.pressed.connect(func(): _open_ship_swap())
+	ship_right.add_child(ship_swap)
 	var ship_close := Button.new()
 	ship_close.text = "关闭"
 	ship_close.custom_minimum_size = Vector2(120, 30)
@@ -2274,13 +2279,47 @@ func _do_invest_deposit(key: String) -> void:
 		_rebuild_invest()
 		_refresh()
 
+## 更换船只：列出本港停泊的船
+func _open_ship_swap() -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "更换船只"
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	dlg.add_child(vb)
+	vb.add_child(_lbl("当前：%s" % String(GameState.ship_def().display_name) if GameState.ship_def() != null else "当前：未知", 420, Color(0.95, 0.9, 0.55)))
+	var port := String(GameState.current_port)
+	var shown := 0
+	for i in range(GameState.ships_owned.size()):
+		var entry: Dictionary = GameState.ships_owned[i]
+		if String(entry.get("station_port", "")) != port:
+			continue
+		var edef: Resource = DataRegistry.get_ship(StringName(String(entry.get("def_id", ""))))
+		if edef == null:
+			continue
+		shown += 1
+		var btn := Button.new()
+		btn.text = String(edef.display_name)
+		btn.custom_minimum_size = Vector2(360, 30)
+		var idx := i
+		btn.pressed.connect(func():
+			var ok := GameState.swap_to_owned(idx, StringName(port))
+			_log("已换乘：" + String(edef.display_name) if ok else "换乘失败（货舱不足或船只不存在）")
+			dlg.queue_free()
+			_rebuild_ship_panel()
+			_refresh())
+		vb.add_child(btn)
+	if shown == 0:
+		vb.add_child(_lbl("本港没有其他船只。可前往港镇以上的船厂购买。", 460, Color(0.75, 0.75, 0.68)))
+	add_child(dlg)
+	dlg.popup_centered()
+
 # ---------------- 舰船面板（1.4.6） ----------------
 
 var ship_root: PanelContainer = null
 var ship_area: Control = null
 var ship_stats_box: VBoxContainer = null
 var ship_tab := "gear"
-var ship_area_size := Vector2(940, 600)
+var ship_area_size := Vector2(1150, 690)
 
 func _toggle_ship() -> void:
 	if ship_root.visible:
@@ -2306,6 +2345,7 @@ func _rebuild_ship_panel() -> void:
 	sil.set_script(load("res://scripts/ui/ship_silhouette.gd"))
 	sil.size = ship_area_size
 	sil.masts = masts
+	sil.tier = tier
 	ship_area.add_child(sil)
 	# 插槽
 	for inst in GameState.ship_modules():
@@ -2318,7 +2358,13 @@ func _rebuild_ship_panel() -> void:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(38, 38)
 		btn.size = btn.custom_minimum_size
-		var layer_dy := float(layer) * 34.0 if mid in ["deck", "gundeck"] else 0.0
+		var layer_dy := 0.0
+		if mid == "deck":
+			var dn := maxi(1, GameState.deck_layers(tier))
+			layer_dy = float(layer) * (26.0 if dn <= 2 else 22.0)
+		elif mid == "gundeck":
+			var gn := maxi(1, GameState.gundeck_layers(tier))
+			layer_dy = float(layer) * (26.0 if gn <= 2 else 22.0)
 		btn.position = Vector2(anchor.x * ship_area_size.x,
 			anchor.y * ship_area_size.y + layer_dy) - btn.size * 0.5
 		btn.text = _ship_slot_text(mid, layer)
