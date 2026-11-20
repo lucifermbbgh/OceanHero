@@ -128,7 +128,50 @@ func stats() -> Dictionary:
 	var sail_add := ship_sail_bonus()
 	if sail_add > 0.0:
 		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + sail_add)
+	# ---- 1.4.2：模块等级接入（stats 契约不变） ----
+	var lv_speed := module_level("sails")
+	var lv_turn := module_level("rudder")
+	var lv_crew := module_level("quarters") + _deck_total_levels()
+	var lv_cargo := module_level("hold")
+	var lv_view := module_level("lookout")
+	var lv_cabin := module_level("cabin")
+	var lv_guns := _gundeck_total_levels()
+	if lv_speed > 0:
+		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + 0.04 * lv_speed)
+	if lv_turn > 0:
+		st["turn_rate"] = float(st.get("turn_rate", 0.0)) * (1.0 + 0.04 * lv_turn)
+	if lv_crew > 0:
+		st["crew_max"] = float(st.get("crew_max", 0.0)) * (1.0 + 0.05 * lv_crew)
+	if lv_cargo > 0:
+		st["cargo_capacity"] = int(round(float(st.get("cargo_capacity", 0)) * (1.0 + 0.06 * lv_cargo)))
+	if lv_view > 0:
+		st["view_bonus"] = float(st.get("view_bonus", 0.0)) + 0.03 * lv_view
+	if lv_guns > 0:
+		st["guns_per_side"] = int(st.get("guns_per_side", 1)) + lv_guns
+	if lv_cabin > 0:
+		st["hull_max"] = float(st.get("hull_max", 400.0)) * (1.0 + 0.01 * lv_cabin)
+	# 非战斗加成（供面板/后续系统读取）
+	st["rep_gain_bonus"] = 0.05 * module_level("flagpole")
+	st["heal_bonus"] = 0.10 * module_level("infirmary")
+	st["recover_bonus"] = 0.08 * module_level("galley")
+	st["repair_bonus"] = 0.10 * module_level("workshop")
 	return st
+
+## 甲板各层等级之和
+func _deck_total_levels() -> int:
+	var total := 0
+	var tier := int(ship_def().get("tier")) if ship_def() != null else 1
+	for i in range(deck_layers(tier)):
+		total += module_level("deck", i)
+	return total
+
+## 炮门各层等级之和
+func _gundeck_total_levels() -> int:
+	var total := 0
+	var tier := int(ship_def().get("tier")) if ship_def() != null else 1
+	for i in range(gundeck_layers(tier)):
+		total += module_level("gundeck", i)
+	return total
 
 # ---------------- 母港建设 ----------------
 

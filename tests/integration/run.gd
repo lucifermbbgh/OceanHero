@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v142_module_stats()
 	await _test_v141_modules()
 	await _test_v140_fixes()
 	await _test_v1317_polish()
@@ -671,6 +672,47 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.2 模块接入属性 ----------------
+func _test_v142_module_stats() -> void:
+	print("\n[1.4.2 模块属性]")
+	GameState.reset_new_game()
+	GameState.ship_def_id = &"first_rate"
+	GameState.ship_module_levels.clear()
+	var s0: Dictionary = GameState.stats()
+	_ok(s0.has("hull_max") and s0.has("base_speed_px") and s0.has("guns_per_side"),
+		"stats 契约字段保留")
+	var speed0: float = float(s0["base_speed_px"])
+	var turn0: float = float(s0["turn_rate"])
+	var guns0: int = int(s0["guns_per_side"])
+	var cargo0: int = int(s0["cargo_capacity"])
+	var crew0: float = float(s0["crew_max"])
+	# 风帆
+	GameState.set_module_level("sails", 0, 5)
+	var s1: Dictionary = GameState.stats()
+	_ok(float(s1["base_speed_px"]) > speed0, "风帆强化提升航速",
+		"%.1f → %.1f" % [speed0, float(s1["base_speed_px"])])
+	# 舵轮
+	GameState.set_module_level("rudder", 0, 5)
+	_ok(float(GameState.stats()["turn_rate"]) > turn0, "舵轮强化提升转向")
+	# 炮门（按层累加）
+	GameState.set_module_level("gundeck", 0, 2)
+	GameState.set_module_level("gundeck", 1, 2)
+	var guns2: int = int(GameState.stats()["guns_per_side"])
+	_ok(guns2 == guns0 + 4, "炮门两层各 +2 门", "%d → %d" % [guns0, guns2])
+	# 仓库 / 宿舍
+	GameState.set_module_level("hold", 0, 5)
+	_ok(int(GameState.stats()["cargo_capacity"]) > cargo0, "仓库强化提升货舱")
+	GameState.set_module_level("quarters", 0, 5)
+	_ok(float(GameState.stats()["crew_max"]) > crew0, "宿舍强化提升船员上限")
+	# 非战斗加成字段
+	_ok(GameState.stats().has("rep_gain_bonus"), "声望加成字段存在")
+	_ok(GameState.stats().has("heal_bonus"), "医疗加成字段存在")
+	# 等级 0 时与基线一致
+	GameState.ship_module_levels.clear()
+	var s_reset: Dictionary = GameState.stats()
+	_ok(is_equal_approx(float(s_reset["base_speed_px"]), speed0), "清空等级回到基线")
+	GameState.reset_new_game()
 
 # ---------------- 1.4.1 模块数据模型 ----------------
 func _test_v141_modules() -> void:
