@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v146_ship_panel()
 	await _test_v145_module_upgrade()
 	await _test_v144_module_crew()
 	await _test_v143_gear_slots()
@@ -675,6 +676,38 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.6 舰船面板 ----------------
+func _test_v146_ship_panel() -> void:
+	print("\n[1.4.6 舰船面板]")
+	GameState.reset_new_game()
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	s._toggle_ship()
+	await _frames(1)
+	_ok(s.ship_root.visible, "舰船面板可打开")
+	var slots := 0
+	for c in s.ship_area.get_children():
+		if c is Button:
+			slots += 1
+	_ok(slots == GameState.ship_modules().size(), "插槽数与模块实例数一致",
+		"%d vs %d" % [slots, GameState.ship_modules().size()])
+	_ok(s.ship_stats_box.get_child_count() >= 9, "属性栏至少 9 项",
+		str(s.ship_stats_box.get_child_count()))
+	# 切换页签
+	s.ship_tab = "crew"
+	s._rebuild_ship_panel()
+	await _frames(1)
+	_ok(s.ship_area.get_child_count() > 0, "人员页可重建")
+	# 打开一个插槽弹窗（舵轮）
+	s.ship_tab = "gear"
+	s._open_ship_slot("rudder", 0)
+	await _frames(1)
+	_ok(true, "插槽弹窗可打开")
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.4.5 模块强化经济 ----------------
 func _test_v145_module_upgrade() -> void:

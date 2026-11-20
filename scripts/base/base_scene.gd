@@ -144,7 +144,7 @@ func _build_ui() -> void:
 
 	_action_button(vb, "船员名单", _toggle_crew_panel)
 	_action_button(vb, "装备强化", _toggle_gear)
-	_action_button(vb, "船只改装", _toggle_mod)
+	_action_button(vb, "舰船", _toggle_ship)
 	_action_button(vb, "势力声望", _toggle_factions)
 	_action_button(vb, "仓库", _toggle_store)
 	if GameState.is_home_visit():
@@ -327,6 +327,49 @@ func _build_ui() -> void:
 	invest_list.add_theme_constant_override("separation", 6)
 	invest_list.custom_minimum_size = Vector2(1510, 0)
 	invscroll.add_child(invest_list)
+
+	# 舰船面板
+	ship_root = PanelContainer.new()
+	ship_root.position = Vector2(16, 72)
+	ship_root.custom_minimum_size = Vector2(1568, 812)
+	ship_root.add_theme_stylebox_override("panel", _panel_style())
+	ship_root.visible = false
+	root.add_child(ship_root)
+	var ship_hb := HBoxContainer.new()
+	ship_hb.add_theme_constant_override("separation", 10)
+	ship_root.add_child(ship_hb)
+	var ship_left := VBoxContainer.new()
+	ship_left.add_theme_constant_override("separation", 6)
+	ship_hb.add_child(ship_left)
+	var ship_tabs := HBoxContainer.new()
+	ship_tabs.add_theme_constant_override("separation", 8)
+	ship_left.add_child(ship_tabs)
+	for spec in [["gear", "装备"], ["crew", "人员"]]:
+		var tb := Button.new()
+		tb.text = String(spec[1])
+		tb.custom_minimum_size = Vector2(110, 34)
+		var key := String(spec[0])
+		tb.pressed.connect(func():
+			ship_tab = key
+			_rebuild_ship_panel())
+		ship_tabs.add_child(tb)
+	ship_area = Control.new()
+	ship_area.custom_minimum_size = ship_area_size
+	ship_area.size = ship_area_size
+	ship_left.add_child(ship_area)
+	var ship_right := VBoxContainer.new()
+	ship_right.add_theme_constant_override("separation", 6)
+	ship_right.custom_minimum_size = Vector2(360, 0)
+	ship_hb.add_child(ship_right)
+	_yard_title_to(ship_right, "舰船属性")
+	ship_stats_box = VBoxContainer.new()
+	ship_stats_box.add_theme_constant_override("separation", 8)
+	ship_right.add_child(ship_stats_box)
+	var ship_close := Button.new()
+	ship_close.text = "关闭"
+	ship_close.custom_minimum_size = Vector2(120, 30)
+	ship_close.pressed.connect(func(): ship_root.visible = false)
+	ship_right.add_child(ship_close)
 
 	# 声望兑换所面板
 	exch_root = PanelContainer.new()
@@ -2227,6 +2270,218 @@ func _do_invest_deposit(key: String) -> void:
 		_rebuild_invest()
 		_refresh()
 
+# ---------------- 舰船面板（1.4.6） ----------------
+
+var ship_root: PanelContainer = null
+var ship_area: Control = null
+var ship_stats_box: VBoxContainer = null
+var ship_tab := "gear"
+var ship_area_size := Vector2(940, 600)
+
+func _toggle_ship() -> void:
+	if ship_root.visible:
+		ship_root.visible = false
+		return
+	_close_all_panels()
+	_rebuild_ship_panel()
+	ship_root.visible = true
+
+func _rebuild_ship_panel() -> void:
+	for c in ship_area.get_children():
+		ship_area.remove_child(c)
+		c.queue_free()
+	for c2 in ship_stats_box.get_children():
+		ship_stats_box.remove_child(c2)
+		c2.queue_free()
+	# 船体占位
+	var hull := Panel.new()
+	hull.position = Vector2(30, ship_area_size.y * 0.52)
+	hull.custom_minimum_size = Vector2(ship_area_size.x - 60, ship_area_size.y * 0.42)
+	hull.size = hull.custom_minimum_size
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.32, 0.24, 0.14)
+	st.set_corner_radius_all(40)
+	hull.add_theme_stylebox_override("panel", st)
+	ship_area.add_child(hull)
+	# 甲板条
+	for i in range(3):
+		var strip := Panel.new()
+		strip.position = Vector2(70, ship_area_size.y * 0.52 + 20 + i * 54)
+		strip.custom_minimum_size = Vector2(ship_area_size.x - 200, 34)
+		strip.size = strip.custom_minimum_size
+		var ss := StyleBoxFlat.new()
+		ss.bg_color = Color(0.42, 0.32, 0.18)
+		ss.set_corner_radius_all(12)
+		strip.add_theme_stylebox_override("panel", ss)
+		ship_area.add_child(strip)
+	# 插槽
+	for inst in GameState.ship_modules():
+		var mid: String = String(inst["module_id"])
+		var layer: int = int(inst["layer"])
+		var md: Resource = DataRegistry.modules.get(mid)
+		if md == null:
+			continue
+		var anchor: Vector2 = md.anchor
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(38, 38)
+		btn.size = btn.custom_minimum_size
+		btn.position = Vector2(anchor.x * ship_area_size.x, anchor.y * ship_area_size.y) - btn.size * 0.5
+		btn.text = _ship_slot_text(mid, layer)
+		btn.add_theme_font_size_override("font_size", 11)
+		btn.add_theme_color_override("font_color", Color(0.15, 0.12, 0.05))
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.95, 0.76, 0.29)
+		style.set_corner_radius_all(19)
+		style.border_color = Color(0.2, 0.15, 0.05)
+		style.set_border_width_all(2)
+		btn.add_theme_stylebox_override("normal", style)
+		var midv := mid
+		var lv := layer
+		btn.pressed.connect(func(): _open_ship_slot(midv, lv))
+		ship_area.add_child(btn)
+	# 右侧属性
+	var stt: Dictionary = GameState.stats()
+	for pair in [
+		["船体", "%d / %d" % [int(GameState.hull_hp if GameState.hull_hp >= 0.0 else float(stt.get("hull_max", 0.0))), int(stt.get("hull_max", 0.0))]],
+		["航速", "%.0f" % float(stt.get("base_speed_px", 0.0))],
+		["转向", "%.0f" % float(stt.get("turn_rate", 0.0))],
+		["装甲", str(int(stt.get("armor", 0)))],
+		["舷侧炮", str(int(stt.get("guns_per_side", 0)))],
+		["货舱", str(int(stt.get("cargo_capacity", 0)))],
+		["船员上限", "%.0f" % float(stt.get("crew_max", 0.0))],
+		["接舷", str(int(stt.get("boarding", 0)))],
+		["声望加成", "%+d%%" % int(round(float(stt.get("rep_gain_bonus", 0.0)) * 100.0))],
+	]:
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 6)
+		ship_stats_box.add_child(hb)
+		hb.add_child(_lbl(String(pair[0]), 180, Color(0.66, 0.76, 0.82)))
+		hb.add_child(_lbl(String(pair[1]), 160, Color(0.95, 0.9, 0.55)))
+
+func _ship_slot_text(mid: String, layer: int) -> String:
+	var md: Resource = DataRegistry.modules.get(mid)
+	var short_name := String(md.display_name).substr(0, 1)
+	if layer > 0:
+		short_name += str(layer)
+	var lv := GameState.module_level(mid, layer)
+	if lv > 0:
+		short_name += "+%d" % lv
+	return short_name
+
+func _open_ship_slot(mid: String, layer: int) -> void:
+	var md: Resource = DataRegistry.modules.get(mid)
+	if md == null:
+		return
+	var dlg := AcceptDialog.new()
+	dlg.title = "%s%s" % [String(md.display_name), "（第 %d 层）" % (layer + 1) if layer > 0 else ""]
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	dlg.add_child(vb)
+	# 强化信息
+	var lv := GameState.module_level(mid, layer)
+	var cap := GameState.module_level_cap()
+	var cost: Dictionary = GameState.module_upgrade_cost(mid, layer)
+	var info := "等级 %d / %d　强化：%d 金 · 木 %d · 铁 %d" % [
+		lv, cap, int(cost["gold"]), int(cost["timber"]), int(cost["iron"])]
+	vb.add_child(_lbl(info, 520, Color(0.85, 0.85, 0.7)))
+	if lv < cap:
+		var ub := Button.new()
+		ub.text = "强化"
+		ub.custom_minimum_size = Vector2(120, 30)
+		var midu := mid
+		var lvu := layer
+		ub.pressed.connect(func():
+			var r: Dictionary = GameState.upgrade_module(midu, lvu)
+			_log("强化成功：Lv%d" % int(r.get("level", 0)) if bool(r.get("ok", false)) else String(r.get("reason", "强化失败")))
+			dlg.queue_free()
+			_rebuild_ship_panel()
+			_refresh())
+		vb.add_child(ub)
+	vb.add_child(HSeparator.new())
+	if ship_tab == "gear":
+		_add_gear_options(vb, mid, layer)
+	else:
+		_add_crew_options(vb, mid, layer)
+	add_child(dlg)
+	dlg.popup_centered()
+
+func _gear_slot_of(mid: String, layer: int) -> String:
+	if mid == "deck":
+		return "figurehead" if layer == 0 else "plate"
+	var md: Resource = DataRegistry.modules.get(mid)
+	if md == null or md.gear_slots.is_empty():
+		return ""
+	return String(md.gear_slots[0])
+
+func _add_gear_options(vb: VBoxContainer, mid: String, layer: int) -> void:
+	var slot := _gear_slot_of(mid, layer)
+	if slot == "" or slot == "cannon":
+		vb.add_child(_lbl("该模块不设装备" if slot == "" else "火炮改装将在后续版本迁移", 420, Color(0.7, 0.7, 0.65)))
+		return
+	var current := String(GameState.equipped.get(slot, ""))
+	vb.add_child(_lbl("当前：%s" % ("无" if current == "" else current), 420, Color(0.85, 0.88, 0.85)))
+	for k in DataRegistry.gear.keys():
+		var g: Resource = DataRegistry.gear[k]
+		if g == null or String(g.slot) != slot:
+			continue
+		var btn := Button.new()
+		var mark := "（已装）" if String(g.id) == current else ""
+		btn.text = "%s%s  %s" % [String(g.display_name), mark, String(g.bonus_text())]
+		btn.custom_minimum_size = Vector2(460, 28)
+		var gid: StringName = g.id
+		var s2 := slot
+		btn.pressed.connect(func():
+			GameState.equipped[s2] = gid
+			_log("装备：%s" % String(g.display_name))
+			_rebuild_ship_panel()
+			_refresh())
+		vb.add_child(btn)
+	var off := Button.new()
+	off.text = "卸下"
+	off.custom_minimum_size = Vector2(120, 28)
+	var s3 := slot
+	off.pressed.connect(func():
+		GameState.equipped.erase(s3)
+		_rebuild_ship_panel()
+		_refresh())
+	vb.add_child(off)
+
+func _add_crew_options(vb: VBoxContainer, mid: String, layer: int) -> void:
+	var posts: Array = GameState.module_posts(mid)
+	if posts.is_empty():
+		vb.add_child(_lbl("该模块不设岗位", 360, Color(0.7, 0.7, 0.65)))
+		return
+	var cur: StringName = GameState.module_crew_of(mid, layer)
+	vb.add_child(_lbl("当前：%s" % ("空缺" if String(cur) == "" else String(cur)), 360,
+		Color(0.85, 0.88, 0.85)))
+	for c in GameState.crew_roster:
+		if not posts.has(c.role):
+			continue
+		var btn := Button.new()
+		btn.text = "%s（%s · 属性 %d）" % [String(c.display_name),
+			String(GameState.POST_NAMES.get(String(c.role), c.role)), int(c.stat)]
+		btn.custom_minimum_size = Vector2(420, 28)
+		var cid: StringName = c.crew_id
+		var midc := mid
+		var lvc := layer
+		btn.pressed.connect(func():
+			var r: Dictionary = GameState.assign_crew_to_module(cid, midc, lvc)
+			_log("安排船员成功" if bool(r.get("ok", false)) else String(r.get("reason", "失败")))
+			_rebuild_ship_panel()
+			_refresh())
+		vb.add_child(btn)
+	if cur != &"":
+		var off := Button.new()
+		off.text = "撤下"
+		off.custom_minimum_size = Vector2(120, 28)
+		var midc2 := mid
+		var lvc2 := layer
+		off.pressed.connect(func():
+			GameState.clear_module_crew(midc2, lvc2)
+			_rebuild_ship_panel()
+			_refresh())
+		vb.add_child(off)
+
 # ---------------- 声望兑换所（1.3.11） ----------------
 
 var exch_root: PanelContainer = null
@@ -2702,7 +2957,7 @@ func _apply_submit(mat: String, from_ship: int, from_wh: int) -> void:
 const FULL_PANELS := ["market_root", "yard_root", "tavern_root", "build_root",
 	"quest_root", "overview_root", "finance_root", "bank_root", "black_root",
 	"save_root", "rep_root", "help_root", "victory_root", "construct_root", "goods_root",
-	"crew_root", "gear_root", "mod_root", "store_root", "invest_root", "fac_root", "exch_root"]
+	"crew_root", "gear_root", "mod_root", "store_root", "invest_root", "fac_root", "exch_root", "ship_root"]
 
 var close_btn: Button = null
 var construct_root: PanelContainer = null
