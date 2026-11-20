@@ -10,5 +10,5 @@ kind = "deck"
 gear_slots = [&"armor", &"figurehead"]
 crew_posts = [&"sailor"]
 max_level = 5
-anchor = Vector2(0.330, 0.600)
+anchor = Vector2(0.144, 0.634)
 stat_key = "crew_max"

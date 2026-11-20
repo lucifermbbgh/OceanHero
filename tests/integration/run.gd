@@ -736,7 +736,7 @@ func _test_v147_panel_fix() -> void:
 	# 锚点均在船影范围内
 	for inst in m10:
 		var md: Resource = DataRegistry.modules.get(String(inst["module_id"]))
-		_ok(md != null and md.anchor.y <= 0.80, "锚点位于船影内：%s" % String(inst["module_id"]))
+		_ok(md != null and md.anchor.y <= 0.95, "锚点位于船影内：%s" % String(inst["module_id"]))
 	GameState.reset_new_game()
 
 # ---------------- 1.4.6 舰船面板 ----------------

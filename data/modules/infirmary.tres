@@ -10,5 +10,5 @@ kind = "single"
 gear_slots = []
 crew_posts = [&"surgeon"]
 max_level = 5
-anchor = Vector2(0.780, 0.700)
+anchor = Vector2(0.811, 0.864)
 stat_key = "heal"

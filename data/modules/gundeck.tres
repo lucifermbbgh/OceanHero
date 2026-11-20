@@ -10,5 +10,5 @@ kind = "gundeck"
 gear_slots = [&"cannon"]
 crew_posts = [&"gunner"]
 max_level = 5
-anchor = Vector2(0.560, 0.600)
+anchor = Vector2(0.375, 0.528)
 stat_key = "guns"

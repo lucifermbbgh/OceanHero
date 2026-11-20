@@ -2317,38 +2317,17 @@ func _open_ship_swap() -> void:
 func _ship_slot_pos(mid: String, layer: int, tier: int) -> Vector2:
 	var w := ship_area_size.x
 	var h := ship_area_size.y
-	var top := 0.50 * h
-	var bottom := 0.80 * h
-	var dn := maxi(1, GameState.deck_layers(tier))
-	var gn := maxi(1, GameState.gundeck_layers(tier))
-	var rows := maxi(dn, gn)
-	var row_h := (bottom - top - 0.06 * h) / float(rows)
-	match mid:
-		"deck":
-			return Vector2(0.30 * w, top + 0.03 * h + (float(layer) + 0.5) * row_h)
-		"gundeck":
-			return Vector2(0.52 * w, top + 0.03 * h + (float(layer) + 0.5) * row_h)
-		"sails":
-			return Vector2(0.42 * w, 0.34 * h)
-		"lookout":
-			return Vector2(0.48 * w, 0.20 * h)
-		"flagpole":
-			return Vector2(0.68 * w, 0.20 * h)
-		"rudder":
-			return Vector2(0.89 * w, 0.70 * h)
-		"quarters":
-			return Vector2(0.66 * w, top + 0.03 * h + 0.5 * row_h)
-		"cabin":
-			return Vector2(0.78 * w, top + 0.03 * h + 0.5 * row_h)
-		"hold":
-			return Vector2(0.60 * w, bottom - 0.055 * h)
-		"workshop":
-			return Vector2(0.68 * w, bottom - 0.055 * h)
-		"galley":
-			return Vector2(0.76 * w, bottom - 0.055 * h)
-		"infirmary":
-			return Vector2(0.84 * w, bottom - 0.055 * h)
-	return Vector2(0.5 * w, 0.6 * h)
+	var md: Resource = DataRegistry.modules.get(mid)
+	if md == null:
+		return Vector2(0.5 * w, 0.6 * h)
+	var a: Vector2 = md.anchor
+	# 分层模块按设计稿的行距向下步进
+	var step := 0.0
+	if mid == "deck":
+		step = 0.121
+	elif mid == "gundeck":
+		step = 0.110
+	return Vector2(a.x * w, (a.y + step * float(layer)) * h)
 
 # ---------------- 舰船面板（1.4.6） ----------------
 
