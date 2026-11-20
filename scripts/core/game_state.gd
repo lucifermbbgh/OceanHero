@@ -3137,6 +3137,8 @@ func to_dict() -> Dictionary:
 		"crew_xp": crew_xp.duplicate(),
 		"nation_rep": nation_rep.duplicate(),
 		"faction_rep": faction_rep.duplicate(),
+		"module_levels": ship_module_levels.duplicate(),
+		"module_crew": module_crew.duplicate(),
 		"building_upgrades": building_upgrades.duplicate(true),
 		"build_submitted": build_submitted.duplicate(true),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
@@ -3269,6 +3271,10 @@ func from_dict(d: Dictionary) -> void:
 	var smlv: Dictionary = d.get("module_levels", {})
 	for mlk in smlv.keys():
 		ship_module_levels[String(mlk)] = int(smlv[mlk])
+	module_crew.clear()
+	var mcr: Dictionary = d.get("module_crew", {})
+	for mck in mcr.keys():
+		module_crew[String(mck)] = StringName(String(mcr[mck]))
 	var frep: Dictionary = d.get("faction_rep", {})
 	for fk in frep.keys():
 		faction_rep[String(fk)] = int(frep[fk])
@@ -3277,8 +3283,6 @@ func from_dict(d: Dictionary) -> void:
 	var nrep: Dictionary = d.get("nation_rep", {})
 	for nk in nrep.keys():
 		nation_rep[String(nk)] = int(nrep[nk])
-	module_crew.clear()
-	ship_module_levels.clear()
 	crew_xp.clear()
 	var cxp: Dictionary = d.get("crew_xp", {})
 	for k0 in cxp.keys():

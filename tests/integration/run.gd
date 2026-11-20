@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1414_ui_save()
 	await _test_v1412_sails()
 	await _test_v1410_layout()
 	await _test_v147_panel_fix()
@@ -679,6 +680,65 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.14 面板/换船/存档 ----------------
+func _test_v1414_ui_save() -> void:
+	print("\n[1.4.14 面板交互与存档]")
+	GameState.reset_new_game()
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	# 装备槽映射（面板用）
+	_ok(s._gear_slot_of("sails", 1) == "sail1", "帆槽按桅映射 sail1")
+	_ok(s._gear_slot_of("deck", 0) == "figurehead", "甲板 0 层为船艏像")
+	_ok(s._gear_slot_of("deck", 1) == "plate", "甲板 1 层为装甲板")
+	# 插槽文本含强化等级
+	GameState.set_module_level("gundeck", 0, 2)
+	_ok(s._ship_slot_text("gundeck", 0).contains("+2"), "插槽显示强化等级",
+		s._ship_slot_text("gundeck", 0))
+	# 换船流程
+	GameState.reset_new_game()
+	GameState.ships_owned.clear()
+	GameState.ships_owned.append({"def_id": "brig", "variant": "standard",
+		"station_port": "jadehaven", "hull_hp": -1.0, "sail_pct": 1.0,
+		"rudder_pct": 1.0, "crew_pct": 1.0, "equipped": {}})
+	var old_ship := String(GameState.ship_def_id)
+	var ok_swap: bool = GameState.swap_to_owned(0, &"jadehaven")
+	_ok(ok_swap, "可换乘本港船只")
+	_ok(String(GameState.ship_def_id) == "brig", "当前船变为 brig",
+		String(GameState.ship_def_id))
+	var back_found := false
+	for sh in GameState.ships_owned:
+		if String(sh.get("def_id", "")) == old_ship:
+			back_found = true
+	_ok(back_found, "旧船回到船库")
+	# 顶栏刷新
+	s._refresh()
+	_ok(s.status_label.text.contains(String(GameState.ship_def().display_name)),
+		"顶栏显示新船型", s.status_label.text.substr(0, 24))
+	# 存档往返：模块等级 / 船员 / 帆装备
+	GameState.reset_new_game()
+	GameState.set_module_level("sails", 0, 3)
+	GameState.set_module_level("gundeck", 1, 2)
+	var crew = load("res://scripts/systems/crew_factory.gd").generate(1, &"standard")[0]
+	crew.role = &"sailor"
+	GameState.crew_roster.append(crew)
+	GameState.assign_crew_to_module(crew.crew_id, "sails", 0)
+	GameState.equipped["sail0"] = &"sail_linen"
+	GameState.equipped["sail1"] = &"sail_cotton"
+	var d: Dictionary = GameState.to_dict()
+	GameState.reset_new_game()
+	GameState.from_dict(d)
+	_ok(GameState.module_level("sails", 0) == 3, "存档恢复模块等级",
+		str(GameState.module_level("sails", 0)))
+	_ok(GameState.module_level("gundeck", 1) == 2, "存档恢复分层等级")
+	_ok(String(GameState.module_crew_of("sails", 0)) != "", "存档恢复模块船员",
+		String(GameState.module_crew_of("sails", 0)))
+	_ok(String(GameState.equipped.get("sail0", "")) == "sail_linen", "存档恢复帆装备")
+	_ok(String(GameState.equipped.get("sail1", "")) == "sail_cotton", "存档恢复第二桅帆")
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.4.12 风帆按桅分层 ----------------
 func _test_v1412_sails() -> void:
