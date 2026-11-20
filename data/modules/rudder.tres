@@ -10,5 +10,5 @@ kind = "single"
 gear_slots = [&"rudder"]
 crew_posts = [&"mate"]
 max_level = 5
-anchor = Vector2(0.655, 0.505)
+anchor = Vector2(0.860, 0.600)
 stat_key = "turn"

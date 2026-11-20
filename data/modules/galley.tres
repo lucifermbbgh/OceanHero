@@ -10,5 +10,5 @@ kind = "single"
 gear_slots = []
 crew_posts = [&"sailor"]
 max_level = 5
-anchor = Vector2(0.812, 0.745)
+anchor = Vector2(0.740, 0.700)
 stat_key = "recover"

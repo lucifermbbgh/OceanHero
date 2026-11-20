@@ -10,5 +10,5 @@ kind = "single"
 gear_slots = [&"flag"]
 crew_posts = []
 max_level = 5
-anchor = Vector2(0.857, 0.514)
+anchor = Vector2(0.680, 0.150)
 stat_key = "rep_gain"

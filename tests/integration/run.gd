@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v147_panel_fix()
 	await _test_v146_ship_panel()
 	await _test_v145_module_upgrade()
 	await _test_v144_module_crew()
@@ -676,6 +677,37 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.7 面板修正 ----------------
+func _test_v147_panel_fix() -> void:
+	print("\n[1.4.7 面板修正]")
+	GameState.reset_new_game()
+	GameState.ship_def_id = &"fishing_sloop"
+	var m1: Array = GameState.ship_modules()
+	_ok(m1.size() == 6, "1 级船 6 个模块", str(m1.size()))
+	var has_flag := false
+	for m in m1:
+		if String(m["module_id"]) == "flagpole":
+			has_flag = true
+	_ok(not has_flag, "1 级船无旗杆")
+	GameState.ship_def_id = &"first_rate"
+	var m10: Array = GameState.ship_modules()
+	_ok(m10.size() >= 15, "10 级船模块 ≥15", str(m10.size()))
+	var deck_n := 0
+	for mm in m10:
+		if String(mm["module_id"]) == "deck":
+			deck_n += 1
+	_ok(deck_n == 3, "10 级船 3 层甲板", str(deck_n))
+	# 旗帜白名单
+	_ok(GameState.slot_allows("flag", "flag_swift"), "疾风旗允许")
+	_ok(GameState.slot_allows("flag", "flag_swift") and not GameState.slot_allows("flag", "uniq_scout_flag"),
+		"旧独有旗被过滤")
+	_ok(GameState.slot_allows("sail", "sail_linen"), "非旗帜槽不限制")
+	# 锚点均在船影范围内
+	for inst in m10:
+		var md: Resource = DataRegistry.modules.get(String(inst["module_id"]))
+		_ok(md != null and md.anchor.y <= 0.80, "锚点位于船影内：%s" % String(inst["module_id"]))
+	GameState.reset_new_game()
 
 # ---------------- 1.4.6 舰船面板 ----------------
 func _test_v146_ship_panel() -> void:

@@ -332,7 +332,10 @@ func _build_ui() -> void:
 	ship_root = PanelContainer.new()
 	ship_root.position = Vector2(16, 72)
 	ship_root.custom_minimum_size = Vector2(1568, 812)
-	ship_root.add_theme_stylebox_override("panel", _panel_style())
+	var ship_style := StyleBoxFlat.new()
+	ship_style.bg_color = Color(0.05, 0.10, 0.13)
+	ship_style.set_corner_radius_all(4)
+	ship_root.add_theme_stylebox_override("panel", ship_style)
 	ship_root.visible = false
 	root.add_child(ship_root)
 	var ship_hb := HBoxContainer.new()
@@ -1136,6 +1139,7 @@ func _toggle_yard() -> void:
 # ---------------- 声望 / 战功 / 帮助 / 通关 ----------------
 
 func _close_all_panels() -> void:
+	# 面板统一置前，避免被侧栏菜单遮挡
 	for pname in FULL_PANELS:
 		var p: Node = get(pname)
 		if p != null and p is PanelContainer:
@@ -2285,6 +2289,8 @@ func _toggle_ship() -> void:
 	_close_all_panels()
 	_rebuild_ship_panel()
 	ship_root.visible = true
+	ship_root.z_index = 20
+	ship_root.move_to_front()
 
 func _rebuild_ship_panel() -> void:
 	for c in ship_area.get_children():
@@ -2293,27 +2299,14 @@ func _rebuild_ship_panel() -> void:
 	for c2 in ship_stats_box.get_children():
 		ship_stats_box.remove_child(c2)
 		c2.queue_free()
-	# 船体占位
-	var hull := Panel.new()
-	hull.position = Vector2(30, ship_area_size.y * 0.52)
-	hull.custom_minimum_size = Vector2(ship_area_size.x - 60, ship_area_size.y * 0.42)
-	hull.size = hull.custom_minimum_size
-	var st := StyleBoxFlat.new()
-	st.bg_color = Color(0.32, 0.24, 0.14)
-	st.set_corner_radius_all(40)
-	hull.add_theme_stylebox_override("panel", st)
-	ship_area.add_child(hull)
-	# 甲板条
-	for i in range(3):
-		var strip := Panel.new()
-		strip.position = Vector2(70, ship_area_size.y * 0.52 + 20 + i * 54)
-		strip.custom_minimum_size = Vector2(ship_area_size.x - 200, 34)
-		strip.size = strip.custom_minimum_size
-		var ss := StyleBoxFlat.new()
-		ss.bg_color = Color(0.42, 0.32, 0.18)
-		ss.set_corner_radius_all(12)
-		strip.add_theme_stylebox_override("panel", ss)
-		ship_area.add_child(strip)
+	# 船影（按船级决定桅杆数）
+	var tier := int(GameState.ship_def().get("tier")) if GameState.ship_def() != null else 1
+	var masts := 1 if tier <= 2 else (2 if tier <= 4 else 3)
+	var sil := Control.new()
+	sil.set_script(load("res://scripts/ui/ship_silhouette.gd"))
+	sil.size = ship_area_size
+	sil.masts = masts
+	ship_area.add_child(sil)
 	# 插槽
 	for inst in GameState.ship_modules():
 		var mid: String = String(inst["module_id"])
@@ -2423,6 +2416,8 @@ func _add_gear_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 	for k in DataRegistry.gear.keys():
 		var g: Resource = DataRegistry.gear[k]
 		if g == null or String(g.slot) != slot:
+			continue
+		if not GameState.slot_allows(slot, String(g.id)):
 			continue
 		var btn := Button.new()
 		var mark := "（已装）" if String(g.id) == current else ""

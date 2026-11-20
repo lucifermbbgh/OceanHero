@@ -10,5 +10,5 @@ kind = "single"
 gear_slots = [&"telescope"]
 crew_posts = [&"sailor"]
 max_level = 5
-anchor = Vector2(0.462, 0.066)
+anchor = Vector2(0.520, 0.170)
 stat_key = "view"

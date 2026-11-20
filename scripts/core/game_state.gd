@@ -874,6 +874,16 @@ func module_crew_of(mid: String, layer: int = 0) -> StringName:
 # ---------------- 装备槽与模块映射（1.4.3） ----------------
 
 ## 装备槽 → 模块 id（甲板分层由调用方决定）
+## 槽位可安装白名单（旗帜只允许设计内的四面）
+const SLOT_ALLOWED := {
+	"flag": ["flag_free", "flag_swift", "flag_reload", "flag_renown"],
+}
+
+func slot_allows(slot: String, gid: String) -> bool:
+	if not SLOT_ALLOWED.has(slot):
+		return true
+	return (SLOT_ALLOWED[slot] as Array).has(gid)
+
 const SLOT_MODULE_MAP := {
 	"sail": "sails",
 	"rudder": "rudder",
@@ -914,10 +924,7 @@ const MODULE_TIER_TABLE := {
 	10: {"deck": 3, "gundeck": 4},
 }
 
-## 基础模块（所有船都有）
-const BASE_MODULES := ["rudder", "sails", "lookout", "flagpole", "cabin", "quarters", "hold", "galley", "workshop"]
-
-## 每艘船的模块实例：{module_id, layer, level}
+## 每艘船的模块强化等级：{"mid#layer": level}
 var ship_module_levels: Dictionary = {}
 
 func deck_layers(tier: int) -> int:
@@ -926,17 +933,34 @@ func deck_layers(tier: int) -> int:
 func gundeck_layers(tier: int) -> int:
 	return int(MODULE_TIER_TABLE.get(clampi(tier, 1, 10), {}).get("gundeck", 1))
 
+## 船级 → 开放的模块（分层模块另行展开）
+const MODULES_BY_TIER := {
+	1: ["sails", "rudder", "hold", "quarters", "galley", "gundeck"],
+	2: ["sails", "rudder", "hold", "quarters", "galley", "gundeck"],
+	3: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck"],
+	4: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck"],
+	5: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck", "workshop", "infirmary"],
+	6: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck", "workshop", "infirmary"],
+	7: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck", "workshop", "infirmary", "flagpole"],
+	8: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck", "workshop", "infirmary", "flagpole"],
+	9: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck", "workshop", "infirmary", "flagpole"],
+	10: ["sails", "rudder", "hold", "quarters", "galley", "gundeck", "lookout", "cabin", "deck", "workshop", "infirmary", "flagpole"],
+}
+
 ## 当前船的模块实例列表
 func ship_modules() -> Array:
 	var tier := int(ship_def().get("tier")) if ship_def() != null else 1
 	var out: Array = []
-	for mid in BASE_MODULES:
-		out.append({"module_id": mid, "layer": 0})
-	for i in range(deck_layers(tier)):
-		out.append({"module_id": "deck", "layer": i})
-	for j in range(gundeck_layers(tier)):
-		out.append({"module_id": "gundeck", "layer": j})
-	out.append({"module_id": "infirmary", "layer": 0})
+	var mids: Array = MODULES_BY_TIER.get(clampi(tier, 1, 10), MODULES_BY_TIER[1])
+	for mid in mids:
+		if String(mid) == "deck":
+			for i in range(deck_layers(tier)):
+				out.append({"module_id": "deck", "layer": i})
+		elif String(mid) == "gundeck":
+			for j in range(gundeck_layers(tier)):
+				out.append({"module_id": "gundeck", "layer": j})
+		else:
+			out.append({"module_id": String(mid), "layer": 0})
 	return out
 
 ## 模块强化等级（默认 0）
