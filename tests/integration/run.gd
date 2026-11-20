@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1415_balance()
 	await _test_v1414_ui_save()
 	await _test_v1412_sails()
 	await _test_v1410_layout()
@@ -680,6 +681,47 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.15 基线平衡 ----------------
+func _test_v1415_balance() -> void:
+	print("\n[1.4.15 基线平衡]")
+	GameState.reset_new_game()
+	# 主线船按船级：船体/炮数/模块数单调不减
+	var main_ids := ["fishing_sloop", "sand_junk", "longship", "schooner",
+		"brig", "sixth_rate", "fifth_rate", "fourth_rate", "third_rate", "first_rate"]
+	var prev_hull := 0.0
+	var prev_guns := 0
+	var prev_mod := 0
+	var monotonic := true
+	for mid in main_ids:
+		GameState.ship_def_id = StringName(mid)
+		GameState.ship_module_levels.clear()
+		var st: Dictionary = GameState.stats()
+		var hull := float(st.get("hull_max", 0.0))
+		var guns := int(st.get("guns_per_side", 0))
+		var mods := GameState.ship_modules().size()
+		if hull < prev_hull or guns < prev_guns or mods < prev_mod:
+			monotonic = false
+		prev_hull = hull
+		prev_guns = guns
+		prev_mod = mods
+	_ok(monotonic, "主线船体/炮数/模块数随船级单调不减")
+	# 强化上限随船级
+	GameState.ship_def_id = &"fishing_sloop"
+	_ok(GameState.module_level_cap() == 1, "1 级船强化上限 1")
+	GameState.ship_def_id = &"brig"
+	_ok(GameState.module_level_cap() == 5, "5 级船强化上限 5")
+	GameState.ship_def_id = &"first_rate"
+	_ok(GameState.module_level_cap() == 5, "10 级船仍封顶 5")
+	# 满级模块收益上限（帆）
+	GameState.ship_module_levels.clear()
+	var s0: float = float(GameState.stats()["base_speed_px"])
+	for i in range(GameState.sails_layers(10)):
+		GameState.set_module_level("sails", i, 5)
+	var s1: float = float(GameState.stats()["base_speed_px"])
+	_ok(s1 > s0 and s1 < s0 * 3.0, "满级风帆收益在合理区间",
+		"%.0f → %.0f" % [s0, s1])
+	GameState.reset_new_game()
 
 # ---------------- 1.4.14 面板/换船/存档 ----------------
 func _test_v1414_ui_save() -> void:
