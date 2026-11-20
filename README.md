@@ -1,4 +1,4 @@
-# 碧海英豪 (SeaHeroes)
+# 碧海英豪 (OceanHero)
 
 > 当前版本 **1.4.20** · 特性版本「舰船模块化」已完结
 
@@ -39,7 +39,7 @@
 
 ## 目录结构
 
-    SeaHeroes/
+    OceanHero/
     ├── README.md
     ├── data/                 数据资源（船只/装备/模块/商品/建筑/海图/配方表）
     ├── docs/                 设计、测试与说明文档
@@ -68,7 +68,7 @@
 
 导出 Windows 可玩版本：
 
-    godot --headless --path . --export-release "Windows" export/SeaHeroes-1.4.20-Windows.exe
+    godot --headless --path . --export-release "Windows" export/OceanHero-1.4.20-Windows.exe
 
 要求：已安装 Godot 4.7.2 导出模板；data/manifest.txt 需包含全部资源路径；
 导出过滤需包含 *.txt,*.json,*.csv。
