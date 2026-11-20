@@ -1654,6 +1654,7 @@ func _toggle_crew(cid: StringName, on_board: bool) -> void:
 	if on_board:
 		GameState.unassign_crew(cid)
 		_log("船员已下阵")
+		_rebuild_tavern()
 	elif not GameState.assign_crew(cid):
 		_log("岗位已满或船员不存在")
 	else:
@@ -3451,6 +3452,9 @@ func _hire_crew(cid: StringName) -> void:
 	GameState.hire_crew(crew)
 	GameState.tavern_pool.erase(crew)
 	_log("雇佣了 %s" % crew.display_name)
+	# 雇佣后立即刷新酒馆面板（否则列表看起来没变化）
+	_rebuild_tavern()
+	_refresh()
 	_rebuild_tavern()
 	_refresh()
 

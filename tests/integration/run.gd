@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1419_island_tavern()
 	await _test_v1418_per_ship()
 	await _test_v1417_upgrade_runtime()
 	await _test_v1415_balance()
@@ -683,6 +684,40 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.19 岛屿酒馆雇佣 ----------------
+func _test_v1419_island_tavern() -> void:
+	print("\n[1.4.19 岛屿酒馆]")
+	GameState.reset_new_game()
+	GameState.register_port("i_test", "测试港镇", 0, 2)
+	GameState.visit_port_id = &"i_test"
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	s._toggle_tavern()
+	await _frames(1)
+	_ok(s.tavern_root.visible, "岛屿酒馆面板可打开")
+	_ok(GameState.tavern_pool.size() > 0, "岛屿酒馆有招募对象", str(GameState.tavern_pool.size()))
+	var pool0: int = GameState.tavern_pool.size()
+	var roster0: int = GameState.crew_roster.size()
+	var gold0: int = GameState.gold
+	var first_id: StringName = StringName(GameState.tavern_pool[0].crew_id)
+	s._hire_crew(first_id)
+	await _frames(1)
+	_ok(GameState.crew_roster.size() == roster0 + 1, "雇佣后名册 +1",
+		str(GameState.crew_roster.size()))
+	_ok(GameState.tavern_pool.size() == pool0 - 1, "雇佣后候选 -1",
+		str(GameState.tavern_pool.size()))
+	_ok(GameState.gold < gold0, "雇佣扣金币", str(GameState.gold))
+	# 面板已重建（招募列表数量与池一致）
+	var hire_btns := 0
+	for n in s.tavern_list.find_children('*', 'Button', true, false):
+		if n is Button and n.text == "雇佣":
+			hire_btns += 1
+	_ok(hire_btns == GameState.tavern_pool.size(), "面板立即刷新", "%d vs %d" % [hire_btns, GameState.tavern_pool.size()])
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.4.18 每船独立模块 ----------------
 func _test_v1418_per_ship() -> void:
