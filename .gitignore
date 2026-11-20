@@ -11,3 +11,6 @@ export_presets.cfg
 # 临时文件
 *.tmp
 export/
+
+# 参考资料（不纳入仓库）
+docs/经济学参考文档/
