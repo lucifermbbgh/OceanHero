@@ -9,6 +9,8 @@ var waypoints: Array = []
 var wp_index: int = 0
 var target: Node = null
 var alive: bool = true
+var display_name: String = ""
+var armor: int = 2
 var fire_cd: float = 1.0
 var name_label: Label = null
 var color: Color = Color(0.75, 0.7, 0.4)
@@ -26,6 +28,8 @@ func setup(nation_key: String, route: Array, col: Color) -> void:
 	name_label.text = String(GameState.NATION_NAMES.get(nation_key, nation_key))
 	name_label.add_theme_font_size_override("font_size", 13)
 	name_label.add_theme_color_override("font_color", col)
+	display_name = "%s巡逻舰" % String(GameState.FACTION_V2_NAMES.get(nation_key, nation_key))
+	armor = 2
 	name_label.position = Vector2(-24, -34)
 	add_child(name_label)
 
@@ -87,10 +91,16 @@ func _tick_combat(delta: float) -> void:
 	if target != null and is_instance_valid(target):
 		target.take_damage(float(guns) * 6.0)
 
-func take_damage(amount: float) -> void:
+func take_damage(amount) -> void:
 	if not alive:
 		return
-	hp -= amount
+	var dmg := 0.0
+	if typeof(amount) == TYPE_DICTIONARY:
+		var d: Dictionary = amount
+		dmg = float(d.get("hull", 0.0)) + float(d.get("crew", 0.0)) * 0.5
+	else:
+		dmg = float(amount)
+	hp -= dmg
 	if hp <= 0.0:
 		_sink()
 

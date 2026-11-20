@@ -1679,6 +1679,14 @@ func _pick_enemy(world: Vector2):
 		if d < best_d:
 			best_d = d
 			best = e
+	# 1.4.0：势力巡逻队也可被锁定攻击
+	for p in patrols:
+		if not is_instance_valid(p) or not p.alive:
+			continue
+		var dp: float = p.position.distance_to(world)
+		if dp < best_d:
+			best_d = dp
+			best = p
 	return best
 
 func _ticker(text: String) -> void:

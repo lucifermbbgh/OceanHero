@@ -680,6 +680,9 @@ func tariff_rate_for_port(pid: StringName) -> float:
 	var nation := port_nation(pid)
 	if nation == "":
 		return 0.05   # 交界 / 母港：基准
+	# 1.4.0：禁运事件对该国关税上浮
+	if faction_embargo(faction_id_of(nation)):
+		return 0.15
 	var v := nation_rep_of(nation)
 	if v < 2000:
 		return 0.10
@@ -2151,7 +2154,7 @@ func tick_production(port_key: String) -> Dictionary:
 	var used: Dictionary = {}
 	# 轮转加工：每轮每个配方最多做 1 批，避免先到先得把原料吃光
 	# 平衡：每周加工批次上限 = 工坊等级（0 级不可加工），最低 1
-	var workshop := building_level(&"sawmill")
+	var workshop := building_level(&"sailmaker")
 	var max_batches := maxi(1, workshop)
 	var batches := 0
 	var progressed := true

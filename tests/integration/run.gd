@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v140_fixes()
 	await _test_v1317_polish()
 	await _test_v1315_events()
 	await _test_v1314_patrol_aggro()
@@ -669,6 +670,33 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.0 遗留修复 ----------------
+func _test_v140_fixes() -> void:
+	print("\n[1.4.0 遗留修复]")
+	GameState.reset_new_game()
+	# 工坊产量按织帆坊等级
+	GameState.buildings[&"sailmaker"] = 2
+	var r: Dictionary = GameState.tick_production("jadehaven")
+	_ok(r.has("产出"), "生产返回产出字段")
+	# 巡逻队可受伤（字典伤害）
+	var PatrolScript = load("res://scripts/sea/patrol_ship.gd")
+	var p = Node2D.new()
+	p.set_script(PatrolScript)
+	add_child(p)
+	p.setup("yunlan", [], Color.WHITE)
+	var hp0: float = p.hp
+	p.take_damage({"hull": 30.0, "crew": 10.0, "sail": 0.0, "rudder": 0.0})
+	_ok(p.hp < hp0, "巡逻队可受字典伤害", "%.0f → %.0f" % [hp0, p.hp])
+	p.queue_free()
+	await _frames(2)
+	# 禁运提高关税
+	GameState.reset_new_game()
+	GameState.register_port("p_chilin", "赤鳞港", 7, 2)
+	GameState.start_faction_event("chilin", "", "embargo", 4)
+	_ok(is_equal_approx(GameState.tariff_rate_for_port(&"p_chilin"), 0.15),
+		"禁运时关税 15%", str(GameState.tariff_rate_for_port(&"p_chilin")))
+	GameState.faction_events.clear()
 
 # ---------------- 1.3.17 兑换交互与声望条 ----------------
 func _test_v1317_polish() -> void:
@@ -1568,7 +1596,7 @@ func _test_v113_polish() -> void:
 	for k in p0.get("产出", {}).keys():
 		n0 += int(p0["产出"][k])
 	_ok(n0 <= 1, "工坊 0 级时每周最多 1 批", str(n0))
-	GameState.buildings[&"sawmill"] = 3
+	GameState.buildings[&"sailmaker"] = 3
 	GameState.warehouse.clear()
 	GameState.warehouse[&"wheat"] = 30
 	var p3: Dictionary = GameState.tick_production("jadehaven")
@@ -1707,7 +1735,7 @@ func _test_v110_core() -> void:
 
 	# 生产运行时产出（C 块补齐）
 	GameState.reset_new_game()
-	GameState.buildings[&"sawmill"] = 3
+	GameState.buildings[&"sailmaker"] = 3
 	GameState.warehouse.clear()
 	GameState.warehouse[&"wheat"] = 9
 	var prod: Dictionary = GameState.tick_production("jadehaven")
@@ -1717,7 +1745,7 @@ func _test_v110_core() -> void:
 	_ok(int(GameState.warehouse.get(&"beer", 0)) == 3, "成品入库")
 	# 军用品链
 	GameState.warehouse.clear()
-	GameState.buildings[&"sawmill"] = 5
+	GameState.buildings[&"sailmaker"] = 5
 	GameState.warehouse[&"iron_ore"] = 8
 	GameState.warehouse[&"timber"] = 6
 	GameState.warehouse[&"copper"] = 4

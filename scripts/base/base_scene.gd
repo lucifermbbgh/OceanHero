@@ -1410,7 +1410,7 @@ func _rebuild_build() -> void:
 	], 520, Color(0.6, 0.8, 0.65)))
 
 	# 工坊生产
-	var lv_ws := GameState.building_level(&"sawmill")
+	var lv_ws := GameState.building_level(&"sailmaker")
 	_yard_title_to(build_list, "工坊生产（每周上限 %d 批）" % maxi(1, lv_ws))
 	var head_prod := HBoxContainer.new()
 	head_prod.add_theme_constant_override("separation", 8)
