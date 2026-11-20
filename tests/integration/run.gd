@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1412_sails()
 	await _test_v1410_layout()
 	await _test_v147_panel_fix()
 	await _test_v146_ship_panel()
@@ -678,6 +679,36 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.12 风帆按桅分层 ----------------
+func _test_v1412_sails() -> void:
+	print("\n[1.4.12 风帆分层]")
+	GameState.reset_new_game()
+	GameState.ship_def_id = &"fishing_sloop"
+	_ok(GameState.sails_layers(1) == 1, "1 级船 1 帆", str(GameState.sails_layers(1)))
+	_ok(GameState.sails_layers(4) == 2, "4 级船 2 帆")
+	_ok(GameState.sails_layers(10) == 3, "10 级船 3 帆")
+	GameState.ship_def_id = &"first_rate"
+	var sail_slots := 0
+	for m in GameState.ship_modules():
+		if String(m["module_id"]) == "sails":
+			sail_slots += 1
+	_ok(sail_slots == 3, "10 级船 3 个帆槽", str(sail_slots))
+	# 各桅装备叠加
+	GameState.ship_module_levels.clear()
+	var base_speed: float = float(GameState.stats()["base_speed_px"])
+	GameState.equipped["sail0"] = &"sail_linen"
+	var s1: float = float(GameState.stats()["base_speed_px"])
+	GameState.equipped["sail1"] = &"sail_linen"
+	var s2: float = float(GameState.stats()["base_speed_px"])
+	_ok(s1 > base_speed, "第一桅帆提升航速")
+	_ok(s2 > s1, "第二桅帆继续叠加")
+	# 各层模块等级累加
+	GameState.set_module_level("sails", 0, 1)
+	GameState.set_module_level("sails", 1, 1)
+	var s3: float = float(GameState.stats()["base_speed_px"])
+	_ok(s3 > s2, "多层风帆强化叠加")
+	GameState.reset_new_game()
 
 # ---------------- 1.4.10 严格坐标布局 ----------------
 func _test_v1410_layout() -> void:

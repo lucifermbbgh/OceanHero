@@ -2343,6 +2343,7 @@ func _toggle_ship() -> void:
 		return
 	_close_all_panels()
 	_rebuild_ship_panel()
+	_refresh()
 	ship_root.visible = true
 	ship_root.z_index = 20
 	ship_root.move_to_front()
@@ -2409,8 +2410,8 @@ func _rebuild_ship_panel() -> void:
 func _ship_slot_text(mid: String, layer: int) -> String:
 	var md: Resource = DataRegistry.modules.get(mid)
 	var short_name := String(md.display_name).substr(0, 1)
-	if layer > 0:
-		short_name += str(layer)
+	if layer > 0 or mid == "sails":
+		short_name += str(layer + 1)
 	var lv := GameState.module_level(mid, layer)
 	if lv > 0:
 		short_name += "+%d" % lv
@@ -2454,6 +2455,8 @@ func _open_ship_slot(mid: String, layer: int) -> void:
 	dlg.popup_centered()
 
 func _gear_slot_of(mid: String, layer: int) -> String:
+	if mid == "sails":
+		return "sail%d" % layer
 	if mid == "deck":
 		return "figurehead" if layer == 0 else "plate"
 	var md: Resource = DataRegistry.modules.get(mid)

@@ -129,7 +129,18 @@ func stats() -> Dictionary:
 	if sail_add > 0.0:
 		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + sail_add)
 	# ---- 1.4.2：模块等级接入（stats 契约不变） ----
-	var lv_speed := module_level("sails")
+	var tier_now := int(ship_def().get("tier")) if ship_def() != null else 1
+	var lv_speed := 0
+	for si in range(sails_layers(tier_now)):
+		lv_speed += module_level("sails", si)
+	# 各桅帆装备叠加
+	for sj in range(sails_layers(tier_now)):
+		var sg_key := "sail%d" % sj
+		var sg_id := String(equipped.get(sg_key, ""))
+		if sg_id != "":
+			var sg: Resource = DataRegistry.get_gear(StringName(sg_id))
+			if sg != null:
+				st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + float(sg.get("speed_pct")))
 	var lv_turn := module_level("rudder")
 	var lv_crew := module_level("quarters") + _deck_total_levels()
 	var lv_cargo := module_level("hold")
@@ -933,6 +944,14 @@ func deck_layers(tier: int) -> int:
 func gundeck_layers(tier: int) -> int:
 	return int(MODULE_TIER_TABLE.get(clampi(tier, 1, 10), {}).get("gundeck", 1))
 
+## 风帆层数 = 桅杆数
+func sails_layers(tier: int) -> int:
+	if tier <= 2:
+		return 1
+	if tier <= 4:
+		return 2
+	return 3
+
 ## 船级 → 开放的模块（分层模块另行展开）
 const MODULES_BY_TIER := {
 	1: ["sails", "rudder", "hold", "quarters", "galley", "gundeck"],
@@ -959,6 +978,9 @@ func ship_modules() -> Array:
 		elif String(mid) == "gundeck":
 			for j in range(gundeck_layers(tier)):
 				out.append({"module_id": "gundeck", "layer": j})
+		elif String(mid) == "sails":
+			for s in range(sails_layers(tier)):
+				out.append({"module_id": "sails", "layer": s})
 		else:
 			out.append({"module_id": String(mid), "layer": 0})
 	return out
