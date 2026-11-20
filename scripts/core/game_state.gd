@@ -112,22 +112,6 @@ func stats() -> Dictionary:
 		st["reload_bonus"] = float(st.get("reload_bonus", 0.0)) + 0.02 * float(rank_sum)
 		st["accuracy_bonus"] = float(st.get("accuracy_bonus", 0.0)) + 0.01 * float(rank_sum)
 		st["boarding"] = int(st.get("boarding", 0)) + rank_sum
-	# 2) 装备强化：每级 +1% 航速/转向、+2 装甲
-	var up_sum := 0
-	for slot_id in equipped.keys():
-		up_sum += gear_level_of(StringName(String(equipped[slot_id])))
-	if up_sum > 0:
-		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + 0.01 * float(up_sum))
-		st["turn_rate"] = float(st.get("turn_rate", 0.0)) * (1.0 + 0.01 * float(up_sum))
-		st["armor"] = int(st.get("armor", 0)) + 2 * up_sum
-	# 3) 火炮位改装：每级 +2 门
-	var gun_add := ship_cannon_bonus()
-	if gun_add > 0:
-		st["guns_per_side"] = int(st.get("guns_per_side", 1)) + gun_add
-	# 4) 帆具改装：每级 +6% 航速
-	var sail_add := ship_sail_bonus()
-	if sail_add > 0.0:
-		st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + sail_add)
 	# ---- 1.4.2：模块等级接入（stats 契约不变） ----
 	var tier_now := int(ship_def().get("tier")) if ship_def() != null else 1
 	var lv_speed := 0
@@ -1900,44 +1884,6 @@ func building_progress_text(bid: StringName) -> String:
 	var used := TimeService.total_weeks() - int(rec.get("start", 0))
 	return "升级中 %d/%d 周 → Lv%d" % [used, int(rec.get("weeks", 2)), int(rec.get("target", 1))]
 
-# ---------------- 船只改装（1.1） ----------------
-
-## 改装记录：{cannon_slots: int, sail_tier: int}
-var ship_mods: Dictionary = {"cannon_slots": 0, "sail_tier": 0}
-
-const MOD_CANNON_COST := [0, 8000, 20000]
-const MOD_SAIL_COST := [0, 6000, 15000]
-
-func ship_cannon_bonus() -> int:
-	return int(ship_mods.get("cannon_slots", 0)) * 2
-
-func ship_sail_bonus() -> float:
-	return float(ship_mods.get("sail_tier", 0)) * 0.06
-
-## 改装火炮位（提升可装炮数与射速）
-func mod_cannon() -> Dictionary:
-	var lv := int(ship_mods.get("cannon_slots", 0))
-	if lv >= 2:
-		return {"ok": false, "reason": "火炮位已满"}
-	var cost := int(MOD_CANNON_COST[lv + 1])
-	if gold < cost:
-		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
-	add_gold(-cost)
-	ship_mods["cannon_slots"] = lv + 1
-	return {"ok": true, "level": lv + 1, "cost": cost}
-
-## 改装帆具（提升航速）
-func mod_sail() -> Dictionary:
-	var lv := int(ship_mods.get("sail_tier", 0))
-	if lv >= 2:
-		return {"ok": false, "reason": "帆具已满"}
-	var cost := int(MOD_SAIL_COST[lv + 1])
-	if gold < cost:
-		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
-	add_gold(-cost)
-	ship_mods["sail_tier"] = lv + 1
-	return {"ok": true, "level": lv + 1, "cost": cost}
-
 # ---------------- 船员职级与装备强化（1.1） ----------------
 
 const CREW_RANKS := ["水手", "舵手", "炮长", "大副"]
@@ -1967,48 +1913,40 @@ func crew_gain_xp(amount: int) -> void:
 ## 装备强化：消耗金币与材料，属性按强化等级提升
 const GEAR_UPGRADE_COST := {1: 2000, 2: 5000, 3: 12000}
 const GEAR_UPGRADE_MAT := {1: 2, 2: 4, 3: 8}
-var gear_level: Dictionary = {}
+# ---------------- 旧接口兼容层（1.4.13，全部转发到模块强化） ----------------
+
+var ship_mods: Dictionary = {}   # 仅兼容旧存档/旧测试，不再参与计算
+var gear_level: Dictionary = {}  # 同上
+
+func ship_sail_bonus() -> float:
+	return 0.0
+
+func ship_cannon_bonus() -> int:
+	return 0
+
+func mod_sail() -> Dictionary:
+	return upgrade_module("sails", 0)
+
+func mod_cannon() -> Dictionary:
+	return upgrade_module("gundeck", 0)
 
 func gear_level_of(gid: StringName) -> int:
-	return int(gear_level.get(String(gid), 0))
+	var g: Resource = DataRegistry.get_gear(gid)
+	if g == null:
+		return 0
+	return module_level(module_for_gear_slot(g.slot), 0)
 
 func gear_upgrade(gid: StringName) -> Dictionary:
-	var lv := gear_level_of(gid)
-	if lv >= 3:
-		return {"ok": false, "reason": "已达最高强化等级"}
-	var cost := int(GEAR_UPGRADE_COST.get(lv + 1, 99999))
-	var mat_n := int(GEAR_UPGRADE_MAT.get(lv + 1, 99))
-	if gold < cost:
-		return {"ok": false, "reason": "金币不足，需要 %d" % cost}
-	if int(warehouse.get(&"iron_ore", 0)) < mat_n:
-		return {"ok": false, "reason": "铁矿不足，需要 %d" % mat_n}
-	add_gold(-cost)
-	warehouse[&"iron_ore"] = int(warehouse.get(&"iron_ore", 0)) - mat_n
-	gear_level[String(gid)] = lv + 1
-	return {"ok": true, "level": lv + 1, "cost": cost}
+	var g: Resource = DataRegistry.get_gear(gid)
+	if g == null:
+		return {"ok": false, "reason": "装备不存在"}
+	var mid := module_for_gear_slot(g.slot)
+	if mid == "":
+		return {"ok": false, "reason": "该装备无对应模块"}
+	return upgrade_module(mid, 0)
 
-## 装备合成：同部位三件同级合成一件高一级
-func gear_combine(slot: StringName, rarity: int) -> Dictionary:
-	var candidates: Array = []
-	for g in gear_owned:
-		var gd: Resource = DataRegistry.get_gear(g)
-		if gd != null and String(gd.slot) == String(slot) and int(gd.rarity) == rarity:
-			candidates.append(g)
-	if candidates.size() < 3:
-		return {"ok": false, "reason": "同部位同稀有度装备不足 3 件"}
-	for i in range(3):
-		gear_owned.erase(candidates[i])
-	var pool: Array = []
-	for k in DataRegistry.gear.keys():
-		var gd2: Resource = DataRegistry.gear[k]
-		if gd2 != null and String(gd2.slot) == String(slot) and int(gd2.rarity) == rarity + 1:
-			pool.append(k)
-	if pool.is_empty():
-		gear_owned.append(candidates[0])
-		return {"ok": false, "reason": "没有更高一级的同类装备"}
-	var new_id: StringName = pool[RngService.randi_range(0, pool.size() - 1)]
-	gear_owned.append(new_id)
-	return {"ok": true, "new_id": new_id}
+func gear_combine(_slot: StringName, _rarity: int) -> Dictionary:
+	return {"ok": false, "reason": "装备合成已移除，请强化模块"}
 
 # ---------------- 数据校验（1.2.9） ----------------
 
@@ -3199,9 +3137,7 @@ func to_dict() -> Dictionary:
 		"crew_xp": crew_xp.duplicate(),
 		"nation_rep": nation_rep.duplicate(),
 		"faction_rep": faction_rep.duplicate(),
-		"ship_mods": ship_mods.duplicate(),
 		"building_upgrades": building_upgrades.duplicate(true),
-		"gear_level": gear_level.duplicate(),
 		"build_submitted": build_submitted.duplicate(true),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
 		"market": {"drift": price_drift.duplicate(), "events": market_events.duplicate(true),
@@ -3329,6 +3265,10 @@ func from_dict(d: Dictionary) -> void:
 		})
 	faction_rep.clear()
 	_init_faction_rep()
+	ship_module_levels.clear()
+	var smlv: Dictionary = d.get("module_levels", {})
+	for mlk in smlv.keys():
+		ship_module_levels[String(mlk)] = int(smlv[mlk])
 	var frep: Dictionary = d.get("faction_rep", {})
 	for fk in frep.keys():
 		faction_rep[String(fk)] = int(frep[fk])
@@ -3338,6 +3278,7 @@ func from_dict(d: Dictionary) -> void:
 	for nk in nrep.keys():
 		nation_rep[String(nk)] = int(nrep[nk])
 	module_crew.clear()
+	ship_module_levels.clear()
 	crew_xp.clear()
 	var cxp: Dictionary = d.get("crew_xp", {})
 	for k0 in cxp.keys():
@@ -3346,14 +3287,6 @@ func from_dict(d: Dictionary) -> void:
 	var bu: Dictionary = d.get("building_upgrades", {})
 	for kb in bu.keys():
 		building_upgrades[StringName(kb)] = bu[kb]
-	ship_mods = {"cannon_slots": 0, "sail_tier": 0}
-	var sm: Dictionary = d.get("ship_mods", {})
-	for k3 in sm.keys():
-		ship_mods[String(k3)] = int(sm[k3])
-	gear_level.clear()
-	var glv: Dictionary = d.get("gear_level", {})
-	for k1 in glv.keys():
-		gear_level[String(k1)] = int(glv[k1])
 	build_submitted.clear()
 	var bsub: Dictionary = d.get("build_submitted", {})
 	for k2 in bsub.keys():
@@ -3513,6 +3446,8 @@ func _cargo_to_dict() -> Dictionary:
 	return out
 
 func reset_new_game() -> void:
+	ship_module_levels.clear()
+	module_crew.clear()
 	gold = START_GOLD
 	nation_rep.clear()
 	_init_nation_rep()

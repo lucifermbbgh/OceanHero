@@ -143,7 +143,6 @@ func _build_ui() -> void:
 		_action_button(vb, "声望与战功", _toggle_rep)
 
 	_action_button(vb, "船员名单", _toggle_crew_panel)
-	_action_button(vb, "装备强化", _toggle_gear)
 	_action_button(vb, "舰船", _toggle_ship)
 	_action_button(vb, "势力声望", _toggle_factions)
 	_action_button(vb, "仓库", _toggle_store)
@@ -2098,6 +2097,11 @@ func _rebuild_crew_panel() -> void:
 		row.add_child(_cell_box(str(int(c.stat)), 120))
 
 func _toggle_gear() -> void:
+	_log("装备强化已并入「舰船」面板的模块强化")
+	_toggle_ship()
+	return
+
+func _gear_panel_legacy() -> void:
 	if gear_root.visible:
 		gear_root.visible = false
 		return
@@ -2165,6 +2169,11 @@ func _do_gear_combine(slot: StringName, rarity: int) -> void:
 		_log(String(r.get("reason", "合成失败")))
 
 func _toggle_mod() -> void:
+	_log("船只改装已并入「舰船」面板的模块强化")
+	_toggle_ship()
+	return
+
+func _mod_panel_legacy() -> void:
 	if mod_root.visible:
 		mod_root.visible = false
 		return

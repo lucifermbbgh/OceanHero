@@ -1638,26 +1638,18 @@ func _test_v1210_stats() -> void:
 	var base_guns := int(base_stats.get("guns_per_side", 0))
 	var base_armor := int(base_stats.get("armor", 0))
 	var base_speed := float(base_stats.get("base_speed_px", 0.0))
-	# 火炮位改装生效
+	# 模块强化生效（原改装/装备强化已合并）
 	GameState.add_gold(100000)
-	_ok(bool(GameState.mod_cannon().get("ok", false)), "改装火炮位")
+	GameState.warehouse[&"timber"] = 9999
+	GameState.warehouse[&"iron"] = 9999
+	_ok(bool(GameState.upgrade_module("gundeck", 0).get("ok", false)), "强化炮门模块")
 	var st1: Dictionary = GameState.stats()
-	_ok(int(st1.get("guns_per_side", 0)) == base_guns + 2, "火炮位 +2 生效",
+	_ok(int(st1.get("guns_per_side", 0)) == base_guns + 1, "炮门强化 +1 门",
 		"%d → %d" % [base_guns, int(st1.get("guns_per_side", 0))])
-	# 帆具改装生效
-	_ok(bool(GameState.mod_sail().get("ok", false)), "改装帆具")
+	_ok(bool(GameState.upgrade_module("sails", 0).get("ok", false)), "强化风帆模块")
 	var st2: Dictionary = GameState.stats()
-	_ok(float(st2.get("base_speed_px", 0.0)) > base_speed, "帆具提升航速生效",
+	_ok(float(st2.get("base_speed_px", 0.0)) > base_speed, "风帆强化提升航速",
 		"%.1f → %.1f" % [base_speed, float(st2.get("base_speed_px", 0.0))])
-	# 装备强化生效（需要装备与铁矿）
-	if not GameState.gear_owned.is_empty():
-		var gid: StringName = GameState.gear_owned[0]
-		GameState.warehouse[&"iron_ore"] = 20
-		var armor_before := int(GameState.stats().get("armor", 0))
-		if bool(GameState.gear_upgrade(gid).get("ok", false)):
-			var armor_after := int(GameState.stats().get("armor", 0))
-			_ok(armor_after >= armor_before, "装备强化提升装甲/属性",
-				"%d → %d" % [armor_before, armor_after])
 	# 船员职级生效
 	GameState.crew_roster.clear()
 	var c = load("res://scripts/systems/crew_factory.gd").generate(1, &"standard")
@@ -1951,9 +1943,9 @@ func _test_v113_polish() -> void:
 	var legacy := {"player": {"gold": 1234, "level": 2}}
 	GameState.from_dict(legacy)
 	_ok(GameState.gold == 1234, "旧档金币可读", str(GameState.gold))
-	_ok(GameState.ship_mods.get("sail_tier", -1) == 0, "缺 ship_mods 时补默认值")
+	_ok(GameState.ship_module_levels.is_empty(), "缺模块等级时为空")
 	_ok(GameState.building_upgrades.is_empty(), "缺 building_upgrades 时为空")
-	_ok(GameState.gear_level.is_empty(), "缺 gear_level 时为空")
+	_ok(GameState.module_crew.is_empty(), "缺模块船员时为空")
 
 	# 新商品在港口有初始库存
 	GameState.reset_new_game()
@@ -2014,12 +2006,12 @@ func _test_v111_ui() -> void:
 	await _frames(1)
 	s._toggle_gear()
 	await _frames(1)
-	_ok(s.gear_root.visible, "装备面板可打开")
+	_ok(s.ship_root.visible, "装备强化入口跳转舰船面板")
 	s._close_all_panels()
+	await _frames(1)
 	s._toggle_mod()
 	await _frames(1)
-	_ok(s.mod_root.visible, "改装面板可打开")
-	_ok(s.mod_list.get_child_count() > 1, "改装面板有内容", str(s.mod_list.get_child_count()))
+	_ok(s.ship_root.visible, "改装入口跳转舰船面板")
 	s._close_all_panels()
 	await _frames(1)
 
@@ -2105,36 +2097,21 @@ func _test_v110_core() -> void:
 	GameState.crew_xp[&"c1"] = 700
 	_ok(GameState.crew_rank_name(&"c1") == "大副", "700 经验升大副")
 
-	# 装备强化
+	# 模块强化（原装备强化与改装合并）
 	GameState.reset_new_game()
 	GameState.add_gold(50000)
-	GameState.warehouse.clear()
-	GameState.warehouse[&"iron_ore"] = 10
-	var gid: StringName = &"nonexistent_gear"
-	_ok(GameState.gear_level_of(gid) == 0, "初始强化 0 级")
-	var gup: Dictionary = GameState.gear_upgrade(gid)
-	_ok(bool(gup.get("ok", false)), "可以强化", str(gup))
-	_ok(GameState.gear_level_of(gid) == 1, "强化到 1 级")
-	_ok(int(GameState.warehouse.get(&"iron_ore", 0)) == 8, "消耗 2 铁矿",
-		str(GameState.warehouse.get(&"iron_ore", 0)))
+	GameState.warehouse[&"timber"] = 999
+	GameState.warehouse[&"iron"] = 999
+	_ok(GameState.module_level("gundeck", 0) == 0, "初始模块 0 级")
+	var gup: Dictionary = GameState.upgrade_module("gundeck", 0)
+	_ok(bool(gup.get("ok", false)), "可以强化模块", str(gup))
+	_ok(GameState.module_level("gundeck", 0) == 1, "强化到 1 级")
+	_ok(int(GameState.warehouse.get(&"iron", 0)) < 999, "强化消耗铁矿")
 	GameState.add_gold(-GameState.gold)
-	var poor: Dictionary = GameState.gear_upgrade(gid)
+	var poor: Dictionary = GameState.upgrade_module("gundeck", 1)
 	_ok(not bool(poor.get("ok", true)), "金币不足时拒绝")
-
-	# 船只改装
-	GameState.reset_new_game()
-	GameState.add_gold(60000)
-	_ok(GameState.ship_sail_bonus() == 0.0, "初始无帆具加成")
-	var m1: Dictionary = GameState.mod_sail()
-	_ok(bool(m1.get("ok", false)), "可以改装帆具")
-	_ok(is_equal_approx(GameState.ship_sail_bonus(), 0.06), "一级帆具 +6% 航速",
-		str(GameState.ship_sail_bonus()))
-	var m2: Dictionary = GameState.mod_cannon()
-	_ok(bool(m2.get("ok", false)), "可以改装火炮位")
-	_ok(GameState.ship_cannon_bonus() == 2, "一级火炮位 +2")
-	GameState.mod_sail()
-	var m3: Dictionary = GameState.mod_sail()
-	_ok(not bool(m3.get("ok", true)), "帆具最多两级")
+	# 合成已移除
+	_ok(not bool(GameState.gear_combine(&"sail", 0).get("ok", true)), "装备合成已移除")
 
 	# 任务类型扩展
 	GameState.reset_new_game()
