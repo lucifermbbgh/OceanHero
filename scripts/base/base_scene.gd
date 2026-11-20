@@ -596,6 +596,7 @@ func _repair_cost() -> int:
 	cost += (1.0 - GameState.rudder_pct) * 200.0
 	cost += (1.0 - GameState.crew_pct) * 150.0
 	cost *= (1.0 - GameState.repair_discount())
+	cost *= (1.0 - minf(0.5, float(GameState.stats().get("repair_bonus", 0.0))))
 	return int(ceil(cost))
 
 func _do_repair() -> void:
@@ -2442,24 +2443,26 @@ func _open_ship_slot(mid: String, layer: int) -> void:
 	var info := "等级 %d / %d　强化：%d 金 · 木 %d · 铁 %d" % [
 		lv, cap, int(cost["gold"]), int(cost["timber"]), int(cost["iron"])]
 	vb.add_child(_lbl(info, 520, Color(0.85, 0.85, 0.7)))
-	if lv < cap:
-		var ub := Button.new()
-		ub.text = "强化"
-		ub.custom_minimum_size = Vector2(120, 30)
-		var err_lbl := _lbl("", 520, Color(0.95, 0.55, 0.45))
-		var midu := mid
-		var lvu := layer
-		ub.pressed.connect(func():
-			var r: Dictionary = GameState.upgrade_module(midu, lvu)
-			if bool(r.get("ok", false)):
-				_log("强化成功：Lv%d" % int(r.get("level", 0)))
-				dlg.queue_free()
-				_rebuild_ship_panel()
-				_refresh()
-			else:
-				err_lbl.text = "强化失败：" + String(r.get("reason", "未知原因")))
-		vb.add_child(ub)
-		vb.add_child(err_lbl)
+	var ub := Button.new()
+	ub.text = "强化" if lv < cap else "已满级"
+	ub.custom_minimum_size = Vector2(120, 30)
+	ub.disabled = lv >= cap
+	if lv >= cap:
+		ub.add_theme_color_override("font_disabled_color", Color(0.55, 0.55, 0.55))
+	var err_lbl := _lbl("", 520, Color(0.95, 0.55, 0.45))
+	var midu := mid
+	var lvu := layer
+	ub.pressed.connect(func():
+		var r: Dictionary = GameState.upgrade_module(midu, lvu)
+		if bool(r.get("ok", false)):
+			_log("强化成功：Lv%d" % int(r.get("level", 0)))
+			dlg.queue_free()
+			_rebuild_ship_panel()
+			_refresh()
+		else:
+			err_lbl.text = "强化失败：" + String(r.get("reason", "未知原因")))
+	vb.add_child(ub)
+	vb.add_child(err_lbl)
 	vb.add_child(HSeparator.new())
 	if ship_tab == "gear":
 		_add_gear_options(vb, mid, layer)

@@ -571,7 +571,11 @@ func add_faction_rep(fid: String, amount: int) -> void:
 	if not FACTIONS_V2.has(fid):
 		return
 	_init_faction_rep()
-	faction_rep[fid] = clampi(faction_rep_of(fid) + amount, -100, 100)
+	var final_amount := amount
+	# 1.4.18：旗杆与旗帜提供声望获取加成（仅正向增益）
+	if amount > 0:
+		final_amount = int(round(float(amount) * (1.0 + float(stats().get("rep_gain_bonus", 0.0)))))
+	faction_rep[fid] = clampi(faction_rep_of(fid) + final_amount, -100, 100)
 
 ## 每 25 点一档：-100~-76, -75~-51, -50~-26, -25~-1, 0~24, 25~49, 50~74, 75~100
 const FACTION_TIERS := [
@@ -1529,13 +1533,15 @@ func swap_to_owned(index: int, port_id: StringName = &"jadehaven") -> bool:
 	if swap_overload(index):
 		return false
 	var other: Dictionary = ships_owned[index]
-	# 把当前船存回库存（停泊在换乘的港口）
+	# 把当前船存回库存（连同模块等级、模块船员、装备一起封存）
 	ships_owned.append({
 		"def_id": String(ship_def_id), "variant": String(ship_variant),
 		"station_port": String(port_id),
 		"hull_hp": hull_hp, "sail_pct": sail_pct,
 		"rudder_pct": rudder_pct, "crew_pct": crew_pct,
 		"equipped": equipped.duplicate(),
+		"module_levels": ship_module_levels.duplicate(),
+		"module_crew": module_crew.duplicate(),
 		"cannon_id": String(cannon_id),
 	})
 	ships_owned.remove_at(index)
@@ -1546,6 +1552,15 @@ func swap_to_owned(index: int, port_id: StringName = &"jadehaven") -> bool:
 	rudder_pct = float(other.get("rudder_pct", 1.0))
 	crew_pct = float(other.get("crew_pct", 1.0))
 	equipped = other.get("equipped", {}).duplicate()
+	# 每艘船的模块状态独立：读取目标船的等级与船员
+	ship_module_levels.clear()
+	var mlv: Dictionary = other.get("module_levels", {})
+	for mk2 in mlv.keys():
+		ship_module_levels[String(mk2)] = int(mlv[mk2])
+	module_crew.clear()
+	var mcr2: Dictionary = other.get("module_crew", {})
+	for ck2 in mcr2.keys():
+		module_crew[String(ck2)] = StringName(String(mcr2[ck2]))
 	cannon_id = StringName(other.get("cannon_id", "pound3_light"))
 	ensure_ship()
 	return true
@@ -3216,6 +3231,8 @@ func from_dict(d: Dictionary) -> void:
 			"rudder_pct": float(e.get("rudder_pct", 1.0)),
 			"crew_pct": float(e.get("crew_pct", 1.0)),
 			"equipped": {},
+			"module_levels": (e.get("module_levels", {}) as Dictionary).duplicate(),
+			"module_crew": (e.get("module_crew", {}) as Dictionary).duplicate(),
 			"cannon_id": String(e.get("cannon_id", "pound3_light")),
 		}
 		var eq2: Dictionary = e.get("equipped", {})
@@ -3431,6 +3448,8 @@ func _fleet_to_array() -> Array:
 			"hull_hp": entry.get("hull_hp", -1.0), "sail_pct": entry.get("sail_pct", 1.0),
 			"rudder_pct": entry.get("rudder_pct", 1.0), "crew_pct": entry.get("crew_pct", 1.0),
 			"equipped": eq,
+			"module_levels": (entry.get("module_levels", {}) as Dictionary).duplicate(),
+			"module_crew": (entry.get("module_crew", {}) as Dictionary).duplicate(),
 			"cannon_id": entry.get("cannon_id", "pound3_light"),
 		})
 	return out

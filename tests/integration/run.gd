@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1418_per_ship()
 	await _test_v1417_upgrade_runtime()
 	await _test_v1415_balance()
 	await _test_v1414_ui_save()
@@ -682,6 +683,33 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.18 每船独立模块 ----------------
+func _test_v1418_per_ship() -> void:
+	print("\n[1.4.18 每船独立]")
+	GameState.reset_new_game()
+	# 当前船强化
+	GameState.ship_module_levels["sails#0"] = 1
+	GameState.ships_owned.clear()
+	GameState.ships_owned.append({"def_id": "brig", "variant": "standard",
+		"station_port": "jadehaven", "hull_hp": -1.0, "sail_pct": 1.0,
+		"rudder_pct": 1.0, "crew_pct": 1.0, "equipped": {},
+		"module_levels": {"gundeck#0": 3}, "module_crew": {}})
+	_ok(bool(GameState.swap_to_owned(0, &"jadehaven")), "换乘到 brig")
+	_ok(GameState.module_level("gundeck", 0) == 3, "目标船模块等级独立读取",
+		str(GameState.module_level("gundeck", 0)))
+	_ok(GameState.module_level("sails", 0) == 0, "原船强化不带入新船",
+		str(GameState.module_level("sails", 0)))
+	# 换回原船，强化应恢复
+	var old_idx := -1
+	for i in range(GameState.ships_owned.size()):
+		if String(GameState.ships_owned[i].get("def_id", "")) == "fishing_sloop":
+			old_idx = i
+	_ok(old_idx >= 0, "原船回到船库", str(old_idx))
+	_ok(bool(GameState.swap_to_owned(old_idx, &"jadehaven")), "换回原船")
+	_ok(GameState.module_level("sails", 0) == 1, "原船强化保留",
+		str(GameState.module_level("sails", 0)))
+	GameState.reset_new_game()
 
 # ---------------- 1.4.17 强化运行时路径 ----------------
 func _test_v1417_upgrade_runtime() -> void:
