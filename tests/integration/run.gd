@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v145_module_upgrade()
 	await _test_v144_module_crew()
 	await _test_v143_gear_slots()
 	await _test_v142_module_stats()
@@ -674,6 +675,49 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.5 模块强化经济 ----------------
+func _test_v145_module_upgrade() -> void:
+	print("\n[1.4.5 模块强化]")
+	GameState.reset_new_game()
+	GameState.ship_module_levels.clear()
+	# 成本随等级上升
+	var c0: Dictionary = GameState.module_upgrade_cost("gundeck", 0)
+	_ok(int(c0["gold"]) > 0 and int(c0["timber"]) > 0 and int(c0["iron"]) > 0,
+		"强化成本含金币/木材/铁矿")
+	GameState.set_module_level("gundeck", 0, 1)
+	var c1: Dictionary = GameState.module_upgrade_cost("gundeck", 0)
+	_ok(int(c1["gold"]) > int(c0["gold"]), "等级越高成本越高",
+		"%d → %d" % [int(c0["gold"]), int(c1["gold"])])
+	# 船级上限
+	GameState.ship_def_id = &"fishing_sloop"
+	_ok(GameState.module_level_cap() == 1, "1 级船模块上限 1",
+		str(GameState.module_level_cap()))
+	GameState.set_module_level("gundeck", 0, 1)
+	var r_cap: Dictionary = GameState.upgrade_module("gundeck", 0)
+	_ok(not bool(r_cap.get("ok", true)), "达上限拒绝强化", str(r_cap.get("reason", "")))
+	# 资源不足拒绝
+	GameState.ship_def_id = &"first_rate"
+	GameState.ship_module_levels.clear()
+	GameState.gold = 10
+	var r_gold: Dictionary = GameState.upgrade_module("sails", 0)
+	_ok(not bool(r_gold.get("ok", true)), "金币不足拒绝", str(r_gold.get("reason", "")))
+	GameState.gold = 100000
+	GameState.warehouse[&"timber"] = 0
+	var r_mat: Dictionary = GameState.upgrade_module("sails", 0)
+	_ok(not bool(r_mat.get("ok", true)), "材料不足拒绝", str(r_mat.get("reason", "")))
+	# 成功强化
+	GameState.warehouse[&"timber"] = 9999
+	GameState.warehouse[&"iron"] = 9999
+	var gold0: int = GameState.gold
+	var r_ok: Dictionary = GameState.upgrade_module("sails", 0)
+	_ok(bool(r_ok.get("ok", false)), "资源充足强化成功", str(r_ok.get("reason", "")))
+	_ok(GameState.module_level("sails", 0) == 1, "等级 +1")
+	_ok(GameState.gold < gold0, "扣除金币")
+	_ok(int(GameState.warehouse[&"timber"]) < 9999, "扣除木材")
+	# 强化后属性提升
+	_ok(float(GameState.stats()["base_speed_px"]) > 0.0, "强化后属性可读取")
+	GameState.reset_new_game()
 
 # ---------------- 1.4.4 船员按模块归属 ----------------
 func _test_v144_module_crew() -> void:

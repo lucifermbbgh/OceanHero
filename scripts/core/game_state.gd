@@ -788,6 +788,52 @@ func can_travel_to(target: int) -> bool:
 			return bool(o["unlocked"])
 	return false
 
+# ---------------- 模块强化经济（1.4.5） ----------------
+
+## 模块造价权重
+const MODULE_WEIGHT := {
+	"gundeck": 1.4, "deck": 1.2, "sails": 1.2, "hold": 1.1, "rudder": 1.1,
+	"cabin": 1.0, "quarters": 1.0, "workshop": 1.0,
+	"lookout": 0.9, "infirmary": 0.9, "flagpole": 0.8, "galley": 0.8,
+}
+
+## 模块强化上限：受船级限制
+func module_level_cap() -> int:
+	var tier := int(ship_def().get("tier")) if ship_def() != null else 1
+	return clampi(tier, 1, 5)
+
+## 下一级花费
+func module_upgrade_cost(mid: String, layer: int = 0) -> Dictionary:
+	var lv := module_level(mid, layer)
+	var w := float(MODULE_WEIGHT.get(mid, 1.0))
+	var n := float(lv + 1)
+	return {
+		"gold": int(round(1200.0 * w * pow(n, 1.6))),
+		"timber": int(round(40.0 * w * n)),
+		"iron": int(round(15.0 * w * n)),
+	}
+
+## 强化模块
+func upgrade_module(mid: String, layer: int = 0) -> Dictionary:
+	var md: Resource = DataRegistry.modules.get(mid)
+	if md == null:
+		return {"ok": false, "reason": "模块不存在"}
+	var lv := module_level(mid, layer)
+	var cap := module_level_cap()
+	if lv >= cap:
+		return {"ok": false, "reason": "已达上限（船级限制 %d 级）" % cap}
+	var cost: Dictionary = module_upgrade_cost(mid, layer)
+	if gold < int(cost["gold"]):
+		return {"ok": false, "reason": "金币不足（需要 %d）" % int(cost["gold"])}
+	for mat in ["timber", "iron"]:
+		if int(warehouse.get(mat, 0)) < int(cost[mat]):
+			return {"ok": false, "reason": "%s不足（需要 %d）" % ["木材" if mat == "timber" else "铁矿", int(cost[mat])]}
+	add_gold(-int(cost["gold"]))
+	for mat2 in ["timber", "iron"]:
+		warehouse[mat2] = maxi(0, int(warehouse.get(mat2, 0)) - int(cost[mat2]))
+	set_module_level(mid, layer, lv + 1)
+	return {"ok": true, "level": lv + 1, "cost": cost}
+
 # ---------------- 船员按模块归属（1.4.4） ----------------
 
 ## 模块槽 → 船员 id：{"mid#layer": crew_id}
