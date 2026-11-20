@@ -3,12 +3,14 @@ extends RefCounted
 
 const CrewDefScript = preload("res://scripts/data/crew_def.gd")
 
-const ROLES := [&"helmsman", &"first_mate", &"gunner", &"lookout", &"boatswain", &"carpenter", &"surgeon", &"sailmaster"]
+const ROLES := [&"mate", &"gunner", &"surgeon", &"sailor"]
+
+const ROLE_WEIGHTS := [&"sailor", &"sailor", &"sailor", &"sailor", &"sailor", &"gunner", &"gunner", &"mate", &"surgeon"]
 
 const ROLE_NAMES := {
-	&"helmsman": "舵手", &"first_mate": "大副", &"gunner": "炮手", &"lookout": "瞭望员",
-	&"boatswain": "水手长", &"carpenter": "木匠", &"surgeon": "军医", &"sailmaster": "操帆长",
-	&"collector": "征税官", &"raider": "突击队长",
+	&"mate": "大副", &"gunner": "炮手", &"surgeon": "船医", &"sailor": "水手",
+	
+	
 }
 
 const SURNAMES := ["陈", "林", "王", "赵", "海", "沈", "顾", "罗", "雷", "白", "秦", "薛"]
@@ -33,7 +35,7 @@ static func _roll_rarity() -> int:
 
 static func generate(count: int, variant: StringName = &"standard") -> Array:
 	var out: Array = []
-	var role_pool: Array = ROLES.duplicate()
+	var role_pool: Array = ROLE_WEIGHTS.duplicate()
 	if variant == &"navy":
 		role_pool.append(&"collector")
 	elif variant == &"pirate":

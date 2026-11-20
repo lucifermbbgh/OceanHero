@@ -55,16 +55,10 @@ static func gear_bonus(equipped: Dictionary) -> Dictionary:
 
 ## 岗位效果：每点技能值提供的加成
 const CREW_EFFECT := {
-	&"helmsman": {"turn_pct": 0.006},
-	&"first_mate": {"reload_pct": 0.005},
-	&"gunner": {"accuracy": 0.03},
-	&"lookout": {"view": 40.0},
-	&"boatswain": {"speed_pct": 0.004},
-	&"sailmaster": {"speed_pct": 0.003},
-	&"raider": {"boarding_pct": 0.25},
-	&"collector": {},
-	&"carpenter": {},
+	&"mate": {"turn_pct": 0.006, "reload_pct": 0.002},
+	&"gunner": {"accuracy": 0.03, "reload_pct": 0.003},
 	&"surgeon": {},
+	&"sailor": {"speed_pct": 0.003},
 }
 
 static func crew_bonus(crew_list: Array) -> Dictionary:

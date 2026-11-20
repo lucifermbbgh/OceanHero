@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v144_module_crew()
 	await _test_v143_gear_slots()
 	await _test_v142_module_stats()
 	await _test_v141_modules()
@@ -673,6 +674,55 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.4 船员按模块归属 ----------------
+func _test_v144_module_crew() -> void:
+	print("\n[1.4.4 船员模块归属]")
+	GameState.reset_new_game()
+	# 船员生成只有 4 岗位
+	var CrewFactory = load("res://scripts/systems/crew_factory.gd")
+	var rolled: Array = CrewFactory.generate(20, &"standard")
+	var roles := {}
+	for c in rolled:
+		roles[String(c.role)] = true
+	for role in roles.keys():
+		_ok(GameState.CREW_POSTS.has(role), "生成的岗位属于四类：%s" % role)
+	# 准备船员
+	GameState.crew_roster.clear()
+	GameState.module_crew.clear()
+	var gunner = rolled[0]
+	gunner.role = &"gunner"
+	gunner.crew_id = &"c_gun"
+	GameState.crew_roster.append(gunner)
+	var sailor = CrewDefCtor(rolled[1], &"c_sail", &"sailor")
+	GameState.crew_roster.append(sailor)
+	# 炮弹岗只接受炮手
+	var r1: Dictionary = GameState.assign_crew_to_module(&"c_sail", "gundeck", 0)
+	_ok(not bool(r1.get("ok", true)), "水手不能进炮门", str(r1.get("reason", "")))
+	var r2: Dictionary = GameState.assign_crew_to_module(&"c_gun", "gundeck", 0)
+	_ok(bool(r2.get("ok", false)), "炮手可进炮门", str(r2.get("reason", "")))
+	_ok(GameState.module_crew_of("gundeck", 0) == &"c_gun", "槽位记录船员")
+	# 同一船员不能占两个槽
+	var r3: Dictionary = GameState.assign_crew_to_module(&"c_gun", "gundeck", 1)
+	_ok(not bool(r3.get("ok", true)), "同一船员不能占两槽")
+	# 不设岗位的模块
+	var r4: Dictionary = GameState.assign_crew_to_module(&"c_sail", "hold", 0)
+	_ok(not bool(r4.get("ok", true)), "仓库不设岗位")
+	# 水手可进风帆
+	var r5: Dictionary = GameState.assign_crew_to_module(&"c_sail", "sails", 0)
+	_ok(bool(r5.get("ok", false)), "水手可进风帆")
+	_ok(GameState.assigned_crews().size() == 2, "在岗船员计入 stats",
+		str(GameState.assigned_crews().size()))
+	# 撤离
+	GameState.clear_module_crew("gundeck", 0)
+	_ok(GameState.module_crew_of("gundeck", 0) == &"", "可撤离船员")
+	GameState.reset_new_game()
+
+func CrewDefCtor(src, cid, role):
+	var c = src
+	c.crew_id = cid
+	c.role = role
+	return c
 
 # ---------------- 1.4.3 装备品类与槽位映射 ----------------
 func _test_v143_gear_slots() -> void:

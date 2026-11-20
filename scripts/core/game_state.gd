@@ -788,6 +788,43 @@ func can_travel_to(target: int) -> bool:
 			return bool(o["unlocked"])
 	return false
 
+# ---------------- 船员按模块归属（1.4.4） ----------------
+
+## 模块槽 → 船员 id：{"mid#layer": crew_id}
+var module_crew: Dictionary = {}
+
+## 该模块实例接受的岗位（取 ModuleDef.crew_posts）
+func module_posts(mid: String) -> Array:
+	var md: Resource = DataRegistry.modules.get(mid)
+	if md == null:
+		return []
+	return md.crew_posts
+
+## 把船员安排到模块槽
+func assign_crew_to_module(crew_id: StringName, mid: String, layer: int = 0) -> Dictionary:
+	var c = find_crew(crew_id)
+	if c == null:
+		return {"ok": false, "reason": "找不到该船员"}
+	var posts: Array = module_posts(mid)
+	if posts.is_empty():
+		return {"ok": false, "reason": "该模块不设岗位"}
+	if not posts.has(c.role):
+		return {"ok": false, "reason": "该模块不接受%s" % String(POST_NAMES.get(String(c.role), c.role))}
+	# 一名船员只能占一个槽
+	for key in module_crew.keys():
+		if StringName(String(module_crew[key])) == crew_id:
+			return {"ok": false, "reason": "该船员已在其他模块"}
+	var slot_key := "%s#%d" % [mid, layer]
+	module_crew[slot_key] = crew_id
+	return {"ok": true, "slot": slot_key}
+
+func clear_module_crew(mid: String, layer: int = 0) -> void:
+	module_crew.erase("%s#%d" % [mid, layer])
+
+func module_crew_of(mid: String, layer: int = 0) -> StringName:
+	var v = module_crew.get("%s#%d" % [mid, layer], &"")
+	return StringName(String(v))
+
 # ---------------- 装备槽与模块映射（1.4.3） ----------------
 
 ## 装备槽 → 模块 id（甲板分层由调用方决定）
@@ -1349,10 +1386,17 @@ func crew_slots() -> int:
 
 func assigned_crews() -> Array:
 	var out: Array = []
+	var seen: Dictionary = {}
 	for id in crew_assigned:
 		var c := find_crew(id)
-		if c != null:
+		if c != null and not seen.has(String(c.crew_id)):
+			seen[String(c.crew_id)] = true
 			out.append(c)
+	for key in module_crew.keys():
+		var mc = find_crew(StringName(String(module_crew[key])))
+		if mc != null and not seen.has(String(mc.crew_id)):
+			seen[String(mc.crew_id)] = true
+			out.append(mc)
 	return out
 
 func find_crew(id: StringName) -> Resource:
@@ -3201,6 +3245,7 @@ func from_dict(d: Dictionary) -> void:
 	var nrep: Dictionary = d.get("nation_rep", {})
 	for nk in nrep.keys():
 		nation_rep[String(nk)] = int(nrep[nk])
+	module_crew.clear()
 	crew_xp.clear()
 	var cxp: Dictionary = d.get("crew_xp", {})
 	for k0 in cxp.keys():
