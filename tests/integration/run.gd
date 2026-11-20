@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1410_layout()
 	await _test_v147_panel_fix()
 	await _test_v146_ship_panel()
 	await _test_v145_module_upgrade()
@@ -677,6 +678,35 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.10 严格坐标布局 ----------------
+func _test_v1410_layout() -> void:
+	print("\n[1.4.10 严格布局]")
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	# 同模块不同层不重叠
+	var p0: Vector2 = s._ship_slot_pos("gundeck", 0, 10)
+	var p1: Vector2 = s._ship_slot_pos("gundeck", 1, 10)
+	_ok(p0.distance_to(p1) > 20.0, "炮门各层不重叠", str(p0) + " / " + str(p1))
+	# 插槽在船体范围内
+	var inside := true
+	for mid in ["deck", "gundeck", "rudder", "hold", "galley"]:
+		for lv in range(3):
+			var p: Vector2 = s._ship_slot_pos(mid, lv, 10)
+			if p.x < 0.0 or p.x > s.ship_area_size.x or p.y < 0.0 or p.y > s.ship_area_size.y:
+				inside = false
+	_ok(inside, "插槽均在面板范围内")
+	# 区域互不冲突：甲板与炮门列不同
+	var d: Vector2 = s._ship_slot_pos("deck", 0, 10)
+	var g: Vector2 = s._ship_slot_pos("gundeck", 0, 10)
+	_ok(absf(d.x - g.x) > 40.0, "甲板列与炮门列分开", str(d.x) + " / " + str(g.x))
+	# 舱室区域互不重叠
+	var a: Vector2 = s._ship_slot_pos("hold", 0, 10)
+	var b2: Vector2 = s._ship_slot_pos("galley", 0, 10)
+	_ok(absf(a.x - b2.x) > 40.0, "仓库与厨房不重叠")
+	s.queue_free()
+	await _frames(2)
 
 # ---------------- 1.4.7 面板修正 ----------------
 func _test_v147_panel_fix() -> void:

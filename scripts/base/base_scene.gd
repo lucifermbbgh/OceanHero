@@ -2313,6 +2313,43 @@ func _open_ship_swap() -> void:
 	add_child(dlg)
 	dlg.popup_centered()
 
+## 插槽绝对坐标（与船影同一套区域常量）
+func _ship_slot_pos(mid: String, layer: int, tier: int) -> Vector2:
+	var w := ship_area_size.x
+	var h := ship_area_size.y
+	var top := 0.50 * h
+	var bottom := 0.80 * h
+	var dn := maxi(1, GameState.deck_layers(tier))
+	var gn := maxi(1, GameState.gundeck_layers(tier))
+	var rows := maxi(dn, gn)
+	var row_h := (bottom - top - 0.06 * h) / float(rows)
+	match mid:
+		"deck":
+			return Vector2(0.30 * w, top + 0.03 * h + (float(layer) + 0.5) * row_h)
+		"gundeck":
+			return Vector2(0.52 * w, top + 0.03 * h + (float(layer) + 0.5) * row_h)
+		"sails":
+			return Vector2(0.42 * w, 0.34 * h)
+		"lookout":
+			return Vector2(0.48 * w, 0.20 * h)
+		"flagpole":
+			return Vector2(0.68 * w, 0.20 * h)
+		"rudder":
+			return Vector2(0.89 * w, 0.70 * h)
+		"quarters":
+			return Vector2(0.66 * w, top + 0.03 * h + 0.5 * row_h)
+		"cabin":
+			return Vector2(0.78 * w, top + 0.03 * h + 0.5 * row_h)
+		"hold":
+			return Vector2(0.60 * w, bottom - 0.055 * h)
+		"workshop":
+			return Vector2(0.68 * w, bottom - 0.055 * h)
+		"galley":
+			return Vector2(0.76 * w, bottom - 0.055 * h)
+		"infirmary":
+			return Vector2(0.84 * w, bottom - 0.055 * h)
+	return Vector2(0.5 * w, 0.6 * h)
+
 # ---------------- 舰船面板（1.4.6） ----------------
 
 var ship_root: PanelContainer = null
@@ -2354,19 +2391,10 @@ func _rebuild_ship_panel() -> void:
 		var md: Resource = DataRegistry.modules.get(mid)
 		if md == null:
 			continue
-		var anchor: Vector2 = md.anchor
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(38, 38)
 		btn.size = btn.custom_minimum_size
-		var layer_dy := 0.0
-		if mid == "deck":
-			var dn := maxi(1, GameState.deck_layers(tier))
-			layer_dy = float(layer) * (26.0 if dn <= 2 else 22.0)
-		elif mid == "gundeck":
-			var gn := maxi(1, GameState.gundeck_layers(tier))
-			layer_dy = float(layer) * (26.0 if gn <= 2 else 22.0)
-		btn.position = Vector2(anchor.x * ship_area_size.x,
-			anchor.y * ship_area_size.y + layer_dy) - btn.size * 0.5
+		btn.position = _ship_slot_pos(mid, layer, tier) - btn.size * 0.5
 		btn.text = _ship_slot_text(mid, layer)
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.add_theme_color_override("font_color", Color(0.15, 0.12, 0.05))
