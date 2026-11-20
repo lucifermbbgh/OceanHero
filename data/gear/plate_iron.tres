@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"plate_iron"
+display_name = "铁板"
+slot = &"plate"
+rarity = 2
+speed_pct = 0
+turn_pct = 0
+armor_add = 4
+view_add = 0
+reload_pct = 0
+rep_gain_pct = 0
+price = 5200
+description = "甲板装甲 +4"

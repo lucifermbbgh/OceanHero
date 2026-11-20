@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"telescope_basic"
+display_name = "单筒望远镜"
+slot = &"telescope"
+rarity = 1
+speed_pct = 0
+turn_pct = 0
+armor_add = 0
+view_add = 0.05
+reload_pct = 0
+rep_gain_pct = 0
+price = 1200
+description = "视野 +5%"

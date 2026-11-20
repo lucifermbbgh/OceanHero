@@ -11,6 +11,9 @@ extends Resource
 @export var armor_add: int = 0
 @export var boarding_add: int = 0
 @export var price: int = 0
+@export var view_add: float = 0.0        # 望远镜：视野
+@export var reload_pct: float = 0.0      # 旗帜：装填
+@export var rep_gain_pct: float = 0.0    # 旗帜：声望获取
 @export var description: String = ""
 
 func bonus_text() -> String:

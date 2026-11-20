@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/gear_def.gd" id="1_g"]
+
+[resource]
+script = ExtResource("1_g")
+id = &"flag_renown"
+display_name = "声望旗"
+slot = &"flag"
+rarity = 2
+speed_pct = 0
+turn_pct = 0
+armor_add = 0
+view_add = 0
+reload_pct = 0
+rep_gain_pct = 0.15
+price = 6000
+description = "声望获取 +15%"

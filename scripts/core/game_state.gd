@@ -151,7 +151,20 @@ func stats() -> Dictionary:
 	if lv_cabin > 0:
 		st["hull_max"] = float(st.get("hull_max", 400.0)) * (1.0 + 0.01 * lv_cabin)
 	# 非战斗加成（供面板/后续系统读取）
-	st["rep_gain_bonus"] = 0.05 * module_level("flagpole")
+	# 旗帜与望远镜效果
+	var flag_gear := String(equipped.get("flag", ""))
+	if flag_gear != "":
+		var fg: Resource = DataRegistry.get_gear(StringName(flag_gear))
+		if fg != null:
+			st["base_speed_px"] = float(st.get("base_speed_px", 0.0)) * (1.0 + float(fg.get("speed_pct")))
+			st["reload_bonus"] = float(st.get("reload_bonus", 0.0)) + float(fg.get("reload_pct"))
+			st["rep_gain_gear"] = float(fg.get("rep_gain_pct"))
+	var tel_gear := String(equipped.get("telescope", ""))
+	if tel_gear != "":
+		var tg: Resource = DataRegistry.get_gear(StringName(tel_gear))
+		if tg != null:
+			st["view_bonus"] = float(st.get("view_bonus", 0.0)) + float(tg.get("view_add"))
+	st["rep_gain_bonus"] = 0.05 * module_level("flagpole") + float(st.get("rep_gain_gear", 0.0))
 	st["heal_bonus"] = 0.10 * module_level("infirmary")
 	st["recover_bonus"] = 0.08 * module_level("galley")
 	st["repair_bonus"] = 0.10 * module_level("workshop")
@@ -774,6 +787,29 @@ func can_travel_to(target: int) -> bool:
 		if int(o["index"]) == target:
 			return bool(o["unlocked"])
 	return false
+
+# ---------------- 装备槽与模块映射（1.4.3） ----------------
+
+## 装备槽 → 模块 id（甲板分层由调用方决定）
+const SLOT_MODULE_MAP := {
+	"sail": "sails",
+	"rudder": "rudder",
+	"plate": "deck",
+	"figurehead": "deck",
+	"telescope": "lookout",
+	"flag": "flagpole",
+}
+
+func module_for_gear_slot(slot: StringName) -> String:
+	return String(SLOT_MODULE_MAP.get(String(slot), ""))
+
+## 该模块实例可接受的装备槽
+func gear_slots_for_module(mid: String) -> Array:
+	var out: Array = []
+	for slot in SLOT_MODULE_MAP.keys():
+		if String(SLOT_MODULE_MAP[slot]) == mid:
+			out.append(StringName(String(slot)))
+	return out
 
 # ---------------- 舰船模块（1.4.1） ----------------
 

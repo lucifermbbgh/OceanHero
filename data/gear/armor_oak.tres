@@ -6,7 +6,7 @@
 script = ExtResource("1_g")
 id = &"armor_oak"
 display_name = "橡木衬"
-slot = &"armor"
+slot = &"plate"
 rarity = 1
 armor_add = 25
 price = 2000

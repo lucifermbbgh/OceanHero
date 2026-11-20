@@ -6,7 +6,7 @@
 script = ExtResource("1_g")
 id = &"uniq_raider_armor"
 display_name = "剪径者胸甲"
-slot = &"armor"
+slot = &"plate"
 rarity = 3
 armor_add = 60
 price = 22000

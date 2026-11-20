@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v143_gear_slots()
 	await _test_v142_module_stats()
 	await _test_v141_modules()
 	await _test_v140_fixes()
@@ -258,7 +259,7 @@ func _test_shipyard() -> void:
 	_ok(DataRegistry.ships.size() == 68, "68 个船体（17 基准 × 4）", "实得 %d" % DataRegistry.ships.size())
 	_ok(DataRegistry.ship_bases.size() == 17, "17 个基准模板（含 7 艘势力专属）",
 		str(DataRegistry.ship_bases.size()))
-	_ok(DataRegistry.gear.size() == 27, "27 件装备（含 7 件势力专属）",
+	_ok(DataRegistry.gear.size() == 36, "36 件装备（含装甲板/望远镜/旗帜）",
 		"实得 %d" % DataRegistry.gear.size())
 	_ok(DataRegistry.get_ship(&"brig_navy") != null, "变体船 id 可查")
 
@@ -672,6 +673,40 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.4.3 装备品类与槽位映射 ----------------
+func _test_v143_gear_slots() -> void:
+	print("\n[1.4.3 装备槽映射]")
+	GameState.reset_new_game()
+	_ok(DataRegistry.gear.size() == 36, "36 件装备", str(DataRegistry.gear.size()))
+	var plate: Resource = DataRegistry.get_gear(&"plate_iron")
+	_ok(plate != null and String(plate.slot) == "plate", "铁板为装甲板槽")
+	_ok(int(plate.armor_add) == 4, "铁板装甲 +4")
+	var tel: Resource = DataRegistry.get_gear(&"telescope_lens")
+	_ok(tel != null and is_equal_approx(float(tel.view_add), 0.10), "透镜望远镜视野 +10%")
+	var fs: Resource = DataRegistry.get_gear(&"flag_swift")
+	_ok(fs != null and is_equal_approx(float(fs.speed_pct), 0.08), "疾风旗航速 +8%")
+	var fr: Resource = DataRegistry.get_gear(&"flag_renown")
+	_ok(fr != null and is_equal_approx(float(fr.rep_gain_pct), 0.15), "声望旗 +15%")
+	# 槽位映射
+	_ok(GameState.module_for_gear_slot(&"sail") == "sails", "帆→风帆模块")
+	_ok(GameState.module_for_gear_slot(&"rudder") == "rudder", "舵→舵轮模块")
+	_ok(GameState.module_for_gear_slot(&"plate") == "deck", "装甲板→甲板模块")
+	_ok(GameState.module_for_gear_slot(&"figurehead") == "deck", "船艏像→甲板模块")
+	_ok(GameState.module_for_gear_slot(&"telescope") == "lookout", "望远镜→瞭望台")
+	_ok(GameState.module_for_gear_slot(&"flag") == "flagpole", "旗帜→旗杆")
+	# 旗帜与望远镜接入 stats
+	GameState.ship_module_levels.clear()
+	var base_stats: Dictionary = GameState.stats()
+	GameState.equipped["flag"] = &"flag_swift"
+	var s1: Dictionary = GameState.stats()
+	_ok(float(s1["base_speed_px"]) > float(base_stats["base_speed_px"]), "疾风旗提升航速")
+	GameState.equipped["telescope"] = &"telescope_lens"
+	_ok(float(GameState.stats()["view_bonus"]) > float(base_stats["view_bonus"]),
+		"望远镜提升视野")
+	GameState.equipped["flag"] = &"flag_renown"
+	_ok(float(GameState.stats()["rep_gain_bonus"]) > 0.0, "声望旗提升声望加成")
+	GameState.reset_new_game()
 
 # ---------------- 1.4.2 模块接入属性 ----------------
 func _test_v142_module_stats() -> void:

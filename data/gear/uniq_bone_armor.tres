@@ -6,7 +6,7 @@
 script = ExtResource("1_g")
 id = &"uniq_bone_armor"
 display_name = "白骨甲板"
-slot = &"armor"
+slot = &"plate"
 rarity = 4
 armor_add = 85
 price = 58000
