@@ -97,6 +97,7 @@ func _ready() -> void:
 	GameState.ensure_ship()
 	name = "SeaScene"
 	map_index = clampi(GameState.current_map, 1, 30)
+	GameState.mark_map_explored(map_index)
 	map_def = DataRegistry.get_map(map_index)
 	_generate_islands()
 	_build_world()

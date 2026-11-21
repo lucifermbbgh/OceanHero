@@ -20,3 +20,4 @@ nation = &""
 contested = true
 neighbors = [25, 26, 27, 28, 30]
 nations = ["chilin", "cangwu", "baijing"]
+world_pos = Vector2(0.50, 0.845)

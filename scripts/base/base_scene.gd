@@ -3455,8 +3455,6 @@ func _hire_crew(cid: StringName) -> void:
 	# 雇佣后立即刷新酒馆面板（否则列表看起来没变化）
 	_rebuild_tavern()
 	_refresh()
-	_rebuild_tavern()
-	_refresh()
 
 func _refresh_tavern_paid() -> void:
 	if GameState.gold < 500:

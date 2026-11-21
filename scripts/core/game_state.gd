@@ -928,6 +928,9 @@ const MODULE_TIER_TABLE := {
 ## 每艘船的模块强化等级：{"mid#layer": level}
 var ship_module_levels: Dictionary = {}
 
+## 1.5.0：已探索海图索引（世界地图迷雾）
+var explored_maps: Array = []
+
 func deck_layers(tier: int) -> int:
 	return int(MODULE_TIER_TABLE.get(clampi(tier, 1, 10), {}).get("deck", 0))
 
@@ -976,6 +979,14 @@ func ship_modules() -> Array:
 	return out
 
 ## 模块强化等级（默认 0）
+## 1.5.0：探索状态
+func is_map_explored(idx: int) -> bool:
+	return explored_maps.has(idx)
+
+func mark_map_explored(idx: int) -> void:
+	if idx > 0 and not explored_maps.has(idx):
+		explored_maps.append(idx)
+
 func module_level(mid: String, layer: int = 0) -> int:
 	return int(ship_module_levels.get("%s#%d" % [mid, layer], 0))
 
@@ -3156,6 +3167,7 @@ func to_dict() -> Dictionary:
 		"faction_rep": faction_rep.duplicate(),
 		"module_levels": ship_module_levels.duplicate(),
 		"module_crew": module_crew.duplicate(),
+		"explored_maps": explored_maps.duplicate(),
 		"building_upgrades": building_upgrades.duplicate(true),
 		"build_submitted": build_submitted.duplicate(true),
 		"bank": {"deposit": bank_deposit, "loans": loans.duplicate(true)},
@@ -3294,6 +3306,11 @@ func from_dict(d: Dictionary) -> void:
 	var mcr: Dictionary = d.get("module_crew", {})
 	for mck in mcr.keys():
 		module_crew[String(mck)] = StringName(String(mcr[mck]))
+	explored_maps.clear()
+	for em in d.get("explored_maps", []):
+		explored_maps.append(int(em))
+	if explored_maps.is_empty():
+		mark_map_explored(maxi(1, current_map))
 	var frep: Dictionary = d.get("faction_rep", {})
 	for fk in frep.keys():
 		faction_rep[String(fk)] = int(frep[fk])
@@ -3473,6 +3490,8 @@ func _cargo_to_dict() -> Dictionary:
 func reset_new_game() -> void:
 	ship_module_levels.clear()
 	module_crew.clear()
+	explored_maps.clear()
+	mark_map_explored(1)
 	gold = START_GOLD
 	nation_rep.clear()
 	_init_nation_rep()

@@ -19,3 +19,4 @@ tier = 2
 nation = &"chilin"
 contested = false
 neighbors = [1, 2, 3, 4, 6, 7, 8, 9]
+world_pos = Vector2(0.50, 0.165)

@@ -19,3 +19,4 @@ tier = 4
 nation = &"shuangyu"
 contested = false
 neighbors = [7, 8, 9, 11, 12, 13, 14, 15]
+world_pos = Vector2(0.22, 0.335)

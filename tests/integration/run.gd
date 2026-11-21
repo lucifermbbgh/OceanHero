@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v150_world_map_data()
 	await _test_v1419_island_tavern()
 	await _test_v1418_per_ship()
 	await _test_v1417_upgrade_runtime()
@@ -685,6 +686,42 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 1.5.0 世界地图数据 ----------------
+func _test_v150_world_map_data() -> void:
+	print("\n[1.5.0 世界地图数据]")
+	GameState.reset_new_game()
+	# 30 张图都有坐标，同级不重叠
+	var seen := {}
+	var missing := 0
+	var overlap := 0
+	for i2 in range(1, 31):
+		var md: Resource = DataRegistry.get_map(i2)
+		if md == null or md.world_pos == Vector2.ZERO:
+			missing += 1
+			continue
+		var key := "%.2f_%.3f" % [md.world_pos.x, md.world_pos.y]
+		if seen.has(key):
+			overlap += 1
+		seen[key] = true
+	_ok(missing == 0, "30 张海图均有坐标", str(missing))
+	_ok(overlap == 0, "同级坐标不重叠", str(overlap))
+	var home: Resource = DataRegistry.get_map(1)
+	_ok(home != null and home.world_pos.x > 0.2 and home.world_pos.y < 0.1,
+		"母港位于左上区域", str(home.world_pos) if home != null else "null")
+	# 探索状态
+	GameState.reset_new_game()
+	_ok(GameState.is_map_explored(1), "开局母港已探索")
+	_ok(not GameState.is_map_explored(7), "未到访海图未探索")
+	GameState.mark_map_explored(7)
+	_ok(GameState.is_map_explored(7), "进入后标记探索")
+	# 存档往返
+	var d2: Dictionary = GameState.to_dict()
+	GameState.reset_new_game()
+	GameState.from_dict(d2)
+	_ok(GameState.is_map_explored(7), "存档恢复探索状态",
+		str(GameState.explored_maps))
+	GameState.reset_new_game()
+
 # ---------------- 1.4.19 岛屿酒馆雇佣 ----------------
 func _test_v1419_island_tavern() -> void:
 	print("\n[1.4.19 岛屿酒馆]")
@@ -701,7 +738,12 @@ func _test_v1419_island_tavern() -> void:
 	var pool0: int = GameState.tavern_pool.size()
 	var roster0: int = GameState.crew_roster.size()
 	var gold0: int = GameState.gold
-	var first_id: StringName = StringName(GameState.tavern_pool[0].crew_id)
+	var cheapest: Resource = null
+	for c2 in GameState.tavern_pool:
+		if int(c2.hire_cost) <= GameState.gold and (cheapest == null or int(c2.hire_cost) < int(cheapest.hire_cost)):
+			cheapest = c2
+	_ok(cheapest != null, "存在可负担的船员")
+	var first_id: StringName = StringName(cheapest.crew_id) if cheapest != null else &""
 	s._hire_crew(first_id)
 	await _frames(1)
 	_ok(GameState.crew_roster.size() == roster0 + 1, "雇佣后名册 +1",

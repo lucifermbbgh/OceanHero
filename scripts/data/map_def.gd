@@ -20,3 +20,6 @@ extends Resource
 @export var contested: bool = false    # 是否交界/争夺图
 @export var neighbors: Array = []      # 1.3.2 邻接图：可通行的相邻海图索引
 @export var nations: Array = []        # 1.3.5 交界图上的多国势力
+
+## 1.5.0：世界地图归一化坐标（0~1）
+@export var world_pos: Vector2 = Vector2.ZERO
