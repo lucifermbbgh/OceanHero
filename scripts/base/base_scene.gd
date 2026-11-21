@@ -2527,7 +2527,9 @@ func _add_gear_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 		owned_count += 1
 		var btn := Button.new()
 		var mark := "（已装）" if String(g.id) == current else ""
-		btn.text = "%s%s  %s" % [String(g.display_name), mark, String(g.bonus_text())]
+		btn.text = "%s%s  稀有度 %s  %s" % [String(g.display_name), mark,
+			Rarity.name_of(int(g.rarity)), String(g.bonus_text())]
+		btn.add_theme_color_override("font_color", Rarity.color(int(g.rarity)))
 		btn.custom_minimum_size = Vector2(460, 28)
 		var gid: StringName = g.id
 		var s2 := slot
@@ -2561,8 +2563,10 @@ func _add_crew_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 		if not posts.has(c.role):
 			continue
 		var btn := Button.new()
-		btn.text = "%s（%s · 属性 %d）" % [String(c.display_name),
-			String(GameState.POST_NAMES.get(String(c.role), c.role)), int(c.stat)]
+		btn.text = "%s（%s · 属性 %d · %s）" % [String(c.display_name),
+			String(GameState.POST_NAMES.get(String(c.role), c.role)), int(c.stat),
+			Rarity.name_of(int(c.rarity))]
+		btn.add_theme_color_override("font_color", Rarity.color(int(c.rarity)))
 		btn.custom_minimum_size = Vector2(420, 28)
 		var cid: StringName = c.crew_id
 		var midc := mid
