@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v153_world_map()
 	await _test_v151_sorting()
 	await _test_v150_world_map_data()
 	await _test_v1419_island_tavern()
@@ -686,6 +687,24 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.5.3 世界地图面板 ----------------
+func _test_v153_world_map() -> void:
+	print("\n[1.5.3 世界地图面板]")
+	GameState.reset_new_game()
+	var wm = load("res://scripts/ui/world_map.gd").new()
+	add_child(wm)
+	await _frames(2)
+	_ok(wm.size.x >= 1500.0 and wm.size.y >= 780.0, "面板尺寸 1568x812", str(wm.size))
+	_ok(not wm.visible, "默认隐藏")
+	wm.toggle()
+	_ok(wm.visible, "M 可打开")
+	wm.toggle()
+	_ok(not wm.visible, "M 可关闭")
+	_ok(GameState.explored_maps.size() >= 1, "探索数据可用", str(GameState.explored_maps))
+	wm.queue_free()
+	await _frames(1)
+	GameState.reset_new_game()
 
 # ---------------- 1.5.1 展示排序 ----------------
 func _test_v151_sorting() -> void:

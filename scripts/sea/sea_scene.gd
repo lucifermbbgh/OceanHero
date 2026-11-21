@@ -51,6 +51,7 @@ var _port_tavern: Array = []    # 当前港口的招募候选
 var port_tab := "local"         # local = 本地市场，world = 世界市场
 var aggro_mult := 1.0           # 伪造旗帜：敌方索敌半径倍率
 var port_ui: CanvasLayer
+var world_map: Control
 var port_panel: PanelContainer
 var port_list: VBoxContainer
 ## 同屏单位上限（超过就不再刷新，避免越打越多）
@@ -394,6 +395,13 @@ func _build_hud() -> void:
 	hud.retreat_pressed.connect(_on_retreat_pressed)
 	hud.return_pressed.connect(_return_to_base)
 	hud.set_ammo_highlight(&"solid")
+	# 1.5.3 世界地图（放在独立 CanvasLayer，避免被相机变换影响）
+	var map_ui := CanvasLayer.new()
+	map_ui.layer = 12
+	add_child(map_ui)
+	world_map = load("res://scripts/ui/world_map.gd").new()
+	map_ui.add_child(world_map)
+	world_map.visible = false
 
 
 # ---------------- 哨站港口 ----------------
@@ -1576,8 +1584,16 @@ func _spawn_navy() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and world_map != null and world_map.visible:
+			world_map.visible = false
+			return
 		if event.keycode == KEY_ESCAPE and port_panel != null and port_panel.visible:
 			port_panel.visible = false
+			return
+		if event.keycode == KEY_M:
+			if world_map != null:
+				world_map.visible = not world_map.visible
+				world_map.refresh()
 			return
 		if event.keycode == KEY_E:
 			if port_panel != null and port_panel.visible:
