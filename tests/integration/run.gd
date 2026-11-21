@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v151_sorting()
 	await _test_v150_world_map_data()
 	await _test_v1419_island_tavern()
 	await _test_v1418_per_ship()
@@ -685,6 +686,35 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.5.1 展示排序 ----------------
+func _test_v151_sorting() -> void:
+	print("\n[1.5.1 展示排序]")
+	GameState.reset_new_game()
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	# 船员按稀有度降序
+	var crew = load("res://scripts/systems/crew_factory.gd").generate(4, &"standard")
+	var sorted_crew = s._sorted_rar(crew)
+	var desc := true
+	for i3 in range(sorted_crew.size() - 1):
+		if int(sorted_crew[i3].rarity) < int(sorted_crew[i3 + 1].rarity):
+			desc = false
+	_ok(desc, "船员按稀有度降序")
+	# 装备 id 按稀有度降序
+	var ids: Array = ["sail_linen", "sail_cotton", "sail_ramie"]
+	var sorted_ids = s._sorted_rar(ids)
+	var desc2 := true
+	for j3 in range(sorted_ids.size() - 1):
+		if s._rarity_of(sorted_ids[j3]) < s._rarity_of(sorted_ids[j3 + 1]):
+			desc2 = false
+	_ok(desc2, "装备按稀有度降序")
+	# 空列表安全
+	_ok(s._sorted_rar([]).is_empty(), "空列表排序安全")
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.5.0 世界地图数据 ----------------
 func _test_v150_world_map_data() -> void:

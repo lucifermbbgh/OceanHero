@@ -1593,7 +1593,7 @@ func _rebuild_tavern() -> void:
 	_yard_title_to(tavern_list, "名册")
 	if GameState.crew_roster.is_empty():
 		tavern_list.add_child(_lbl("（还没有招募任何船员）", 420, Color(0.45, 0.5, 0.5)))
-	for c in GameState.crew_roster:
+	for c in _sorted_rar(GameState.crew_roster):
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 8)
 		tavern_list.add_child(hb)
@@ -1616,7 +1616,7 @@ func _rebuild_tavern() -> void:
 		hb.add_child(bd)
 
 	_yard_title_to(tavern_list, "招募（本周结算后刷新）")
-	for c in GameState.tavern_pool:
+	for c in _sorted_rar(GameState.tavern_pool):
 		var hb2 := HBoxContainer.new()
 		hb2.add_theme_constant_override("separation", 8)
 		tavern_list.add_child(hb2)
@@ -2086,7 +2086,7 @@ func _rebuild_crew_panel() -> void:
 	if GameState.crew_roster.is_empty():
 		crew_list.add_child(_lbl("　（暂无船员，去酒馆招募）", 500, Color(0.55, 0.6, 0.6)))
 		return
-	for c in GameState.crew_roster:
+	for c in _sorted_rar(GameState.crew_roster):
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 0)
 		crew_list.add_child(row)
@@ -2123,7 +2123,7 @@ func _rebuild_gear() -> void:
 	if GameState.gear_owned.is_empty():
 		gear_list.add_child(_lbl("　（暂无装备）", 400, Color(0.55, 0.6, 0.6)))
 		return
-	for gid in GameState.gear_owned:
+	for gid in _sorted_rar(GameState.gear_owned):
 		var gd: Resource = DataRegistry.get_gear(gid)
 		if gd == null:
 			continue
@@ -2340,6 +2340,22 @@ func _ship_slot_pos(mid: String, layer: int, tier: int) -> Vector2:
 		step = 0.110
 	return Vector2(a.x * w, (a.y + step * float(layer)) * h)
 
+## 1.5.1：按稀有度从高到低排序（船员/装备/物品通用）
+func _rarity_of(x) -> int:
+	if x is Dictionary:
+		return int(x.get("rarity", 0))
+	if x is Object:
+		return int(x.get("rarity"))
+	if x is StringName or x is String:
+		var gx: Resource = DataRegistry.get_gear(StringName(String(x)))
+		return int(gx.rarity) if gx != null else 0
+	return 0
+
+func _sorted_rar(items: Array) -> Array:
+	var arr: Array = items.duplicate()
+	arr.sort_custom(func(a, b): return _rarity_of(a) > _rarity_of(b))
+	return arr
+
 # ---------------- 舰船面板（1.4.6） ----------------
 
 var ship_root: PanelContainer = null
@@ -2492,7 +2508,14 @@ func _add_gear_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 	# 帆按桅使用 sail0..2，装备本体槽位仍是 sail
 	var filter_slot := "sail" if slot.begins_with("sail") else slot
 	var owned_count := 0
-	for k in DataRegistry.gear.keys():
+	var sorted_keys: Array = DataRegistry.gear.keys()
+	sorted_keys.sort_custom(func(a, b):
+		var ga: Resource = DataRegistry.gear.get(a)
+		var gb: Resource = DataRegistry.gear.get(b)
+		var ra := int(ga.rarity) if ga != null else 0
+		var rb := int(gb.rarity) if gb != null else 0
+		return ra > rb)
+	for k in sorted_keys:
 		var g: Resource = DataRegistry.gear[k]
 		if g == null or String(g.slot) != filter_slot:
 			continue
@@ -2534,7 +2557,7 @@ func _add_crew_options(vb: VBoxContainer, mid: String, layer: int) -> void:
 	var cur: StringName = GameState.module_crew_of(mid, layer)
 	vb.add_child(_lbl("当前：%s" % ("空缺" if String(cur) == "" else String(cur)), 360,
 		Color(0.85, 0.88, 0.85)))
-	for c in GameState.crew_roster:
+	for c in _sorted_rar(GameState.crew_roster):
 		if not posts.has(c.role):
 			continue
 		var btn := Button.new()
@@ -3439,7 +3462,7 @@ func _do_upgrade_port() -> void:
 
 func _hire_crew(cid: StringName) -> void:
 	var crew: Resource = null
-	for c in GameState.tavern_pool:
+	for c in _sorted_rar(GameState.tavern_pool):
 		if StringName(c.crew_id) == cid:
 			crew = c
 			break
@@ -3566,7 +3589,7 @@ func _rebuild_yard() -> void:
 	_yard_title("装备库（可购买 / 可装备）")
 	var slot_names := {"sail": "风帆", "rudder": "船舵", "armor": "装甲", "figurehead": "船首像", "flag": "旗帜"}
 	for slot in StatsLib.GEAR_SLOTS:
-		for g in DataRegistry.gear_by_slot(slot):
+		for g in _sorted_rar(DataRegistry.gear_by_slot(slot)):
 			var hb := HBoxContainer.new()
 			hb.add_theme_constant_override("separation", 8)
 			yard_list.add_child(hb)
