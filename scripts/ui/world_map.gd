@@ -18,6 +18,7 @@ func _ready() -> void:
 	position = Vector2(16, 44)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
+	_load_polys()
 
 func toggle() -> void:
 	visible = not visible
@@ -74,8 +75,44 @@ func _hit(p: Vector2) -> int:
 			return i
 	return -1
 
+## 从 Tiled 构建产物读取归一化多边形；缺文件时回退到程序生成
+var _polys: Dictionary = {}
+
+func _load_polys() -> void:
+	_polys.clear()
+	var path := "res://data/generated/world_regions.json"
+	if not FileAccess.file_exists(path):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return
+	var parsed = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	for r in parsed.get("regions", []):
+		var pts: Array = []
+		for p in r.get("polygon", []):
+			pts.append(Vector2(float(p[0]), float(p[1])))
+		_polys[int(r.get("index", 0))] = {"polygon": pts,
+			"anchor": Vector2(float(r["anchor"][0]), float(r["anchor"][1]))}
+
+func _anchor_pos(idx: int) -> Vector2:
+	if _polys.has(idx):
+		return _pos(_polys[idx]["anchor"])
+	var md: Resource = DataRegistry.get_map(idx)
+	return _pos(md.world_pos) if md != null else Vector2.ZERO
+
 ## 以 world_pos 为中心生成「切角矩形」海域多边形（地图局部坐标）
 func _cell_poly(idx: int) -> PackedVector2Array:
+	if _polys.has(idx):
+		# 向质心内缩 8%，让海域之间露出底图（更接近海图观感）
+		var center: Vector2 = _polys[idx]["anchor"]
+		var out := PackedVector2Array()
+		for p in _polys[idx]["polygon"]:
+			var pv: Vector2 = p
+			var inset: Vector2 = center + (pv - center) * 0.92
+			out.append(_pos(inset))
+		return out
 	var md: Resource = DataRegistry.get_map(idx)
 	if md == null:
 		return PackedVector2Array()
@@ -182,7 +219,7 @@ func _draw() -> void:
 		draw_polyline(closed, line, 2.0)
 		if i == GameState.current_map:
 			draw_polyline(closed, Color(1.0, 0.82, 0.35), 3.0)
-		var c := _pos(md.world_pos)
+		var c := _anchor_pos(i)
 		if explored:
 			draw_string(font, c + Vector2(-18, 5), "%d-%d" % [(i - 1) / 3 + 1, (i - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.95, 0.9))
 		else:
@@ -195,7 +232,7 @@ func _draw() -> void:
 			var mb: Resource = DataRegistry.get_map(int(_route[k + 1]))
 			if ma == null or mb == null:
 				continue
-			_dashed_line(_pos(ma.world_pos), _pos(mb.world_pos), Color(1.0, 0.80, 0.30), 3.0)
+			_dashed_line(_anchor_pos(int(_route[k])), _anchor_pos(int(_route[k + 1])), Color(1.0, 0.80, 0.30), 3.0)
 
 	# 右侧详情
 	var ix := INFO_RECT.position.x + 16.0

@@ -1,0 +1,1255 @@
+{
+ "type": "map",
+ "version": "1.10",
+ "tiledversion": "1.12.2",
+ "orientation": "orthogonal",
+ "renderorder": "right-down",
+ "width": 128,
+ "height": 72,
+ "tilewidth": 32,
+ "tileheight": 32,
+ "infinite": false,
+ "nextlayerid": 2,
+ "nextobjectid": 31,
+ "layers": [
+  {
+   "type": "objectgroup",
+   "name": "Regions",
+   "id": 1,
+   "opacity": 1,
+   "visible": true,
+   "objects": [
+    {
+     "id": 1,
+     "name": "map1",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 120.0
+      },
+      {
+       "x": 1360.0,
+       "y": 120.0
+      },
+      {
+       "x": 1372.5,
+       "y": 312.6
+      },
+      {
+       "x": 80.0,
+       "y": 328.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map1"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 1
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "name": "map2",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1360.0,
+       "y": 120.0
+      },
+      {
+       "x": 2680.0,
+       "y": 120.0
+      },
+      {
+       "x": 2648.1,
+       "y": 348.4
+      },
+      {
+       "x": 1372.5,
+       "y": 312.6
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map2"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "name": "map3",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2680.0,
+       "y": 120.0
+      },
+      {
+       "x": 4016.0,
+       "y": 120.0
+      },
+      {
+       "x": 4016.0,
+       "y": 328.0
+      },
+      {
+       "x": 2648.1,
+       "y": 348.4
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map3"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 3
+      }
+     ]
+    },
+    {
+     "id": 4,
+     "name": "map4",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 328.0
+      },
+      {
+       "x": 1372.5,
+       "y": 312.6
+      },
+      {
+       "x": 1382.2,
+       "y": 502.2
+      },
+      {
+       "x": 80.0,
+       "y": 536.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map4"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    },
+    {
+     "id": 5,
+     "name": "map5",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1372.5,
+       "y": 312.6
+      },
+      {
+       "x": 2648.1,
+       "y": 348.4
+      },
+      {
+       "x": 2678.3,
+       "y": 509.5
+      },
+      {
+       "x": 1382.2,
+       "y": 502.2
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map5"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 5
+      }
+     ]
+    },
+    {
+     "id": 6,
+     "name": "map6",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2648.1,
+       "y": 348.4
+      },
+      {
+       "x": 4016.0,
+       "y": 328.0
+      },
+      {
+       "x": 4016.0,
+       "y": 536.0
+      },
+      {
+       "x": 2678.3,
+       "y": 509.5
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map6"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 6
+      }
+     ]
+    },
+    {
+     "id": 7,
+     "name": "map7",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 536.0
+      },
+      {
+       "x": 1382.2,
+       "y": 502.2
+      },
+      {
+       "x": 1353.9,
+       "y": 720.4
+      },
+      {
+       "x": 80.0,
+       "y": 744.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map7"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 7
+      }
+     ]
+    },
+    {
+     "id": 8,
+     "name": "map8",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1382.2,
+       "y": 502.2
+      },
+      {
+       "x": 2678.3,
+       "y": 509.5
+      },
+      {
+       "x": 2710.1,
+       "y": 708.4
+      },
+      {
+       "x": 1353.9,
+       "y": 720.4
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map8"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    {
+     "id": 9,
+     "name": "map9",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2678.3,
+       "y": 509.5
+      },
+      {
+       "x": 4016.0,
+       "y": 536.0
+      },
+      {
+       "x": 4016.0,
+       "y": 744.0
+      },
+      {
+       "x": 2710.1,
+       "y": 708.4
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map9"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 9
+      }
+     ]
+    },
+    {
+     "id": 10,
+     "name": "map10",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 744.0
+      },
+      {
+       "x": 1353.9,
+       "y": 720.4
+      },
+      {
+       "x": 1386.6,
+       "y": 921.8
+      },
+      {
+       "x": 80.0,
+       "y": 952.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map10"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 10
+      }
+     ]
+    },
+    {
+     "id": 11,
+     "name": "map11",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1353.9,
+       "y": 720.4
+      },
+      {
+       "x": 2710.1,
+       "y": 708.4
+      },
+      {
+       "x": 2705.4,
+       "y": 932.6
+      },
+      {
+       "x": 1386.6,
+       "y": 921.8
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map11"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 11
+      }
+     ]
+    },
+    {
+     "id": 12,
+     "name": "map12",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2710.1,
+       "y": 708.4
+      },
+      {
+       "x": 4016.0,
+       "y": 744.0
+      },
+      {
+       "x": 4016.0,
+       "y": 952.0
+      },
+      {
+       "x": 2705.4,
+       "y": 932.6
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map12"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 12
+      }
+     ]
+    },
+    {
+     "id": 13,
+     "name": "map13",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 952.0
+      },
+      {
+       "x": 1386.6,
+       "y": 921.8
+      },
+      {
+       "x": 1392.1,
+       "y": 1132.2
+      },
+      {
+       "x": 80.0,
+       "y": 1160.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map13"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 13
+      }
+     ]
+    },
+    {
+     "id": 14,
+     "name": "map14",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1386.6,
+       "y": 921.8
+      },
+      {
+       "x": 2705.4,
+       "y": 932.6
+      },
+      {
+       "x": 2653.4,
+       "y": 1160.2
+      },
+      {
+       "x": 1392.1,
+       "y": 1132.2
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map14"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 14
+      }
+     ]
+    },
+    {
+     "id": 15,
+     "name": "map15",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2705.4,
+       "y": 932.6
+      },
+      {
+       "x": 4016.0,
+       "y": 952.0
+      },
+      {
+       "x": 4016.0,
+       "y": 1160.0
+      },
+      {
+       "x": 2653.4,
+       "y": 1160.2
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map15"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 15
+      }
+     ]
+    },
+    {
+     "id": 16,
+     "name": "map16",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 1160.0
+      },
+      {
+       "x": 1392.1,
+       "y": 1132.2
+      },
+      {
+       "x": 1396.4,
+       "y": 1409.6
+      },
+      {
+       "x": 80.0,
+       "y": 1368.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map16"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 16
+      }
+     ]
+    },
+    {
+     "id": 17,
+     "name": "map17",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1392.1,
+       "y": 1132.2
+      },
+      {
+       "x": 2653.4,
+       "y": 1160.2
+      },
+      {
+       "x": 2675.6,
+       "y": 1333.7
+      },
+      {
+       "x": 1396.4,
+       "y": 1409.6
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map17"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 17
+      }
+     ]
+    },
+    {
+     "id": 18,
+     "name": "map18",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2653.4,
+       "y": 1160.2
+      },
+      {
+       "x": 4016.0,
+       "y": 1160.0
+      },
+      {
+       "x": 4016.0,
+       "y": 1368.0
+      },
+      {
+       "x": 2675.6,
+       "y": 1333.7
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map18"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 18
+      }
+     ]
+    },
+    {
+     "id": 19,
+     "name": "map19",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 1368.0
+      },
+      {
+       "x": 1396.4,
+       "y": 1409.6
+      },
+      {
+       "x": 1340.7,
+       "y": 1592.4
+      },
+      {
+       "x": 80.0,
+       "y": 1576.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map19"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 19
+      }
+     ]
+    },
+    {
+     "id": 20,
+     "name": "map20",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1396.4,
+       "y": 1409.6
+      },
+      {
+       "x": 2675.6,
+       "y": 1333.7
+      },
+      {
+       "x": 2643.4,
+       "y": 1595.8
+      },
+      {
+       "x": 1340.7,
+       "y": 1592.4
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map20"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 20
+      }
+     ]
+    },
+    {
+     "id": 21,
+     "name": "map21",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2675.6,
+       "y": 1333.7
+      },
+      {
+       "x": 4016.0,
+       "y": 1368.0
+      },
+      {
+       "x": 4016.0,
+       "y": 1576.0
+      },
+      {
+       "x": 2643.4,
+       "y": 1595.8
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map21"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 21
+      }
+     ]
+    },
+    {
+     "id": 22,
+     "name": "map22",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 1576.0
+      },
+      {
+       "x": 1340.7,
+       "y": 1592.4
+      },
+      {
+       "x": 1377.7,
+       "y": 1747.0
+      },
+      {
+       "x": 80.0,
+       "y": 1784.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map22"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 22
+      }
+     ]
+    },
+    {
+     "id": 23,
+     "name": "map23",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1340.7,
+       "y": 1592.4
+      },
+      {
+       "x": 2643.4,
+       "y": 1595.8
+      },
+      {
+       "x": 2661.4,
+       "y": 1827.5
+      },
+      {
+       "x": 1377.7,
+       "y": 1747.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map23"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 23
+      }
+     ]
+    },
+    {
+     "id": 24,
+     "name": "map24",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2643.4,
+       "y": 1595.8
+      },
+      {
+       "x": 4016.0,
+       "y": 1576.0
+      },
+      {
+       "x": 4016.0,
+       "y": 1784.0
+      },
+      {
+       "x": 2661.4,
+       "y": 1827.5
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map24"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 24
+      }
+     ]
+    },
+    {
+     "id": 25,
+     "name": "map25",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 1784.0
+      },
+      {
+       "x": 1377.7,
+       "y": 1747.0
+      },
+      {
+       "x": 1368.2,
+       "y": 1956.9
+      },
+      {
+       "x": 80.0,
+       "y": 1992.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map25"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 25
+      }
+     ]
+    },
+    {
+     "id": 26,
+     "name": "map26",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1377.7,
+       "y": 1747.0
+      },
+      {
+       "x": 2661.4,
+       "y": 1827.5
+      },
+      {
+       "x": 2638.0,
+       "y": 1964.2
+      },
+      {
+       "x": 1368.2,
+       "y": 1956.9
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map26"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 26
+      }
+     ]
+    },
+    {
+     "id": 27,
+     "name": "map27",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2661.4,
+       "y": 1827.5
+      },
+      {
+       "x": 4016.0,
+       "y": 1784.0
+      },
+      {
+       "x": 4016.0,
+       "y": 1992.0
+      },
+      {
+       "x": 2638.0,
+       "y": 1964.2
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map27"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 27
+      }
+     ]
+    },
+    {
+     "id": 28,
+     "name": "map28",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 80.0,
+       "y": 1992.0
+      },
+      {
+       "x": 1368.2,
+       "y": 1956.9
+      },
+      {
+       "x": 1360.0,
+       "y": 2200.0
+      },
+      {
+       "x": 80.0,
+       "y": 2200.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map28"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 28
+      }
+     ]
+    },
+    {
+     "id": 29,
+     "name": "map29",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 1368.2,
+       "y": 1956.9
+      },
+      {
+       "x": 2638.0,
+       "y": 1964.2
+      },
+      {
+       "x": 2680.0,
+       "y": 2200.0
+      },
+      {
+       "x": 1360.0,
+       "y": 2200.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map29"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 29
+      }
+     ]
+    },
+    {
+     "id": 30,
+     "name": "map30",
+     "type": "Region",
+     "x": 0,
+     "y": 0,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "polygon": [
+      {
+       "x": 2638.0,
+       "y": 1964.2
+      },
+      {
+       "x": 4016.0,
+       "y": 1992.0
+      },
+      {
+       "x": 4016.0,
+       "y": 2200.0
+      },
+      {
+       "x": 2680.0,
+       "y": 2200.0
+      }
+     ],
+     "properties": [
+      {
+       "name": "region_id",
+       "type": "string",
+       "value": "map30"
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "value": 30
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
