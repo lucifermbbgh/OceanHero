@@ -20,3 +20,9 @@ docs/经济学参考文档/
 
 # Godot 4.4+ 脚本 UID 旁注
 *.uid
+
+# 参考文档（不纳入仓库）
+docs/版本文档/Godot_4.6_架空海洋世界地图系统设计文档.md
+# 参考文档与素材目录（不纳入仓库）
+docs/版本文档/Godot_4.6_架空海洋世界地图系统设计文档/
+docs/版本文档/Godot_WorldMap_Design_Reference/
