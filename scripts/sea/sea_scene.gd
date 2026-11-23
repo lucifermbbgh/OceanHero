@@ -52,6 +52,7 @@ var port_tab := "local"         # local = 本地市场，world = 世界市场
 var aggro_mult := 1.0           # 伪造旗帜：敌方索敌半径倍率
 var port_ui: CanvasLayer
 var world_map: Control
+var mini_map: Control
 var port_panel: PanelContainer
 var port_list: VBoxContainer
 ## 同屏单位上限（超过就不再刷新，避免越打越多）
@@ -402,6 +403,14 @@ func _build_hud() -> void:
 	world_map = load("res://scripts/ui/world_map.gd").new()
 	map_ui.add_child(world_map)
 	world_map.visible = false
+	# 1.5.6 小地图
+	var mini_ui := CanvasLayer.new()
+	mini_ui.layer = 13
+	add_child(mini_ui)
+	mini_map = load("res://scripts/ui/mini_map.gd").new()
+	mini_map.sea = self
+	mini_map.world_size = float(SEA_SIZE)
+	mini_ui.add_child(mini_map)
 
 
 # ---------------- 哨站港口 ----------------

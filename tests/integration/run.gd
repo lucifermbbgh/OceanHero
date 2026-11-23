@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v156_mini_map()
 	await _test_v153_world_map()
 	await _test_v151_sorting()
 	await _test_v150_world_map_data()
@@ -687,6 +688,21 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.5.6 海上小地图 ----------------
+func _test_v156_mini_map() -> void:
+	print("\n[1.5.6 海上小地图]")
+	GameState.reset_new_game()
+	var sea = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(sea)
+	await _frames(6)
+	_ok(sea.mini_map != null, "小地图已创建")
+	_ok(sea.mini_map.size.x >= 200.0, "小地图尺寸 220", str(sea.mini_map.size))
+	_ok(sea.mini_map.map_scale() > 0.0, "地图缩放比例可用", str(sea.mini_map.map_scale()))
+	_ok(sea.mini_map.position.x > 1000.0, "小地图位于右上角", str(sea.mini_map.position))
+	sea.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.5.3 世界地图面板 ----------------
 func _test_v153_world_map() -> void:

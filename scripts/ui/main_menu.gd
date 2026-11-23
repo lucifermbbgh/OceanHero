@@ -30,7 +30,7 @@ func _ready() -> void:
 	body.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "OceanHero · 2D 单机航海 RPG"
+	sub.text = "碧海英豪 · 2D 单机航海 RPG"
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.add_theme_color_override("font_color", Color(0.6, 0.75, 0.8))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
