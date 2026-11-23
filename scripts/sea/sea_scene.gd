@@ -1595,6 +1595,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE and world_map != null and world_map.visible:
 			world_map.visible = false
+			if mini_map != null:
+				mini_map.visible = true
 			return
 		if event.keycode == KEY_ESCAPE and port_panel != null and port_panel.visible:
 			port_panel.visible = false
@@ -1603,6 +1605,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			if world_map != null:
 				world_map.visible = not world_map.visible
 				world_map.refresh()
+				# 世界地图打开时隐藏小地图，避免遮挡右侧详情
+				if mini_map != null:
+					mini_map.visible = not world_map.visible
 			return
 		if event.keycode == KEY_E:
 			if port_panel != null and port_panel.visible:

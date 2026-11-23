@@ -1,9 +1,8 @@
 extends Control
-## 1.5.5 世界地图（只读 + 交互增强）：悬停/选中/详情/缩放/拖拽/路线预览。
+## 1.6.1 世界地图（矢量区域版）：多边形海域 + 迷雾 + 悬停/选中/航线
 
 const MAP_RECT := Rect2(28, 76, 1180, 680)
 const INFO_RECT := Rect2(1228, 76, 312, 680)
-const NODE_R := 13.0
 
 var _nodes := 0
 var _hover := -1
@@ -13,7 +12,6 @@ var _zoom := 1.0
 var _offset := Vector2.ZERO
 var _dragging := false
 var _drag_moved := false
-var _drag_from := Vector2.ZERO
 
 func _ready() -> void:
 	size = Vector2(1568, 812)
@@ -61,36 +59,45 @@ func _gui_input(event: InputEvent) -> void:
 			if event.pressed:
 				_dragging = true
 				_drag_moved = false
-				_drag_from = event.position
 			else:
 				_dragging = false
 				if not _drag_moved:
-					var h2 := _hit(event.position)
-					select_map(h2)
+					select_map(_hit(event.position))
 
 func _clamp_offset() -> void:
 	_offset.x = clampf(_offset.x, -MAP_RECT.size.x * 0.35, MAP_RECT.size.x * 0.35)
 	_offset.y = clampf(_offset.y, -MAP_RECT.size.y * 0.35, MAP_RECT.size.y * 0.35)
 
 func _hit(p: Vector2) -> int:
-	var best := -1
-	var best_d := NODE_R * 1.6
 	for i in range(1, 31):
-		var m: Resource = DataRegistry.get_map(i)
-		if m == null:
-			continue
-		var d := p.distance_to(_pos(m.world_pos))
-		if d < best_d:
-			best_d = d
-			best = i
-	return best
+		if Geometry2D.is_point_in_polygon(p, _cell_poly(i)):
+			return i
+	return -1
+
+## 以 world_pos 为中心生成「切角矩形」海域多边形（地图局部坐标）
+func _cell_poly(idx: int) -> PackedVector2Array:
+	var md: Resource = DataRegistry.get_map(idx)
+	if md == null:
+		return PackedVector2Array()
+	var c := _pos(md.world_pos)
+	var w := 300.0 * _zoom
+	var h := 56.0 * _zoom
+	var bx := w * 0.5
+	var by := h * 0.5
+	var cut := minf(18.0 * _zoom, minf(bx, by) * 0.5)
+	var pts := PackedVector2Array([
+		c + Vector2(-bx + cut, -by), c + Vector2(bx - cut, -by),
+		c + Vector2(bx, -by + cut), c + Vector2(bx, by - cut),
+		c + Vector2(bx - cut, by), c + Vector2(-bx + cut, by),
+		c + Vector2(-bx, by - cut), c + Vector2(-bx, -by + cut),
+	])
+	return pts
 
 func _compute_route(from_i: int, to_i: int) -> Array:
 	if from_i <= 0 or to_i <= 0 or from_i == to_i:
 		return []
 	if not GameState.is_map_explored(to_i):
 		return []
-	# 仅已探索且已解锁的节点参与寻路
 	var dist := {}
 	var prev := {}
 	var open: Array = [from_i]
@@ -137,63 +144,58 @@ func _draw() -> void:
 	draw_rect(INFO_RECT, Color(0.10, 0.12, 0.15, 0.9))
 	draw_rect(INFO_RECT, Color(0.35, 0.40, 0.45), false, 1.0)
 
-	# 连线
+	# 海域底色与波纹
+	draw_rect(MAP_RECT, Color(0.04, 0.16, 0.26))
+	for wv in range(14):
+		var y0 := MAP_RECT.position.y + 24.0 + float(wv) * 48.0
+		var pts := PackedVector2Array()
+		for sx in range(0, 40):
+			var x := MAP_RECT.position.x + float(sx) * (MAP_RECT.size.x / 39.0)
+			pts.append(Vector2(x, y0 + sin(float(sx) * 0.7 + float(wv)) * 3.0))
+		draw_polyline(pts, Color(0.12, 0.35, 0.48, 0.25), 1.0)
+
+	# 区域多边形
+	_nodes = 0
 	for i in range(1, 31):
-		if not GameState.is_map_explored(i):
-			continue
 		var md: Resource = DataRegistry.get_map(i)
 		if md == null:
 			continue
-		for nb in md.neighbors:
-			var j := int(nb)
-			if j <= i or j > 30 or not GameState.is_map_explored(j):
-				continue
-			var m2: Resource = DataRegistry.get_map(j)
-			if m2 == null:
-				continue
-			draw_line(_pos(md.world_pos), _pos(m2.world_pos), Color(0.35, 0.45, 0.50, 0.55), 1.5)
+		_nodes += 1
+		var poly := _cell_poly(i)
+		if poly.size() < 3:
+			continue
+		var explored: bool = GameState.is_map_explored(i)
+		var fill := Color(0.10, 0.14, 0.18, 0.9)
+		var line := Color(0.30, 0.34, 0.38, 0.8)
+		if explored:
+			var base_col: Color = GameState.NATION_COLORS.get(String(md.nation), Color(0.45, 0.55, 0.6))
+			fill = Color(base_col.r, base_col.g, base_col.b, 0.55)
+			line = Color(base_col.r * 1.3, base_col.g * 1.3, base_col.b * 1.3, 0.9)
+		if i == _selected:
+			fill = Color(0.20, 0.55, 0.90, 0.55)
+			line = Color(0.45, 0.90, 1.0)
+		if i == _hover:
+			line = Color(1, 1, 1)
+		draw_colored_polygon(poly, fill)
+		var closed := poly.duplicate()
+		closed.append(poly[0])
+		draw_polyline(closed, line, 2.0)
+		if i == GameState.current_map:
+			draw_polyline(closed, Color(1.0, 0.82, 0.35), 3.0)
+		var c := _pos(md.world_pos)
+		if explored:
+			draw_string(font, c + Vector2(-18, 5), "%d-%d" % [(i - 1) / 3 + 1, (i - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.95, 0.9))
+		else:
+			draw_string(font, c + Vector2(-4, 5), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.55, 0.58, 0.62))
 
-	# 路线
+	# 航线（虚线）
 	if _route.size() >= 2:
 		for k in range(_route.size() - 1):
 			var ma: Resource = DataRegistry.get_map(int(_route[k]))
 			var mb: Resource = DataRegistry.get_map(int(_route[k + 1]))
-			if ma != null and mb != null:
-				draw_line(_pos(ma.world_pos), _pos(mb.world_pos), Color(1.0, 0.80, 0.30), 3.0)
-
-	# 节点
-	_nodes = 0
-	var reachable := GameState.travel_options()
-	for i2 in range(1, 31):
-		var m: Resource = DataRegistry.get_map(i2)
-		if m == null:
-			continue
-		_nodes += 1
-		var p := _pos(m.world_pos)
-		var explored: bool = GameState.is_map_explored(i2)
-		if explored:
-			var col: Color = GameState.NATION_COLORS.get(String(m.nation), Color(0.55, 0.55, 0.6))
-			draw_circle(p, NODE_R, col)
-			draw_circle(p, NODE_R, Color(0.95, 0.92, 0.80), false, 1.5)
-			var lv := (i2 - 1) / 3 + 1
-			var col_i := (i2 - 1) % 3 + 1
-			draw_string(font, p + Vector2(16, 5), "%d-%d" % [lv, col_i], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.9, 0.92, 0.88))
-			var is_reach := false
-			for o in reachable:
-				if int(o["index"]) == i2 and bool(o["unlocked"]):
-					is_reach = true
-			if is_reach:
-				draw_arc(p, NODE_R + 6.0, 0.0, TAU, 24, Color(0.45, 0.95, 0.60), 1.5)
-			if i2 == GameState.current_map:
-				draw_arc(p, NODE_R + 9.0, 0.0, TAU, 32, Color(1.0, 0.85, 0.35), 3.0)
-			if i2 == _selected:
-				draw_arc(p, NODE_R + 6.0, 0.0, TAU, 32, Color(0.40, 0.85, 1.0), 2.5)
-			if i2 == _hover:
-				draw_arc(p, NODE_R + 4.0, 0.0, TAU, 32, Color(1.0, 1.0, 1.0), 1.5)
-		else:
-			draw_circle(p, NODE_R - 3.0, Color(0.22, 0.24, 0.27))
-			draw_circle(p, NODE_R - 3.0, Color(0.38, 0.40, 0.44), false, 1.0)
-			draw_string(font, p + Vector2(-4, 5), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.58, 0.62))
+			if ma == null or mb == null:
+				continue
+			_dashed_line(_pos(ma.world_pos), _pos(mb.world_pos), Color(1.0, 0.80, 0.30), 3.0)
 
 	# 右侧详情
 	var ix := INFO_RECT.position.x + 16.0
@@ -202,8 +204,6 @@ func _draw() -> void:
 	if show_i > 0 and GameState.is_map_explored(show_i):
 		var sm: Resource = DataRegistry.get_map(show_i)
 		if sm != null:
-			var lv2 := (show_i - 1) / 3 + 1
-			var col2 := (show_i - 1) % 3 + 1
 			draw_string(font, Vector2(ix, iy), String(sm.display_name), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.95, 0.88, 0.60))
 			iy += 30
 			draw_string(font, Vector2(ix, iy), "势力：%s" % String(GameState.NATION_NAMES.get(String(sm.nation), "争夺")), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.82, 0.86, 0.84))
@@ -221,5 +221,17 @@ func _draw() -> void:
 		iy += 30
 		draw_string(font, Vector2(ix, iy), "尚未探索，无法查看信息", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.58, 0.60))
 
-	var explored_n := GameState.explored_maps.size()
-	draw_string(font, Vector2(28, 790), "已探索 %d / 30　　当前海域：%d　　黄线 = 路线预览，绿环 = 可直接前往" % [explored_n, GameState.current_map], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.72, 0.76, 0.74))
+	draw_string(font, Vector2(28, 790), "已探索 %d / 30　　当前海域：%d　　金框 = 当前，黄虚线 = 航线" % [GameState.explored_maps.size(), GameState.current_map], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.72, 0.76, 0.74))
+
+func _dashed_line(a: Vector2, b: Vector2, col: Color, w: float) -> void:
+	var d := b - a
+	var len := d.length()
+	if len <= 0.0:
+		return
+	var dir := d / len
+	var seg := 14.0
+	var x := 0.0
+	while x < len:
+		var e := minf(x + seg, len)
+		draw_line(a + dir * x, a + dir * e, col, w)
+		x = e + 8.0
