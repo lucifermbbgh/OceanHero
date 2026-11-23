@@ -12,6 +12,7 @@ var _zoom := 1.0
 var _offset := Vector2.ZERO
 var _dragging := false
 var _drag_moved := false
+var _bg: Texture2D = null
 
 func _ready() -> void:
 	size = Vector2(1568, 812)
@@ -19,6 +20,14 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	_load_polys()
+	var bg_path := "res://art/world_map/world_map_bg.png"
+	if ResourceLoader.exists(bg_path):
+		_bg = load(bg_path)
+	else:
+		# 尚未导入时直接读原始 PNG
+		var img := Image.new()
+		if img.load(bg_path) == OK:
+			_bg = ImageTexture.create_from_image(img)
 
 func toggle() -> void:
 	visible = not visible
@@ -110,7 +119,7 @@ func _cell_poly(idx: int) -> PackedVector2Array:
 		var out := PackedVector2Array()
 		for p in _polys[idx]["polygon"]:
 			var pv: Vector2 = p
-			var inset: Vector2 = center + (pv - center) * 0.92
+			var inset: Vector2 = center + (pv - center) * 1.0
 			out.append(_pos(inset))
 		return out
 	var md: Resource = DataRegistry.get_map(idx)
@@ -181,8 +190,11 @@ func _draw() -> void:
 	draw_rect(INFO_RECT, Color(0.10, 0.12, 0.15, 0.9))
 	draw_rect(INFO_RECT, Color(0.35, 0.40, 0.45), false, 1.0)
 
-	# 海域底色与波纹
+	# 海域底图
 	draw_rect(MAP_RECT, Color(0.04, 0.16, 0.26))
+	if _bg != null:
+		var bg_rect := Rect2(_pos(Vector2.ZERO), MAP_RECT.size * _zoom)
+		draw_texture_rect(_bg, bg_rect, false)
 	for wv in range(14):
 		var y0 := MAP_RECT.position.y + 24.0 + float(wv) * 48.0
 		var pts := PackedVector2Array()
@@ -202,12 +214,12 @@ func _draw() -> void:
 		if poly.size() < 3:
 			continue
 		var explored: bool = GameState.is_map_explored(i)
-		var fill := Color(0.10, 0.14, 0.18, 0.9)
-		var line := Color(0.30, 0.34, 0.38, 0.8)
+		var fill := Color(0.02, 0.05, 0.08, 0.20)
+		var line := Color(0.30, 0.36, 0.40, 0.35)
 		if explored:
 			var base_col: Color = GameState.NATION_COLORS.get(String(md.nation), Color(0.45, 0.55, 0.6))
-			fill = Color(base_col.r, base_col.g, base_col.b, 0.55)
-			line = Color(base_col.r * 1.3, base_col.g * 1.3, base_col.b * 1.3, 0.9)
+			fill = Color(base_col.r, base_col.g, base_col.b, 0.22)
+			line = Color(base_col.r * 1.2, base_col.g * 1.2, base_col.b * 1.2, 0.9)
 		if i == _selected:
 			fill = Color(0.20, 0.55, 0.90, 0.55)
 			line = Color(0.45, 0.90, 1.0)
@@ -223,7 +235,7 @@ func _draw() -> void:
 		if explored:
 			draw_string(font, c + Vector2(-18, 5), "%d-%d" % [(i - 1) / 3 + 1, (i - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.95, 0.9))
 		else:
-			draw_string(font, c + Vector2(-4, 5), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.55, 0.58, 0.62))
+			draw_string(font, c + Vector2(-4, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.50, 0.54))
 
 	# 航线（虚线）
 	if _route.size() >= 2:
