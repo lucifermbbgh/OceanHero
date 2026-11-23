@@ -4,6 +4,10 @@ var slot_box: VBoxContainer
 var body: VBoxContainer
 
 func _ready() -> void:
+	# 1.5.4：应用显示名用中文，项目名/目录/仓库保持 OceanHero
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_title("碧海英豪")
+		Engine.get_main_loop().get_root().title = "碧海英豪"
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
