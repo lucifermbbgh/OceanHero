@@ -25,3 +25,8 @@ regions.sort(key=lambda r: r['index'])
 os.makedirs('data/generated', exist_ok=True)
 json.dump({'source': 'world_regions.tmj', 'canvas': [W, H], 'regions': regions}, open(dst, 'w'), ensure_ascii=False, indent=1)
 print('regions', len(regions))
+# 陆地蒙板（供运行时绘制与命中排除）
+import shutil
+if os.path.exists('data/source/land_masses.json'):
+    shutil.copyfile('data/source/land_masses.json', 'data/generated/land_masses.json')
+    print('land copied')

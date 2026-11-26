@@ -13,6 +13,7 @@ var _offset := Vector2.ZERO
 var _dragging := false
 var _drag_moved := false
 var _bg: Texture2D = null
+var _land: Array = []
 
 func _ready() -> void:
 	size = Vector2(1568, 812)
@@ -20,7 +21,8 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	_load_polys()
-	var bg_path := "res://art/world_map/world_map_bg.png"
+	_load_land()
+	var bg_path := "res://art/world_map/bg_sea.png"
 	if ResourceLoader.exists(bg_path):
 		_bg = load(bg_path)
 	else:
@@ -79,6 +81,8 @@ func _clamp_offset() -> void:
 	_offset.y = clampf(_offset.y, -MAP_RECT.size.y * 0.35, MAP_RECT.size.y * 0.35)
 
 func _hit(p: Vector2) -> int:
+	if _in_land(p):
+		return -1
 	for i in range(1, 31):
 		if Geometry2D.is_point_in_polygon(p, _cell_poly(i)):
 			return i
@@ -104,6 +108,32 @@ func _load_polys() -> void:
 			pts.append(Vector2(float(p[0]), float(p[1])))
 		_polys[int(r.get("index", 0))] = {"polygon": pts,
 			"anchor": Vector2(float(r["anchor"][0]), float(r["anchor"][1]))}
+
+func _load_land() -> void:
+	_land.clear()
+	var path := "res://data/generated/land_masses.json"
+	if not FileAccess.file_exists(path):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return
+	var parsed = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	for item in parsed.get("land", []):
+		var pts: Array = []
+		for p in item.get("polygon", []):
+			pts.append(Vector2(float(p[0]), float(p[1])))
+		_land.append(pts)
+
+func _in_land(p: Vector2) -> bool:
+	for lp in _land:
+		var pts := PackedVector2Array()
+		for v in lp:
+			pts.append(_pos(v))
+		if pts.size() >= 3 and Geometry2D.is_point_in_polygon(p, pts):
+			return true
+	return false
 
 func _anchor_pos(idx: int) -> Vector2:
 	if _polys.has(idx):
@@ -231,9 +261,29 @@ func _draw() -> void:
 		draw_polyline(closed, line, 2.0)
 		if i == GameState.current_map:
 			draw_polyline(closed, Color(1.0, 0.82, 0.35), 3.0)
-		var c := _anchor_pos(i)
-		if explored:
-			draw_string(font, c + Vector2(-18, 5), "%d-%d" % [(i - 1) / 3 + 1, (i - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.95, 0.9))
+
+	# 陆地覆盖：先画区域，再盖陆地，避免色块压到陆地
+	for lp in _land:
+		var lpts := PackedVector2Array()
+		for v in lp:
+			lpts.append(_pos(v))
+		if lpts.size() < 3:
+			continue
+		draw_colored_polygon(lpts, Color(0.86, 0.80, 0.64, 0.96))
+		var lclosed := lpts.duplicate()
+		lclosed.append(lpts[0])
+		draw_polyline(lclosed, Color(0.42, 0.34, 0.22, 0.9), 2.0)
+
+	# 区域标签（陆地之上不显示）
+	for i2 in range(1, 31):
+		var md2: Resource = DataRegistry.get_map(i2)
+		if md2 == null:
+			continue
+		var c := _anchor_pos(i2)
+		if _in_land(c):
+			continue
+		if GameState.is_map_explored(i2):
+			draw_string(font, c + Vector2(-18, 5), "%d-%d" % [(i2 - 1) / 3 + 1, (i2 - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.95, 0.9))
 		else:
 			draw_string(font, c + Vector2(-4, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.50, 0.54))
 

@@ -731,6 +731,12 @@ func _test_v153_world_map() -> void:
 	_ok(wm._hit(p1) == 1, "命中检测可选中节点")
 	_ok(wm._polys.size() == 30, "Tiled 多边形已载入", str(wm._polys.size()))
 	_ok(wm._polys[1]["polygon"].size() >= 3, "多边形顶点有效")
+	_ok(wm._land.size() == 6, "陆地蒙板已载入", str(wm._land.size()))
+	var lc := Vector2.ZERO
+	for p in wm._land[0]:
+		lc += p
+	lc /= float(wm._land[0].size())
+	_ok(wm._hit(wm._pos(lc)) == -1, "陆地不参与区域命中")
 	wm.queue_free()
 	await _frames(1)
 	GameState.reset_new_game()
