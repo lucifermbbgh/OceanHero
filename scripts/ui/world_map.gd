@@ -14,6 +14,7 @@ var _dragging := false
 var _drag_moved := false
 var _bg: Texture2D = null
 var _land: Array = []
+var _land_tex: Texture2D = null
 
 func _ready() -> void:
 	size = Vector2(1568, 812)
@@ -23,13 +24,8 @@ func _ready() -> void:
 	_load_polys()
 	_load_land()
 	var bg_path := "res://art/world_map/bg_sea.png"
-	if ResourceLoader.exists(bg_path):
-		_bg = load(bg_path)
-	else:
-		# 尚未导入时直接读原始 PNG
-		var img := Image.new()
-		if img.load(bg_path) == OK:
-			_bg = ImageTexture.create_from_image(img)
+	_bg = _load_tex(bg_path)
+	_land_tex = _load_tex("res://art/world_map/land_overlay.png")
 
 func toggle() -> void:
 	visible = not visible
@@ -108,6 +104,14 @@ func _load_polys() -> void:
 			pts.append(Vector2(float(p[0]), float(p[1])))
 		_polys[int(r.get("index", 0))] = {"polygon": pts,
 			"anchor": Vector2(float(r["anchor"][0]), float(r["anchor"][1]))}
+
+func _load_tex(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	var img := Image.new()
+	if img.load(path) == OK:
+		return ImageTexture.create_from_image(img)
+	return null
 
 func _load_land() -> void:
 	_land.clear()
@@ -262,17 +266,21 @@ func _draw() -> void:
 		if i == GameState.current_map:
 			draw_polyline(closed, Color(1.0, 0.82, 0.35), 3.0)
 
-	# 陆地覆盖：先画区域，再盖陆地，避免色块压到陆地
-	for lp in _land:
-		var lpts := PackedVector2Array()
-		for v in lp:
-			lpts.append(_pos(v))
-		if lpts.size() < 3:
-			continue
-		draw_colored_polygon(lpts, Color(0.86, 0.80, 0.64, 0.96))
-		var lclosed := lpts.duplicate()
-		lclosed.append(lpts[0])
-		draw_polyline(lclosed, Color(0.42, 0.34, 0.22, 0.9), 2.0)
+	# 陆地覆盖：先画区域，再盖陆地贴图，避免色块压到陆地
+	if _land_tex != null:
+		var lrect := Rect2(_pos(Vector2.ZERO), MAP_RECT.size * _zoom)
+		draw_texture_rect(_land_tex, lrect, false)
+	else:
+		for lp in _land:
+			var lpts := PackedVector2Array()
+			for v in lp:
+				lpts.append(_pos(v))
+			if lpts.size() < 3:
+				continue
+			draw_colored_polygon(lpts, Color(0.86, 0.80, 0.64, 0.96))
+			var lclosed := lpts.duplicate()
+			lclosed.append(lpts[0])
+			draw_polyline(lclosed, Color(0.42, 0.34, 0.22, 0.9), 2.0)
 
 	# 区域标签（陆地之上不显示）
 	for i2 in range(1, 31):
