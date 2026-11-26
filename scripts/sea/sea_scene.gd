@@ -160,8 +160,24 @@ func _apply_contraband_effects() -> void:
 			player.crew_hp = player.crew_max
 		hud.ticker("违禁药物生效：船员上限 +20%")
 
+var _region_islands: Dictionary = {}
+
+func _load_region_islands() -> void:
+	if not _region_islands.is_empty():
+		return
+	var path := "res://data/generated/region_islands.json"
+	if not FileAccess.file_exists(path):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return
+	var parsed = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) == TYPE_DICTIONARY:
+		_region_islands = parsed
+
 func _generate_islands() -> void:
 	islands.clear()
+	_load_region_islands()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(map_def.island_seed) * 7919 + map_index * 131
 	var n := mini(8, 4 + (map_index % 3))
@@ -187,11 +203,12 @@ func _generate_islands() -> void:
 		var key := GameState.island_key(map_index, i)
 		tier = GameState.island_tier_of(key, tier)
 		var rr: Vector2 = ISLAND_RADIUS[tier]
+		var rad: float = rng.randf_range(rr.x, rr.y)
 		var specialty: StringName = SPECIALTIES[i % SPECIALTIES.size()]
 		var nm := _island_name(i, tier)
 		GameState.register_port(key, nm, map_index, tier)
 		# [位置, 半径, 等级, 名称, 特产]
-		islands.append([pos, rng.randf_range(rr.x, rr.y), tier, nm, specialty])
+		islands.append([pos, rad, tier, nm, specialty])
 
 ## 把港口贴到最近岛屿的岸边，而不是漂在海面
 func _anchor_port_to_island(want: Vector2) -> Vector2:

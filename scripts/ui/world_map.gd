@@ -15,6 +15,7 @@ var _drag_moved := false
 var _bg: Texture2D = null
 var _land: Array = []
 var _land_tex: Texture2D = null
+var _mask_img: Image = null
 
 func _ready() -> void:
 	size = Vector2(1568, 812)
@@ -23,9 +24,16 @@ func _ready() -> void:
 	visible = false
 	_load_polys()
 	_load_land()
-	var bg_path := "res://art/world_map/bg_sea.png"
-	_bg = _load_tex(bg_path)
-	_land_tex = _load_tex("res://art/world_map/land_overlay.png")
+	_bg = _load_tex("res://art/world_map/chart_base_game.png")
+	var mp := "res://art/world_map/land_mask_game.png"
+	if ResourceLoader.exists(mp):
+		var mres = load(mp)
+		if mres is Texture2D:
+			_mask_img = mres.get_image()
+	if _mask_img == null:
+		var mi := Image.new()
+		if mi.load(mp) == OK:
+			_mask_img = mi
 
 func toggle() -> void:
 	visible = not visible
@@ -105,13 +113,20 @@ func _load_polys() -> void:
 		_polys[int(r.get("index", 0))] = {"polygon": pts,
 			"anchor": Vector2(float(r["anchor"][0]), float(r["anchor"][1]))}
 
+static var _CACHE := {}
+
 func _load_tex(path: String) -> Texture2D:
+	if _CACHE.has(path):
+		return _CACHE[path]
+	var tex: Texture2D = null
 	if ResourceLoader.exists(path):
-		return load(path)
-	var img := Image.new()
-	if img.load(path) == OK:
-		return ImageTexture.create_from_image(img)
-	return null
+		tex = load(path)
+	else:
+		var img := Image.new()
+		if img.load(path) == OK:
+			tex = ImageTexture.create_from_image(img)
+	_CACHE[path] = tex
+	return tex
 
 func _load_land() -> void:
 	_land.clear()
@@ -130,7 +145,18 @@ func _load_land() -> void:
 			pts.append(Vector2(float(p[0]), float(p[1])))
 		_land.append(pts)
 
+func _unpos(p: Vector2) -> Vector2:
+	var c := MAP_RECT.position + MAP_RECT.size * 0.5
+	return (p - c - _offset) / (MAP_RECT.size * _zoom) + Vector2(0.5, 0.5)
+
 func _in_land(p: Vector2) -> bool:
+	if _mask_img != null:
+		var wp := _unpos(p)
+		if wp.x < 0.0 or wp.y < 0.0 or wp.x > 1.0 or wp.y > 1.0:
+			return false
+		var mx := int(wp.x * float(_mask_img.get_width() - 1))
+		var my := int(wp.y * float(_mask_img.get_height() - 1))
+		return _mask_img.get_pixel(mx, my).r > 0.5
 	for lp in _land:
 		var pts := PackedVector2Array()
 		for v in lp:
@@ -213,7 +239,7 @@ func _compute_route(from_i: int, to_i: int) -> Array:
 
 func _pos(wp: Vector2) -> Vector2:
 	var c := MAP_RECT.position + MAP_RECT.size * 0.5
-	return c + (wp - Vector2(0.5, 0.45)) * MAP_RECT.size * _zoom + _offset
+	return c + (wp - Vector2(0.5, 0.5)) * MAP_RECT.size * _zoom + _offset
 
 func _draw() -> void:
 	var font := ThemeDB.fallback_font
@@ -224,20 +250,13 @@ func _draw() -> void:
 	draw_rect(INFO_RECT, Color(0.10, 0.12, 0.15, 0.9))
 	draw_rect(INFO_RECT, Color(0.35, 0.40, 0.45), false, 1.0)
 
-	# 海域底图
+	# 海图底图（AI 艺术母版）
 	draw_rect(MAP_RECT, Color(0.04, 0.16, 0.26))
 	if _bg != null:
 		var bg_rect := Rect2(_pos(Vector2.ZERO), MAP_RECT.size * _zoom)
 		draw_texture_rect(_bg, bg_rect, false)
-	for wv in range(14):
-		var y0 := MAP_RECT.position.y + 24.0 + float(wv) * 48.0
-		var pts := PackedVector2Array()
-		for sx in range(0, 40):
-			var x := MAP_RECT.position.x + float(sx) * (MAP_RECT.size.x / 39.0)
-			pts.append(Vector2(x, y0 + sin(float(sx) * 0.7 + float(wv)) * 3.0))
-		draw_polyline(pts, Color(0.12, 0.35, 0.48, 0.25), 1.0)
 
-	# 区域多边形
+	# 区域：未探索=迷雾遮罩，已探索=细边界
 	_nodes = 0
 	for i in range(1, 31):
 		var md: Resource = DataRegistry.get_map(i)
@@ -247,53 +266,43 @@ func _draw() -> void:
 		var poly := _cell_poly(i)
 		if poly.size() < 3:
 			continue
-		var explored: bool = GameState.is_map_explored(i)
-		var fill := Color(0.02, 0.05, 0.08, 0.20)
-		var line := Color(0.30, 0.36, 0.40, 0.35)
-		if explored:
-			var base_col: Color = GameState.NATION_COLORS.get(String(md.nation), Color(0.45, 0.55, 0.6))
-			fill = Color(base_col.r, base_col.g, base_col.b, 0.22)
-			line = Color(base_col.r * 1.2, base_col.g * 1.2, base_col.b * 1.2, 0.9)
-		if i == _selected:
-			fill = Color(0.20, 0.55, 0.90, 0.55)
-			line = Color(0.45, 0.90, 1.0)
-		if i == _hover:
-			line = Color(1, 1, 1)
-		draw_colored_polygon(poly, fill)
 		var closed := poly.duplicate()
 		closed.append(poly[0])
-		draw_polyline(closed, line, 2.0)
+		if not GameState.is_map_explored(i):
+			draw_colored_polygon(poly, Color(0.02, 0.05, 0.08, 0.90))
+			draw_polyline(closed, Color(0.25, 0.30, 0.34, 0.35), 1.0)
+			continue
+		var line := Color(0.90, 0.93, 0.95, 0.30)
+		var wdt := 1.5
+		var fill := Color(0, 0, 0, 0)
+		if i == _selected:
+			fill = Color(0.20, 0.55, 0.90, 0.18)
+			line = Color(0.45, 0.90, 1.0, 0.95)
+			wdt = 2.5
+		elif i == _hover:
+			fill = Color(1, 1, 1, 0.08)
+			line = Color(1, 1, 1, 0.85)
+			wdt = 2.0
+		if fill.a > 0.0:
+			draw_colored_polygon(poly, fill)
+		draw_polyline(closed, line, wdt)
 		if i == GameState.current_map:
-			draw_polyline(closed, Color(1.0, 0.82, 0.35), 3.0)
+			draw_polyline(closed, Color(1.0, 0.82, 0.35, 0.95), 3.0)
 
-	# 陆地覆盖：先画区域，再盖陆地贴图，避免色块压到陆地
-	if _land_tex != null:
-		var lrect := Rect2(_pos(Vector2.ZERO), MAP_RECT.size * _zoom)
-		draw_texture_rect(_land_tex, lrect, false)
-	else:
-		for lp in _land:
-			var lpts := PackedVector2Array()
-			for v in lp:
-				lpts.append(_pos(v))
-			if lpts.size() < 3:
-				continue
-			draw_colored_polygon(lpts, Color(0.86, 0.80, 0.64, 0.96))
-			var lclosed := lpts.duplicate()
-			lclosed.append(lpts[0])
-			draw_polyline(lclosed, Color(0.42, 0.34, 0.22, 0.9), 2.0)
-
-	# 区域标签（陆地之上不显示）
+	# 节点与标签：已探索显示琥珀节点，未探索仅问号
 	for i2 in range(1, 31):
 		var md2: Resource = DataRegistry.get_map(i2)
 		if md2 == null:
 			continue
 		var c := _anchor_pos(i2)
-		if _in_land(c):
+		if not GameState.is_map_explored(i2):
+			draw_string(font, c + Vector2(-4, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.55, 0.60, 0.64))
 			continue
-		if GameState.is_map_explored(i2):
-			draw_string(font, c + Vector2(-18, 5), "%d-%d" % [(i2 - 1) / 3 + 1, (i2 - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.95, 0.9))
-		else:
-			draw_string(font, c + Vector2(-4, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.50, 0.54))
+		var fac: Color = GameState.NATION_COLORS.get(String(md2.nation), Color(0.9, 0.7, 0.2))
+		draw_circle(c, 7.0, fac)
+		draw_circle(c, 4.5, Color(0.91, 0.70, 0.23))
+		draw_circle(c, 1.8, Color(1.0, 0.96, 0.86))
+		draw_string(font, c + Vector2(11, 4), "%d-%d" % [(i2 - 1) / 3 + 1, (i2 - 1) % 3 + 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.97, 0.97, 0.94))
 
 	# 航线（虚线）
 	if _route.size() >= 2:

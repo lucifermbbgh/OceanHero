@@ -10,12 +10,22 @@ func _mark(label: String) -> void:
 	var now := Time.get_ticks_msec()
 	print("   ⏱ %s: %d ms（累计 %d ms）" % [label, now - _last, now - _t0])
 	_last = now
+	var f := FileAccess.open("res://tests/integration/progress.log", FileAccess.READ_WRITE)
+	if f == null:
+		f = FileAccess.open("res://tests/integration/progress.log", FileAccess.WRITE)
+	if f != null:
+		f.seek_end()
+		f.store_line("%d %s" % [now - _t0, label])
+		f.close()
 
 var _last := 0
 
 func _ready() -> void:
 	_t0 = Time.get_ticks_msec()
 	_last = _t0
+	var fz := FileAccess.open("res://tests/integration/progress.log", FileAccess.WRITE)
+	if fz != null:
+		fz.close()
 	print("=== SeaHeroes 集成测试 ===")
 	await _test_base_scene()
 	await _test_sea_and_combat()
@@ -27,6 +37,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1613_chart_wiring()
 	await _test_v156_mini_map()
 	await _test_v153_world_map()
 	await _test_v151_sorting()
@@ -689,6 +700,27 @@ func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
 
+# ---------------- 1.6.13 海图接入 ----------------
+func _test_v1613_chart_wiring() -> void:
+	print("\n[1.6.13 海图接入]")
+	GameState.reset_new_game()
+	# 小地图（独立实例，避免重复实例化海面场景拖慢套件）
+	var mm2 = load("res://scripts/ui/mini_map.gd").new()
+	add_child(mm2)
+	await _frames(1)
+	_ok(mm2._base != null, "小地图海图底图载入")
+	_ok(mm2._bboxes.size() == 30, "小地图区域框载入", str(mm2._bboxes.size()))
+	mm2.queue_free()
+	# 世界地图掩膜与底图
+	var wm = load("res://scripts/ui/world_map.gd").new()
+	add_child(wm)
+	await _frames(1)
+	_ok(wm._mask_img != null, "世界地图陆地掩膜载入")
+	_ok(wm._bg != null, "世界地图海图底图载入")
+	wm.queue_free()
+	await _frames(1)
+	GameState.reset_new_game()
+
 # ---------------- 1.5.6 海上小地图 ----------------
 func _test_v156_mini_map() -> void:
 	print("\n[1.5.6 海上小地图]")
@@ -731,12 +763,21 @@ func _test_v153_world_map() -> void:
 	_ok(wm._hit(p1) == 1, "命中检测可选中节点")
 	_ok(wm._polys.size() == 30, "Tiled 多边形已载入", str(wm._polys.size()))
 	_ok(wm._polys[1]["polygon"].size() >= 3, "多边形顶点有效")
-	_ok(wm._land.size() == 6, "陆地蒙板已载入", str(wm._land.size()))
-	var lc := Vector2.ZERO
-	for p in wm._land[0]:
-		lc += p
-	lc /= float(wm._land[0].size())
-	_ok(wm._hit(wm._pos(lc)) == -1, "陆地不参与区域命中")
+	# 掩膜上找一块陆地，验证命中排除
+	var land_wp := Vector2(-1, -1)
+	if wm._mask_img != null:
+		var mw: int = wm._mask_img.get_width()
+		var mh: int = wm._mask_img.get_height()
+		for sy in range(0, mh, 17):
+			if land_wp.x >= 0.0:
+				break
+			for sx in range(0, mw, 17):
+				if wm._mask_img.get_pixel(sx, sy).r > 0.5:
+					land_wp = Vector2(float(sx) / float(mw), float(sy) / float(mh))
+					break
+	_ok(land_wp.x >= 0.0, "掩膜含陆地像素")
+	if land_wp.x >= 0.0:
+		_ok(wm._hit(wm._pos(land_wp)) == -1, "陆地不参与区域命中")
 	wm.queue_free()
 	await _frames(1)
 	GameState.reset_new_game()
@@ -3243,8 +3284,30 @@ func _test_interaction() -> void:
 	await _frames(3)
 	_ok(s2.salvages.size() > 0, "采集任务生成打捞点", "count=%d" % s2.salvages.size())
 
-	s2.player.global_position = Vector2(3800, 3800)
-	_ok(s2.interact_prompt() == "", "远离互动物时没有提示")
+	# 找一个远离所有岛屿与打捞点的空位
+	var free_spot := Vector2(3800, 3800)
+	for gy in range(4, 76, 6):
+		var done := false
+		for gx in range(4, 76, 6):
+			var cand := Vector2(gx * 100.0, gy * 100.0)
+			var ok_spot := true
+			for isl in s2.islands:
+				if cand.distance_to(isl[0]) < float(isl[1]) + 700.0:
+					ok_spot = false
+					break
+			if ok_spot:
+				for svv in s2.salvages:
+					if cand.distance_to(svv) < 500.0:
+						ok_spot = false
+						break
+			if ok_spot:
+				free_spot = cand
+				done = true
+				break
+		if done:
+			break
+	s2.player.global_position = free_spot
+	_ok(s2.interact_prompt() == "", "远离互动物时没有提示", str(free_spot))
 
 	var sv: Vector2 = s2.salvages[0]
 	s2.player.global_position = sv + Vector2(80, 0)
