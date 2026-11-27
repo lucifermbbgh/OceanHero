@@ -28,7 +28,7 @@ def pip(x,y,poly):
         if ((yi>y)!=(yj>y)) and (x < (xj-xi)*(y-yi)/(yj-yi+1e-9)+xi): c=not c
         j=i
     return c
-# 每区域岛屿：区域内掩膜连通域
+# 每区域：先求「海域矩形」（区域内海面像素 bbox），岛屿相对海域矩形定位
 region_islands={}
 for r in regions:
     idx=int(r['index'])
@@ -36,39 +36,50 @@ for r in regions:
     xs=[p[0] for p in poly]; ys=[p[1] for p in poly]
     bx0,by0,bx1,by1=int(min(xs)),int(min(ys)),int(max(xs)),int(max(ys))
     bw,bh=max(2,bx1-bx0),max(2,by1-by0)
-    sub=mask[by0:by1,bx0:bx1].copy()
+    inside=np.zeros((bh,bw),bool)
     yy,xx=np.mgrid[by0:by1,bx0:bx1]
-    inside=np.zeros(sub.shape,bool)
-    for i in range(sub.shape[0]):
-        for j in range(sub.shape[1]):
+    for i in range(bh):
+        for j in range(bw):
             inside[i,j]=pip(xx[i,j],yy[i,j],poly)
-    sub=sub&inside
+    sub_land=mask[by0:by1,bx0:bx1]&inside
+    sub_sea=inside&(~mask[by0:by1,bx0:bx1])
+    sea_frac=sub_sea.sum()/max(1,inside.sum())
+    if sea_frac>0.25 and sub_sea.sum()>0:
+        sy,sx=np.nonzero(sub_sea)
+        rx0,rx1=sx.min(),sx.max(); ry0,ry1=sy.min(),sy.max()
+    else:
+        rx0,ry0,rx1,ry1=0,0,bw-1,bh-1
+    rw,rh=max(2,rx1-rx0),max(2,ry1-ry0)
+    # 海域矩形内的陆地连通域 = 岛屿
+    isl_mask=sub_land[ry0:ry1,rx0:rx1]
     ds=4
-    sh,sw=sub.shape
-    if sh<ds or sw<ds: region_islands[str(idx)]=[]; continue
-    small=sub[:sh//ds*ds,:sw//ds*ds].reshape(sh//ds,ds,sw//ds,ds).mean(axis=(1,3))>0.5
-    lab=np.zeros(small.shape,dtype=np.int32); isl=[]
-    SH,SW=small.shape
-    for i in range(SH):
-        for j in range(SW):
-            if small[i,j] and lab[i,j]==0:
-                q=deque([(i,j)]); lab[i,j]=1; pts=[]
-                while q:
-                    y,x=q.popleft(); pts.append((y,x))
-                    for dy,dx in ((1,0),(-1,0),(0,1),(0,-1)):
-                        ny,nx=y+dy,x+dx
-                        if 0<=ny<SH and 0<=nx<SW and small[ny,nx] and lab[ny,nx]==0:
-                            lab[ny,nx]=1; q.append((ny,nx))
-                if len(pts)>=20:
-                    pys=[p[0] for p in pts]; pxs=[p[1] for p in pts]
-                    lx=(sum(pxs)/len(pxs))*ds/bw; ly=(sum(pys)/len(pys))*ds/bh
-                    lr=min(0.45,(max(max(pxs)-min(pxs),max(pys)-min(pys))/2)*ds/bw)
-                    isl.append({'x':round(lx,4),'y':round(ly,4),'r':round(lr,4)})
+    sh,sw=isl_mask.shape
+    isl=[]
+    if sh>=ds and sw>=ds:
+        small=isl_mask[:sh//ds*ds,:sw//ds*ds].reshape(sh//ds,ds,sw//ds,ds).mean(axis=(1,3))>0.5
+        lab=np.zeros(small.shape,dtype=np.int32)
+        SH,SW=small.shape
+        for i in range(SH):
+            for j in range(SW):
+                if small[i,j] and lab[i,j]==0:
+                    q=deque([(i,j)]); lab[i,j]=1; pts=[]
+                    while q:
+                        y,x=q.popleft(); pts.append((y,x))
+                        for dy,dx in ((1,0),(-1,0),(0,1),(0,-1)):
+                            ny,nx=y+dy,x+dx
+                            if 0<=ny<SH and 0<=nx<SW and small[ny,nx] and lab[ny,nx]==0:
+                                lab[ny,nx]=1; q.append((ny,nx))
+                    if len(pts)>=12:
+                        pys=[p[0] for p in pts]; pxs=[p[1] for p in pts]
+                        lx=(sum(pxs)/len(pxs))*ds/rw; ly=(sum(pys)/len(pys))*ds/rh
+                        lr=min(0.45,(max(max(pxs)-min(pxs),max(pys)-min(pys))/2)*ds/rw)
+                        isl.append({'x':round(lx,4),'y':round(ly,4),'r':round(lr,4)})
     isl.sort(key=lambda z:-z['r'])
-    region_islands[str(idx)]=isl[:8]
+    region_islands[str(idx)]={'sea_rect':[round((bx0+rx0)/W,5),round((by0+ry0)/H,5),round(rw/W,5),round(rh/H,5)],'islands':isl[:8]}
 json.dump(region_islands, open('data/generated/region_islands.json','w'), ensure_ascii=False, indent=1)
-tot=sum(len(v) for v in region_islands.values())
-print('islands total', tot, {k:len(v) for k,v in list(region_islands.items())[:6]})
+tot=sum(len(v['islands']) for v in region_islands.values())
+print('islands total', tot, {k:len(v['islands']) for k,v in list(region_islands.items())[:6]})
+
 # 底图（无叠加）保存
 img.save('art/world_map/chart_base_v3.png')
 # 叠加层

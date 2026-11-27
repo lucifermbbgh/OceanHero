@@ -180,7 +180,9 @@ func _generate_islands() -> void:
 	_load_region_islands()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(map_def.island_seed) * 7919 + map_index * 131
-	var n := mini(8, 4 + (map_index % 3))
+	var rdata: Dictionary = _region_islands.get(str(map_index), {})
+	var art: Array = rdata.get("islands", [])
+	var n := mini(8, maxi(4 + (map_index % 3), art.size()))
 	var safe_center := Vector2(SEA_SIZE * 0.5, SEA_SIZE * 0.5 + 300)
 	# 母港所在海图：前两座固定为近港的港城与港镇
 	var fixed_spots := {
@@ -191,10 +193,26 @@ func _generate_islands() -> void:
 		var pos: Vector2
 		if map_index == 0 and fixed_spots.has(i):
 			pos = fixed_spots[i]
+		elif i < art.size():
+			# 1.6.14：岛屿位置取自世界海图母版，保证世界图/小地图/海面三图一致
+			var e: Dictionary = art[i]
+			pos = Vector2(float(e.get("x", 0.5)), float(e.get("y", 0.5))) * SEA_SIZE
+			if pos.distance_to(safe_center) < 900.0:
+				pos = pos.lerp(Vector2(6600, 6600), 0.6)
 		else:
 			pos = Vector2(rng.randf_range(1500.0, 6500.0), rng.randf_range(1500.0, 6500.0))
 			if pos.distance_to(safe_center) < 900.0:
 				pos = pos.lerp(Vector2(6600, 6600), 0.6)
+			# 1.6.14：与已有岛屿保持航道间距，避免窄水道
+			for _try in range(14):
+				var too_close := false
+				for other in islands:
+					if pos.distance_to(other[0]) < float(other[1]) + 1100.0:
+						too_close = true
+						break
+				if not too_close:
+					break
+				pos = Vector2(rng.randf_range(1500.0, 6500.0), rng.randf_range(1500.0, 6500.0))
 		var tier := 1
 		if i == 0:
 			tier = 3
@@ -203,7 +221,11 @@ func _generate_islands() -> void:
 		var key := GameState.island_key(map_index, i)
 		tier = GameState.island_tier_of(key, tier)
 		var rr: Vector2 = ISLAND_RADIUS[tier]
-		var rad: float = rng.randf_range(rr.x, rr.y)
+		var rad: float
+		if i < art.size():
+			rad = rr.x + (rr.y - rr.x) * clampf(float(art[i].get("r", 0.1)) / 0.3, 0.0, 1.0)
+		else:
+			rad = rng.randf_range(rr.x, rr.y)
 		var specialty: StringName = SPECIALTIES[i % SPECIALTIES.size()]
 		var nm := _island_name(i, tier)
 		GameState.register_port(key, nm, map_index, tier)

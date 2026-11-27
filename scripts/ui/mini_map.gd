@@ -30,6 +30,11 @@ func _ready() -> void:
 			var parsed = JSON.parse_string(f.get_as_text())
 			if typeof(parsed) == TYPE_DICTIONARY:
 				for r in parsed.get("regions", []):
+					var idx0: int = int(r.get("index", 0))
+					var sr: Array = r.get("sea_rect", [])
+					if sr.size() == 4:
+						_bboxes[idx0] = Rect2(float(sr[0]), float(sr[1]), float(sr[2]), float(sr[3]))
+						continue
 					var xs: Array = []
 					var ys: Array = []
 					for p in r.get("polygon", []):
@@ -41,7 +46,7 @@ func _ready() -> void:
 					var x1: float = xs.max()
 					var y0: float = ys.min()
 					var y1: float = ys.max()
-					_bboxes[int(r.get("index", 0))] = Rect2(x0, y0, x1 - x0, y1 - y0)
+					_bboxes[idx0] = Rect2(x0, y0, x1 - x0, y1 - y0)
 
 func _process(_dt: float) -> void:
 	if visible:
@@ -62,24 +67,24 @@ func _draw() -> void:
 	draw_rect(area, Color(0.08, 0.16, 0.20, 0.85))
 	if sea == null:
 		return
-	# 1.6.13：小地图底图 = 世界海图的开阔海面裁剪（艺术纹理）
-	if _base != null:
+	# 1.6.14：小地图底图 = 世界海图当前区域裁剪（岛屿与海面场景同源于 region_islands）
+	var mi: int = int(sea.map_index)
+	if _base != null and _bboxes.has(mi):
+		var bb: Rect2 = _bboxes[mi]
 		var tw := float(_base.get_width())
 		var th := float(_base.get_height())
-		var src := Rect2(tw * 0.34, th * 0.76, tw * 0.34, th * 0.22)
+		var src := Rect2(bb.position.x * tw, bb.position.y * th, bb.size.x * tw, bb.size.y * th)
 		draw_texture_rect_region(_base, area, src)
 	else:
 		draw_rect(area, Color(0.10, 0.30, 0.40, 0.9))
 	draw_rect(area, Color(0.55, 0.62, 0.60, 0.8), false, 1.0)
 	var sc := map_scale()
-	# 岛屿（玩法真值）+ 港口标记
+	# 港口标记（岛屿本体由底图艺术呈现）
 	for isl in sea.islands:
 		var wp: Vector2 = isl[0]
 		var p := area.position + Vector2(wp.x, wp.y) * sc
-		var rr2: float = maxf(2.5, float(isl[1]) * sc)
-		draw_circle(p, rr2, Color(0.82, 0.74, 0.55))
-		draw_circle(p, rr2, Color(0.35, 0.28, 0.16), false, 1.0)
 		draw_circle(p, 3.0, Color(0.95, 0.75, 0.25))
+		draw_circle(p, 3.0, Color(0.25, 0.18, 0.08), false, 1.0)
 	# 玩家
 	if sea.player != null:
 		var pp: Vector2 = area.position + Vector2(sea.player.global_position.x, sea.player.global_position.y) * sc
