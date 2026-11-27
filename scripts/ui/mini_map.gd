@@ -48,6 +48,20 @@ func _ready() -> void:
 					var y1: float = ys.max()
 					_bboxes[idx0] = Rect2(x0, y0, x1 - x0, y1 - y0)
 
+func _tex(path: String) -> Texture2D:
+	var full := "res://art/" + path
+	if _CACHE.has(full):
+		return _CACHE[full]
+	var tex: Texture2D = null
+	if ResourceLoader.exists(full):
+		tex = load(full)
+	else:
+		var im := Image.new()
+		if im.load(full) == OK:
+			tex = ImageTexture.create_from_image(im)
+	_CACHE[full] = tex
+	return tex
+
 func _process(_dt: float) -> void:
 	if visible:
 		queue_redraw()
@@ -67,24 +81,28 @@ func _draw() -> void:
 	draw_rect(area, Color(0.08, 0.16, 0.20, 0.85))
 	if sea == null:
 		return
-	# 1.6.14：小地图底图 = 世界海图当前区域裁剪（岛屿与海面场景同源于 region_islands）
-	var mi: int = int(sea.map_index)
-	if _base != null and _bboxes.has(mi):
-		var bb: Rect2 = _bboxes[mi]
-		var tw := float(_base.get_width())
-		var th := float(_base.get_height())
-		var src := Rect2(bb.position.x * tw, bb.position.y * th, bb.size.x * tw, bb.size.y * th)
-		draw_texture_rect_region(_base, area, src)
+	# 1.6.15：小地图 = 开阔海背景 + 与海面场景同源的岛屿精灵
+	if _base != null:
+		var tw0 := float(_base.get_width())
+		var th0 := float(_base.get_height())
+		var src0 := Rect2(tw0 * 0.34, th0 * 0.76, tw0 * 0.34, th0 * 0.22)
+		draw_texture_rect_region(_base, area, src0)
 	else:
 		draw_rect(area, Color(0.10, 0.30, 0.40, 0.9))
 	draw_rect(area, Color(0.55, 0.62, 0.60, 0.8), false, 1.0)
 	var sc := map_scale()
-	# 港口标记（岛屿本体由底图艺术呈现）
 	for isl in sea.islands:
 		var wp: Vector2 = isl[0]
 		var p := area.position + Vector2(wp.x, wp.y) * sc
-		draw_circle(p, 3.0, Color(0.95, 0.75, 0.25))
-		draw_circle(p, 3.0, Color(0.25, 0.18, 0.08), false, 1.0)
+		if isl.size() > 5 and String(isl[5]) != "" and float(isl[6]) > 0.0:
+			var tex: Texture2D = _tex(String(isl[5]))
+			if tex != null:
+				var rw := float(isl[6]) * area.size.x
+				var rh := float(isl[7]) * area.size.y
+				draw_texture_rect(tex, Rect2(p - Vector2(rw, rh) * 0.5, Vector2(rw, rh)), false)
+		else:
+			draw_circle(p, maxf(2.5, float(isl[1]) * sc), Color(0.82, 0.74, 0.55))
+		draw_circle(p, 2.5, Color(0.95, 0.75, 0.25))
 	# 玩家
 	if sea.player != null:
 		var pp: Vector2 = area.position + Vector2(sea.player.global_position.x, sea.player.global_position.y) * sc

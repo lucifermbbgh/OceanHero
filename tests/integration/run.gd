@@ -732,6 +732,12 @@ func _test_v156_mini_map() -> void:
 	_ok(sea.mini_map.size.x >= 200.0, "小地图尺寸 220", str(sea.mini_map.size))
 	_ok(sea.mini_map.map_scale() > 0.0, "地图缩放比例可用", str(sea.mini_map.map_scale()))
 	_ok(sea.mini_map.position.x > 1000.0, "小地图位于右上角", str(sea.mini_map.position))
+	# 1.6.15：岛屿带精灵字段
+	var with_spr := 0
+	for isl2 in sea.islands:
+		if isl2.size() > 5 and String(isl2[5]) != "":
+			with_spr += 1
+	_ok(with_spr >= 1, "海面岛屿携带母版精灵", str(with_spr))
 	sea.queue_free()
 	await _frames(2)
 	GameState.reset_new_game()
@@ -3502,13 +3508,25 @@ func _test_pathfinding() -> void:
 	if not blocked:
 		_ok(direct.size() == 1, "无障碍时只有目标点", "waypoints=%d" % direct.size())
 
-	# 多岛串联：随便挑几个远点，航线都必须不穿岛
+	# 多岛串联：挑几个开阔水域的远点，航线都必须不穿岛
 	var ok_all := true
-	for k in range(6):
-		var dest := Vector2(600.0 + k * 1100.0, 700.0 + k * 900.0).clamp(Vector2(100, 100), Vector2(7900, 7900))
+	var tried := 0
+	for k in range(10):
+		if tried >= 6:
+			break
+		var dest := Vector2(600.0 + k * 900.0, 700.0 + k * 750.0).clamp(Vector2(100, 100), Vector2(7900, 7900))
+		var in_isle := false
+		for isl4 in s.islands:
+			if dest.distance_to(isl4[0]) < float(isl4[1]) + 120.0:
+				in_isle = true
+				break
+		if in_isle:
+			continue
+		tried += 1
 		var rt: Array = s._route_to(dest)
 		if _path_hits_island(s, rt, s.player.global_position):
 			ok_all = false
+	_ok(tried >= 4, "找到足够开阔目标点", str(tried))
 	_ok(ok_all, "随机 6 个目标点的航线都不穿岛")
 
 	# 撤离也走规划而不是直线

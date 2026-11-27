@@ -161,6 +161,24 @@ func _apply_contraband_effects() -> void:
 		hud.ticker("违禁药物生效：船员上限 +20%")
 
 var _region_islands: Dictionary = {}
+var _sprite_pool: Array = []
+static var _isl_cache := {}
+
+func _island_tex(path: String) -> Texture2D:
+	if path == "":
+		return null
+	if _isl_cache.has(path):
+		return _isl_cache[path]
+	var full := "res://art/" + path
+	var tex: Texture2D = null
+	if ResourceLoader.exists(full):
+		tex = load(full)
+	else:
+		var im := Image.new()
+		if im.load(full) == OK:
+			tex = ImageTexture.create_from_image(im)
+	_isl_cache[path] = tex
+	return tex
 
 func _load_region_islands() -> void:
 	if not _region_islands.is_empty():
@@ -174,6 +192,11 @@ func _load_region_islands() -> void:
 	var parsed = JSON.parse_string(f.get_as_text())
 	if typeof(parsed) == TYPE_DICTIONARY:
 		_region_islands = parsed
+		_sprite_pool.clear()
+		for k in _region_islands.keys():
+			for e in _region_islands[k].get("islands", []):
+				if String(e.get("sprite", "")) != "":
+					_sprite_pool.append(e)
 
 func _generate_islands() -> void:
 	islands.clear()
@@ -229,8 +252,21 @@ func _generate_islands() -> void:
 		var specialty: StringName = SPECIALTIES[i % SPECIALTIES.size()]
 		var nm := _island_name(i, tier)
 		GameState.register_port(key, nm, map_index, tier)
-		# [位置, 半径, 等级, 名称, 特产]
-		islands.append([pos, rad, tier, nm, specialty])
+		var spr := ""
+		var wl := 0.0
+		var hl := 0.0
+		if i < art.size():
+			spr = String(art[i].get("sprite", ""))
+			wl = float(art[i].get("w", 0.0))
+			hl = float(art[i].get("h", 0.0))
+		elif not _sprite_pool.is_empty():
+			# 补充岛也复用母版岛屿精灵，保持画风一致
+			var e2: Dictionary = _sprite_pool[(map_index * 7 + i) % _sprite_pool.size()]
+			spr = String(e2.get("sprite", ""))
+			wl = float(e2.get("w", 0.0))
+			hl = float(e2.get("h", 0.0))
+		# [位置, 半径, 等级, 名称, 特产, 精灵, 宽, 高]
+		islands.append([pos, rad, tier, nm, specialty, spr, wl, hl])
 
 ## 把港口贴到最近岛屿的岸边，而不是漂在海面
 func _anchor_port_to_island(want: Vector2) -> Vector2:
@@ -349,9 +385,15 @@ func _draw() -> void:
 	draw_rect(Rect2(40, 40, SEA_SIZE - 80, SEA_SIZE - 80), Color(0.30, 0.52, 0.58), false, 12.0)
 	# 岛屿（避障区另一圈淡环，让玩家看得见"浅滩"范围）
 	for isl in islands:
-		draw_circle(isl[0], isl[1] + AVOID_MARGIN, Color(0.16, 0.30, 0.30, 0.35))
-		draw_circle(isl[0], isl[1], Color(0.30, 0.34, 0.20))
-		draw_circle(isl[0], isl[1] * 0.72, Color(0.36, 0.40, 0.24))
+		draw_circle(isl[0], isl[1] + AVOID_MARGIN, Color(0.16, 0.30, 0.30, 0.22))
+		var itex: Texture2D = _island_tex(String(isl[5])) if isl.size() > 5 else null
+		if itex != null and float(isl[6]) > 0.0:
+			var tw := float(isl[6]) * SEA_SIZE
+			var th := float(isl[7]) * SEA_SIZE
+			draw_texture_rect(itex, Rect2(isl[0] - Vector2(tw, th) * 0.5, Vector2(tw, th)), false)
+		else:
+			draw_circle(isl[0], isl[1], Color(0.30, 0.34, 0.20))
+			draw_circle(isl[0], isl[1] * 0.72, Color(0.36, 0.40, 0.24))
 		draw_arc(isl[0], isl[1], 0, TAU, 40, Color(0.50, 0.55, 0.33), 5.0)
 		var tier := int(isl[2])
 		var tcol := Color(0.62, 0.86, 0.66) if tier >= 3 else (Color(0.78, 0.86, 0.6) if tier == 2 else Color(0.72, 0.74, 0.68))
@@ -1711,7 +1753,7 @@ func _route_to(target: Vector2) -> Array:
 		return [target]
 	var start: Vector2 = player.global_position
 	var pts: Array = [start, target]
-	for iteration in range(8):
+	for iteration in range(14):
 		var inserted := false
 		for i in range(pts.size() - 1):
 			var a: Vector2 = pts[i]
