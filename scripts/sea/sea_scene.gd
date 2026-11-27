@@ -245,8 +245,9 @@ func _generate_islands() -> void:
 		tier = GameState.island_tier_of(key, tier)
 		var rr: Vector2 = ISLAND_RADIUS[tier]
 		var rad: float
-		if i < art.size():
-			rad = rr.x + (rr.y - rr.x) * clampf(float(art[i].get("r", 0.1)) / 0.3, 0.0, 1.0)
+		if i < art.size() and float(art[i].get("rad", 0.0)) > 0.0:
+			# 1.6.16：碰撞半径 = 精灵实际尺度，所见即所撞
+			rad = clampf(float(art[i].get("rad", 0.1)) * SEA_SIZE, 200.0, 900.0)
 		else:
 			rad = rng.randf_range(rr.x, rr.y)
 		var specialty: StringName = SPECIALTIES[i % SPECIALTIES.size()]
@@ -255,18 +256,22 @@ func _generate_islands() -> void:
 		var spr := ""
 		var wl := 0.0
 		var hl := 0.0
+		var port_local := Vector2(0.5, 0.5)
 		if i < art.size():
 			spr = String(art[i].get("sprite", ""))
 			wl = float(art[i].get("w", 0.0))
 			hl = float(art[i].get("h", 0.0))
+			port_local = Vector2(float(art[i].get("px", 0.5)), float(art[i].get("py", 0.5)))
 		elif not _sprite_pool.is_empty():
 			# 补充岛也复用母版岛屿精灵，保持画风一致
 			var e2: Dictionary = _sprite_pool[(map_index * 7 + i) % _sprite_pool.size()]
 			spr = String(e2.get("sprite", ""))
 			wl = float(e2.get("w", 0.0))
 			hl = float(e2.get("h", 0.0))
-		# [位置, 半径, 等级, 名称, 特产, 精灵, 宽, 高]
-		islands.append([pos, rad, tier, nm, specialty, spr, wl, hl])
+			port_local = Vector2(float(e2.get("px", 0.5)), float(e2.get("py", 0.5)))
+		var port_pos := Vector2(port_local.x, port_local.y) * SEA_SIZE
+		# [位置, 半径, 等级, 名称, 特产, 精灵, 宽, 高, 港口岸点]
+		islands.append([pos, rad, tier, nm, specialty, spr, wl, hl, port_pos])
 
 ## 把港口贴到最近岛屿的岸边，而不是漂在海面
 func _anchor_port_to_island(want: Vector2) -> Vector2:
@@ -388,20 +393,25 @@ func _draw() -> void:
 		draw_circle(isl[0], isl[1] + AVOID_MARGIN, Color(0.16, 0.30, 0.30, 0.22))
 		var itex: Texture2D = _island_tex(String(isl[5])) if isl.size() > 5 else null
 		if itex != null and float(isl[6]) > 0.0:
-			var tw := float(isl[6]) * SEA_SIZE
-			var th := float(isl[7]) * SEA_SIZE
+			# 1.6.16：精灵绘制尺寸由碰撞半径决定，视觉与物理完全一致
+			var tw := float(isl[1]) * 2.4
+			var asp := clampf(float(isl[7]) / maxf(0.01, float(isl[6])), 0.5, 2.0)
+			var th := tw * asp
 			draw_texture_rect(itex, Rect2(isl[0] - Vector2(tw, th) * 0.5, Vector2(tw, th)), false)
 		else:
 			draw_circle(isl[0], isl[1], Color(0.30, 0.34, 0.20))
 			draw_circle(isl[0], isl[1] * 0.72, Color(0.36, 0.40, 0.24))
-		draw_arc(isl[0], isl[1], 0, TAU, 40, Color(0.50, 0.55, 0.33), 5.0)
+		# 浅滩海岸环：与碰撞半径一致，提示可停靠边缘
+		draw_arc(isl[0], isl[1] + 60.0, 0, TAU, 48, Color(0.62, 0.84, 0.84, 0.35), 3.0)
 		var tier := int(isl[2])
 		var tcol := Color(0.62, 0.86, 0.66) if tier >= 3 else (Color(0.78, 0.86, 0.6) if tier == 2 else Color(0.72, 0.74, 0.68))
 		draw_string(ThemeDB.fallback_font, isl[0] + Vector2(-60, -float(isl[1]) - 18),
 			"%s·%s" % [String(isl[3]), String(ISLAND_TIERS.get(tier, "港口"))],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 24, tcol)
-		# 港口标记
-		draw_circle(isl[0], 16.0, tcol)
+		# 港口标记（岸点，而非岛心）
+		var pp: Vector2 = isl[8] if isl.size() > 8 else isl[0]
+		draw_circle(pp, 16.0, tcol)
+		draw_circle(pp, 6.0, Color(0.95, 0.85, 0.5))
 	# 任务目标标记（运输/护航 → 哨站）
 	for q in GameState.quests_active:
 		var qt := String(q.get("type", ""))

@@ -738,6 +738,18 @@ func _test_v156_mini_map() -> void:
 		if isl2.size() > 5 and String(isl2[5]) != "":
 			with_spr += 1
 	_ok(with_spr >= 1, "海面岛屿携带母版精灵", str(with_spr))
+	# 1.6.16：艺术岛即真岛（碰撞半径与岸点）
+	var isl0: Array = sea.islands[0]
+	_ok(isl0.size() >= 9, "岛屿条目含岸点", str(isl0.size()))
+	_ok(float(isl0[1]) >= 200.0, "碰撞半径取自精灵尺度", str(isl0[1]))
+	sea.player.global_position = isl0[0] + Vector2(float(isl0[1]) + 60.0, 0.0)
+	await _frames(1)
+	_ok(int(sea.nearest_port_island() if sea.nearest_port_island() != null else -1) == 0,
+		"抵达艺术岛边缘即可停靠", str(sea.nearest_port_island()))
+	sea.player.global_position = isl0[0] + Vector2(float(isl0[1]) + 1200.0, 0.0)
+	await _frames(1)
+	var ni = sea.nearest_port_island()
+	_ok(ni == null or int(ni) != 0, "远离该岛后不可停靠", str(ni))
 	sea.queue_free()
 	await _frames(2)
 	GameState.reset_new_game()
@@ -3498,15 +3510,24 @@ func _test_pathfinding() -> void:
 		prev = p
 	_ok(not slow_zone_hit, "航线不进入岛屿减速带")
 
-	# 直线可达时不应绕路
-	var clear_target: Vector2 = (s.player.global_position + Vector2(0, 500)).clamp(Vector2(100, 100), Vector2(7900, 7900))
-	var direct: Array = s._route_to(clear_target)
-	var blocked := false
-	for i in s.islands:
-		if s._segment_hits_circle(s.player.global_position, clear_target, i[0], i[1] + 40.0):
-			blocked = true
-	if not blocked:
+	# 直线可达时不应绕路（找一个真正开阔的方向）
+	var clear_target := Vector2.ZERO
+	for dirv in [Vector2(0, 500), Vector2(0, -500), Vector2(500, 0), Vector2(-500, 0), Vector2(400, 400), Vector2(-400, -400)]:
+		var cand: Vector2 = (s.player.global_position + dirv).clamp(Vector2(100, 100), Vector2(7900, 7900))
+		var hit := false
+		for i in s.islands:
+			# 与规划器同口径：减速带 + 外扩余量
+			if s._segment_hits_circle(s.player.global_position, cand, i[0], i[1] + s.AVOID_MARGIN + 120.0):
+				hit = true
+				break
+		if not hit:
+			clear_target = cand
+			break
+	if clear_target != Vector2.ZERO:
+		var direct: Array = s._route_to(clear_target)
 		_ok(direct.size() == 1, "无障碍时只有目标点", "waypoints=%d" % direct.size())
+	else:
+		_ok(true, "无障碍时只有目标点（本布局无开阔方向，跳过）")
 
 	# 多岛串联：挑几个开阔水域的远点，航线都必须不穿岛
 	var ok_all := true
@@ -3756,6 +3777,25 @@ func _test_quest_nav() -> void:
 			break
 	if idle != null:
 		idle.target = null
+		# 放到开阔水域，避免岛屿避障干扰闲置判定
+		var free6 := Vector2(4000.0, 4000.0)
+		for gy in range(25, 60, 5):
+			var done6 := false
+			for gx in range(25, 60, 5):
+				var cand6 := Vector2(gx * 100.0, gy * 100.0)
+				var ok6 := true
+				for isl6 in s6.islands:
+					if cand6.distance_to(isl6[0]) < float(isl6[1]) + 900.0:
+						ok6 = false
+						break
+				if ok6:
+					free6 = cand6
+					done6 = true
+					break
+			if done6:
+				break
+		idle.global_position = free6
+		idle.home_pos = free6
 		idle.wander_heading = idle.heading
 		idle.wander_timer = 100.0
 		var steer: float = idle._ai_steer(0.016)

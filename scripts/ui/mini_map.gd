@@ -97,12 +97,15 @@ func _draw() -> void:
 		if isl.size() > 5 and String(isl[5]) != "" and float(isl[6]) > 0.0:
 			var tex: Texture2D = _tex(String(isl[5]))
 			if tex != null:
-				var rw := float(isl[6]) * area.size.x
-				var rh := float(isl[7]) * area.size.y
+				var rw := float(isl[1]) * 2.4 / maxf(1.0, world_size) * area.size.x
+				var asp := clampf(float(isl[7]) / maxf(0.01, float(isl[6])), 0.5, 2.0)
+				var rh := rw * asp
 				draw_texture_rect(tex, Rect2(p - Vector2(rw, rh) * 0.5, Vector2(rw, rh)), false)
 		else:
 			draw_circle(p, maxf(2.5, float(isl[1]) * sc), Color(0.82, 0.74, 0.55))
-		draw_circle(p, 2.5, Color(0.95, 0.75, 0.25))
+		var ppos: Vector2 = isl[8] if isl.size() > 8 else isl[0]
+		var pd := area.position + Vector2(ppos.x, ppos.y) * sc
+		draw_circle(pd, 2.5, Color(0.95, 0.75, 0.25))
 	# 玩家
 	if sea.player != null:
 		var pp: Vector2 = area.position + Vector2(sea.player.global_position.x, sea.player.global_position.y) * sc

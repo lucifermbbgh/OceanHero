@@ -2,9 +2,11 @@ from PIL import Image, ImageFilter
 import numpy as np, json, os, math
 from collections import deque
 W,H=2048,1152
+S=2
 SEA=8000.0
-base=Image.open('art/world_map/chart_base_v3.png').convert('RGB')
-mask=np.asarray(Image.open('art/world_map/land_mask_v2.png').convert('L'))>127
+base=Image.open('art/world_map/chart_base_v3.png').convert('RGB').resize((W*S,H*S),Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=3,percent=140,threshold=2))
+mask=Image.open('art/world_map/land_mask_v2.png').convert('L').resize((W,H),Image.NEAREST)
+mask=np.asarray(mask)>127
 data=json.load(open('data/generated/region_islands.json'))
 os.makedirs('art/islands',exist_ok=True)
 ds=4
@@ -48,17 +50,24 @@ for key,entry in data.items():
         if not ok: continue
         acc.append((cx,cy,rad_est(rec['r'])))
         k=len(out)
-        pad=10
-        gx0=x0+max(0,rec['bx']-pad); gy0=y0+max(0,rec['by']-pad)
-        gx1=x0+min(bw,rec['bx']+int(rec['bw'])+pad); gy1=y0+min(bh,rec['by']+int(rec['bh'])+pad)
-        rgb=base.crop((gx0,gy0,gx1,gy1)).filter(ImageFilter.UnsharpMask(radius=2, percent=130, threshold=2))
-        cm=Image.fromarray((sub[max(0,rec['by']-pad):min(bh,rec['by']+int(rec['bh'])+pad), max(0,rec['bx']-pad):min(bw,rec['bx']+int(rec['bw'])+pad)]*255).astype('uint8'))
-        cm=cm.filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(1.2))
+        pad=6
+        bx0,by0,bx1,by1=max(0,rec['bx']-pad),max(0,rec['by']-pad),min(bw,rec['bx']+int(rec['bw'])+pad),min(bh,rec['by']+int(rec['bh'])+pad)
+        cmask=sub[by0:by1,bx0:bx1]
+        if cmask.mean()<0.04: continue
+        rgb=base.crop(((x0+bx0)*S, (y0+by0)*S, (x0+bx1)*S, (y0+by1)*S))
+        cm=Image.fromarray((cmask*255).astype('uint8')).filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(1.5))
+        cm=cm.resize((rgb.width, rgb.height), Image.LANCZOS)
         spr=Image.new('RGBA',rgb.size)
         spr.paste(rgb,(0,0),cm)
         name='isl_%s_%d.png'%(key,k)
         spr.save('art/islands/'+name)
-        out.append({'x':round(cx,4),'y':round(cy,4),'r':round(rec['r'],4),'w':round(rec['bw']/bw,4),'h':round(rec['bh']/bh,4),'sprite':'islands/'+name})
+        w=rec['bw']/bw; h=rec['bh']/bh
+        rad=min(0.1125,max(0.025,max(w,h)*0.45))
+        dx,dy=0.5-cx,0.5-cy
+        L=math.hypot(dx,dy) or 1.0
+        px_=cx+dx/L*rad*0.8; py_=cy+dy/L*rad*0.8
+        out.append({'x':round(cx,4),'y':round(cy,4),'r':round(rec['r'],4),'w':round(w,4),'h':round(h,4),
+            'rad':round(rad,4),'px':round(px_,4),'py':round(py_,4),'sprite':'islands/'+name})
     entry['islands']=out
 json.dump(data,open('data/generated/region_islands.json','w'),ensure_ascii=False,indent=1)
-print('sprites filtered', sum(len(v['islands']) for v in data.values()))
+print('sprites v2', sum(len(v['islands']) for v in data.values()))
