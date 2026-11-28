@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1620_crew_portraits()
 	await _test_v1619_modcan_icons()
 	await _test_v1618_gear_icons()
 	await _test_v1617_commodity_icons()
@@ -702,6 +703,49 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.6.20 船员头像 ----------------
+func _test_v1620_crew_portraits() -> void:
+	print("\n[1.6.20 船员头像]")
+	GameState.reset_new_game()
+	var miss := 0
+	for post in ["mate", "gunner", "surgeon", "sailor"]:
+		for look in range(6):
+			if not FileAccess.file_exists("res://art/icons/crew/crew_%s_%d.png" % [post, look]):
+				miss += 1
+	_ok(miss == 0, "24 枚船员头像齐全", str(miss))
+	var cp = load("res://scripts/ui/crew_portrait.gd")
+	var cf = load("res://scripts/systems/crew_factory.gd")
+	var c = cf.generate(1)[0]
+	c.display_name = "陈阿七"
+	c.role = &"mate"
+	c.rarity = 3
+	_ok(cp.look_of(c) == cp.look_of(c), "同一船员面孔稳定")
+	_ok(cp.texture(c) != null, "头像贴图可加载")
+	_ok(cp.path_of(c).ends_with("/crew_mate_%d.png" % cp.look_of(c)), "岗位决定头像目录")
+	c.role = &"collector"
+	_ok(cp.path_of(c).contains("/crew_mate_"), "collector 复用大副头像")
+	c.role = &"mate"
+	c.rarity = 0
+	var ic: Control = cp.icon(c, 40)
+	_ok(ic != null and ic.get_child_count() == 1, "头像控件带贴图")
+	ic.free()
+	# 酒馆名册/招募行接入头像
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	GameState.crew_roster.clear()
+	GameState.crew_roster.append(c)
+	s._toggle_tavern()
+	await _frames(1)
+	var shown := 0
+	for n in s.tavern_list.find_children('*', 'TextureRect', true, false):
+		if n.texture != null:
+			shown += 1
+	_ok(shown >= 2, "酒馆行显示头像", str(shown))
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.6.19 模块/火炮/弹药图标 ----------------
 func _test_v1619_modcan_icons() -> void:

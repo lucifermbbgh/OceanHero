@@ -8,6 +8,7 @@ const LootSystem = preload("res://scripts/systems/loot_system.gd")
 const CombatResolver = preload("res://scripts/systems/combat_resolver.gd")
 const MarketModel = preload("res://scripts/systems/market_model.gd")
 const Rarity = preload("res://scripts/ui/rarity.gd")
+const CrewPortrait = preload("res://scripts/ui/crew_portrait.gd")
 const StatsLib = preload("res://scripts/systems/ship_stats.gd")
 
 ## 海域邻接表：从某条边出去会到哪张图（0 = 母港）
@@ -777,6 +778,7 @@ func _rebuild_port() -> void:
 			var thb := HBoxContainer.new()
 			thb.add_theme_constant_override("separation", 10)
 			port_list.add_child(thb)
+			thb.add_child(CrewPortrait.icon(cw, 36))
 			thb.add_child(_p_lbl(String(cw.display_name), 150))
 			thb.add_child(_p_lbl("%s · %s" % [
 				String(CrewFactory.ROLE_NAMES.get(StringName(cw.role), String(cw.role))),

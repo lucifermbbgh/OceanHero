@@ -4,6 +4,7 @@ extends Node2D
 const MarketModel = preload("res://scripts/systems/market_model.gd")
 const StatsLib = preload("res://scripts/systems/ship_stats.gd")
 const Rarity = preload("res://scripts/ui/rarity.gd")
+const CrewPortrait = preload("res://scripts/ui/crew_portrait.gd")
 const CrewFactory = preload("res://scripts/systems/crew_factory.gd")
 func _pid() -> StringName:
 	return GameState.visit_port_id
@@ -1598,6 +1599,7 @@ func _rebuild_tavern() -> void:
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 8)
 		tavern_list.add_child(hb)
+		hb.add_child(CrewPortrait.icon(c, 40))
 		hb.add_child(_lbl(c.display_name, 80, Rarity.color(int(c.rarity))))
 		hb.add_child(_lbl(String(CrewFactory.ROLE_NAMES.get(StringName(c.role), String(c.role))), 80))
 		hb.add_child(_lbl(Rarity.name_of(int(c.rarity)), 70, Rarity.color(int(c.rarity))))
@@ -1621,6 +1623,7 @@ func _rebuild_tavern() -> void:
 		var hb2 := HBoxContainer.new()
 		hb2.add_theme_constant_override("separation", 8)
 		tavern_list.add_child(hb2)
+		hb2.add_child(CrewPortrait.icon(c, 40))
 		hb2.add_child(_lbl(c.display_name, 80, Rarity.color(int(c.rarity))))
 		hb2.add_child(_lbl(String(CrewFactory.ROLE_NAMES.get(StringName(c.role), String(c.role))), 80))
 		hb2.add_child(_lbl(Rarity.name_of(int(c.rarity)), 70, Rarity.color(int(c.rarity))))
@@ -2092,9 +2095,10 @@ func _rebuild_crew_panel() -> void:
 		row.add_theme_constant_override("separation", 0)
 		crew_list.add_child(row)
 		var cid: StringName = c.crew_id
+		row.add_child(CrewPortrait.icon(c, 40))
 		row.add_child(_cell_box(String(c.display_name), 200))
-		row.add_child(_cell_box(String(c.role), 140))
-		row.add_child(_cell_box(str(int(c.rarity)), 120))
+		row.add_child(_cell_box(String(CrewFactory.ROLE_NAMES.get(StringName(c.role), String(c.role))), 140))
+		row.add_child(_cell_box(Rarity.name_of(int(c.rarity)), 120, Rarity.color(int(c.rarity))))
 		row.add_child(_cell_box(GameState.crew_rank_name(cid), 140, Color(0.95, 0.9, 0.55)))
 		row.add_child(_cell_box(str(int(GameState.crew_xp.get(cid, 0))), 140))
 		row.add_child(_cell_box(str(int(c.stat)), 120))
