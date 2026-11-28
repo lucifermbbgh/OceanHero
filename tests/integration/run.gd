@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1617_commodity_icons()
 	await _test_v1613_chart_wiring()
 	await _test_v156_mini_map()
 	await _test_v153_world_map()
@@ -699,6 +700,29 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.6.17 商品图标 ----------------
+func _test_v1617_commodity_icons() -> void:
+	print("\n[1.6.17 商品图标]")
+	GameState.reset_new_game()
+	var missing := 0
+	for k in DataRegistry.commodities.keys():
+		if not FileAccess.file_exists("res://art/icons/commodity/%s.png" % String(k)):
+			missing += 1
+	_ok(missing == 0, "28 种商品图标齐全", str(missing))
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	_ok(s._com_icon("wheat") != null, "小麦图标可加载")
+	s._toggle_market()
+	await _frames(1)
+	var icons := 0
+	for n in s.market_list.find_children('*', 'TextureRect', true, false):
+		icons += 1
+	_ok(icons >= 3, "市场行显示图标", str(icons))
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.6.13 海图接入 ----------------
 func _test_v1613_chart_wiring() -> void:

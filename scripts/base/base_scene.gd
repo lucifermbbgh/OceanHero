@@ -737,6 +737,7 @@ func _rebuild_market() -> void:
 		market_list.add_child(row)
 		var have := int(GameState.cargo.get(id, 0))
 		var in_wh := int(GameState.warehouse.get(id, 0))
+		row.add_child(_icon_rect(String(id)))
 		row.add_child(_cell_box(c.display_name, 150))
 		row.add_child(_cell_box(str(bp), 120))
 		row.add_child(_cell_box(str(sp), 120))
@@ -2340,6 +2341,31 @@ func _ship_slot_pos(mid: String, layer: int, tier: int) -> Vector2:
 		step = 0.110
 	return Vector2(a.x * w, (a.y + step * float(layer)) * h)
 
+## 1.6.17：商品图标（白底抠除后的 RGBA）
+static var _com_icon_cache := {}
+
+func _com_icon(cid: String) -> Texture2D:
+	if _com_icon_cache.has(cid):
+		return _com_icon_cache[cid]
+	var path := "res://art/icons/commodity/%s.png" % cid
+	var tex: Texture2D = null
+	if ResourceLoader.exists(path):
+		tex = load(path)
+	else:
+		var im := Image.new()
+		if im.load(path) == OK:
+			tex = ImageTexture.create_from_image(im)
+	_com_icon_cache[cid] = tex
+	return tex
+
+func _icon_rect(cid: String, px: float = 26.0) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.texture = _com_icon(cid)
+	tr.custom_minimum_size = Vector2(px, px)
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.visible = tr.texture != null
+	return tr
+
 ## 1.5.1：按稀有度从高到低排序（船员/装备/物品通用）
 func _rarity_of(x) -> int:
 	if x is Dictionary:
@@ -2876,6 +2902,7 @@ func _rebuild_store() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 0)
 		store_list.add_child(row)
+		row.add_child(_icon_rect(String(cid)))
 		row.add_child(_cell_box(String(cdef.display_name), 180))
 		row.add_child(_cell_box(String(GameState.CATEGORY_NAMES.get(String(cdef.category), String(cdef.category))), 110))
 		row.add_child(_cell_box(str(in_ship), 110, Color(0.95, 0.9, 0.55) if in_ship > 0 else Color(0.6, 0.6, 0.6)))
