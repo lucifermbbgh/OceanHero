@@ -2369,6 +2369,14 @@ func _icon_rect(cid: String, px: float = 26.0) -> TextureRect:
 func _gear_icon_rect(gid: String, px: float = 26.0) -> TextureRect:
 	return _icon_rect_path("res://art/icons/gear/%s.png" % gid, px)
 
+## 1.6.21：舰船立绘（3:2 横幅，sid 可为基准船或变体 id）
+func _ship_icon_rect(sid: String, h: float = 40.0) -> TextureRect:
+	var tr := _icon_rect_path("res://art/icons/ship/%s.png" % sid, h)
+	tr.custom_minimum_size = Vector2(h * 1.5, h)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return tr
+
 func _icon_rect_path(path: String, px: float) -> TextureRect:
 	var tr := TextureRect.new()
 	if _com_icon_cache.has(path):
@@ -2383,6 +2391,7 @@ func _icon_rect_path(path: String, px: float) -> TextureRect:
 				tex = ImageTexture.create_from_image(im)
 		_com_icon_cache[path] = tex
 		tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.custom_minimum_size = Vector2(px, px)
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.visible = tr.texture != null
@@ -2463,7 +2472,8 @@ func _rebuild_ship_panel() -> void:
 		var lv := layer
 		btn.pressed.connect(func(): _open_ship_slot(midv, lv))
 		ship_area.add_child(btn)
-	# 右侧属性
+	# 右侧属性（1.6.21 顶部船立绘）
+	ship_stats_box.add_child(_ship_icon_rect("%s_%s" % [String(GameState.ship_def_id), String(GameState.ship_variant)], 96))
 	var stt: Dictionary = GameState.stats()
 	for pair in [
 		["船体", "%d / %d" % [int(minf(GameState.hull_hp, float(stt.get("hull_max", 0.0))) if GameState.hull_hp >= 0.0 else float(stt.get("hull_max", 0.0))), int(stt.get("hull_max", 0.0))]],
@@ -3574,6 +3584,7 @@ func _rebuild_yard() -> void:
 	_yard_title("船厂 —— %s·%s" % [def.display_name, String(st.get("variant_name", ""))])
 	var info := HBoxContainer.new()
 	info.add_theme_constant_override("separation", 10)
+	info.add_child(_ship_icon_rect("%s_%s" % [String(GameState.ship_def_id), String(GameState.ship_variant)], 64))
 	info.add_child(_lbl("船体 %.0f" % float(st.get("hull_max", 0)), 110))
 	info.add_child(_lbl("炮位 %d（单侧 %d）" % [int(def.cannon_slots), int(st.get("guns_per_side", 1))], 150))
 	info.add_child(_lbl("航速 %.0f" % float(st.get("base_speed_px", 0)), 100))
@@ -3690,6 +3701,7 @@ func _rebuild_yard() -> void:
 		hb.add_theme_constant_override("separation", 8)
 		yard_list.add_child(hb)
 		var edef: Resource = DataRegistry.get_ship(StringName(entry.get("def_id", "")))
+		hb.add_child(_ship_icon_rect(String(entry.get("def_id", "")), 40))
 		var vname := String(StatsLib.VARIANT_NAMES.get(StringName(entry.get("variant", "standard")), ""))
 		hb.add_child(_lbl("%s·%s" % [edef.display_name, vname] if edef != null else "未知船", 320))
 		var hp: float = float(entry.get("hull_hp", -1.0))
@@ -3724,6 +3736,7 @@ func _rebuild_yard() -> void:
 			vcolor = Color(0.55, 0.72, 0.92)
 		elif StringName(d.variant) == &"pirate":
 			vcolor = Color(0.9, 0.55, 0.5)
+		hb.add_child(_ship_icon_rect(String(d.id), 40))
 		hb.add_child(_lbl("%s·%s" % [d.display_name, vname2], 260, vcolor))
 		hb.add_child(_lbl("炮 %d" % int(d.cannon_slots), 70))
 		hb.add_child(_lbl("%d 金" % int(d.price), 110, Color(0.9, 0.82, 0.45)))

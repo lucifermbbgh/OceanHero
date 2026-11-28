@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1621_ship_icons()
 	await _test_v1620_crew_portraits()
 	await _test_v1619_modcan_icons()
 	await _test_v1618_gear_icons()
@@ -703,6 +704,37 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.6.21 舰船立绘 ----------------
+func _test_v1621_ship_icons() -> void:
+	print("\n[1.6.21 舰船立绘]")
+	GameState.reset_new_game()
+	var miss := 0
+	for k in DataRegistry.ships.keys():
+		if not FileAccess.file_exists("res://art/icons/ship/%s.png" % String(k)):
+			miss += 1
+	_ok(miss == 0, "68 张舰船图标（17 基准 + 51 变体）齐全", str(miss))
+	var s = load("res://scenes/base/base_scene.tscn").instantiate()
+	add_child(s)
+	await _frames(3)
+	var tr: TextureRect = s._ship_icon_rect("fishing_sloop_standard", 40)
+	_ok(tr.texture != null, "舰船图标可加载")
+	_ok(is_equal_approx(tr.custom_minimum_size.x, 60.0), "舰船图标 3:2 横幅", str(tr.custom_minimum_size))
+	s._toggle_yard()
+	await _frames(1)
+	var icons := 0
+	for n in s.yard_list.find_children('*', 'TextureRect', true, false):
+		icons += 1
+	_ok(icons >= 3, "船厂显示船立绘", str(icons))
+	s._toggle_ship()
+	await _frames(1)
+	var hero := 0
+	for n in s.ship_stats_box.find_children('*', 'TextureRect', true, false):
+		hero += 1
+	_ok(hero >= 1, "舰船面板顶部显示立绘", str(hero))
+	s.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.6.20 船员头像 ----------------
 func _test_v1620_crew_portraits() -> void:
