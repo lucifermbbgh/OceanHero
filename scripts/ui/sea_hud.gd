@@ -279,7 +279,15 @@ func _build_command_bar(root: Control) -> void:
 	for id in ["solid", "chain", "grape"]:
 		var b := Button.new()
 		b.text = ammo_names[id]
-		b.custom_minimum_size = Vector2(96, 38)
+		b.custom_minimum_size = Vector2(118, 38)
+		var ap := "res://art/icons/ammo/%s.png" % id
+		if ResourceLoader.exists(ap):
+			b.icon = load(ap)
+		else:
+			var aim := Image.new()
+			if aim.load(ap) == OK:
+				b.icon = ImageTexture.create_from_image(aim)
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(func(): ammo_selected.emit(StringName(id)))
 		hb.add_child(b)
 		_ammo_buttons[StringName(id)] = b

@@ -2497,13 +2497,21 @@ func _open_ship_slot(mid: String, layer: int) -> void:
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 6)
 	dlg.add_child(vb)
+	# 模块图标
+	var mrow := HBoxContainer.new()
+	mrow.add_theme_constant_override("separation", 8)
+	vb.add_child(mrow)
+	mrow.add_child(_icon_rect_path("res://art/icons/module/%s.png" % mid, 40))
+	var mcol := VBoxContainer.new()
+	mcol.add_theme_constant_override("separation", 4)
+	mrow.add_child(mcol)
 	# 强化信息
 	var lv := GameState.module_level(mid, layer)
 	var cap := GameState.module_level_cap()
 	var cost: Dictionary = GameState.module_upgrade_cost(mid, layer)
 	var info := "等级 %d / %d　强化：%d 金 · 木 %d · 铁 %d" % [
 		lv, cap, int(cost["gold"]), int(cost["timber"]), int(cost["iron"])]
-	vb.add_child(_lbl(info, 520, Color(0.85, 0.85, 0.7)))
+	mcol.add_child(_lbl(info, 470, Color(0.85, 0.85, 0.7)))
 	var ub := Button.new()
 	ub.text = "强化" if lv < cap else "已满级"
 	ub.custom_minimum_size = Vector2(120, 30)
@@ -3586,6 +3594,7 @@ func _rebuild_yard() -> void:
 		var ok_f: bool = int(c.pound_class) <= foundry_cap
 		var ok_w: bool = int(c.pound_class) <= max_w
 		var ok_all: bool = ok_f and ok_w
+		hb.add_child(_icon_rect_path("res://art/icons/cannon/%s.png" % String(c.id), 28))
 		hb.add_child(_lbl(c.display_name, 120, Color(0.85, 0.85, 0.8) if ok_all else Color(0.45, 0.45, 0.45)))
 		hb.add_child(_lbl("伤害 %.0f" % float(c.damage), 90))
 		hb.add_child(_lbl("装填 %.1fs" % float(c.reload_seconds), 100))

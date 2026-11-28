@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _test_exchange()
 	await _test_cross_port()
 	await _test_quest_board()
+	await _test_v1619_modcan_icons()
 	await _test_v1618_gear_icons()
 	await _test_v1617_commodity_icons()
 	await _test_v1613_chart_wiring()
@@ -701,6 +702,34 @@ func _test_island_and_bounds() -> void:
 func _physics_wait(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
+
+# ---------------- 1.6.19 模块/火炮/弹药图标 ----------------
+func _test_v1619_modcan_icons() -> void:
+	print("\n[1.6.19 模块火炮弹药图标]")
+	GameState.reset_new_game()
+	var miss := 0
+	for k in DataRegistry.modules.keys():
+		if not FileAccess.file_exists("res://art/icons/module/%s.png" % String(k)):
+			miss += 1
+	for k2 in DataRegistry.cannons.keys():
+		if not FileAccess.file_exists("res://art/icons/cannon/%s.png" % String(k2)):
+			miss += 1
+	for a in ["solid", "chain", "grape"]:
+		if not FileAccess.file_exists("res://art/icons/ammo/%s.png" % a):
+			miss += 1
+	_ok(miss == 0, "25 枚模块/火炮/弹药图标齐全", str(miss))
+	var sea = load("res://scenes/sea/sea_scene.tscn").instantiate()
+	add_child(sea)
+	await _frames(4)
+	var with_icon := 0
+	for bid in ["solid", "chain", "grape"]:
+		var btn: Button = sea.hud._ammo_buttons[StringName(bid)]
+		if btn != null and btn.icon != null:
+			with_icon += 1
+	_ok(with_icon == 3, "弹药按钮带图标", str(with_icon))
+	sea.queue_free()
+	await _frames(2)
+	GameState.reset_new_game()
 
 # ---------------- 1.6.18 装备图标 ----------------
 func _test_v1618_gear_icons() -> void:
