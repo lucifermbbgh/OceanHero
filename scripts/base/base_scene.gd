@@ -2359,8 +2359,26 @@ func _com_icon(cid: String) -> Texture2D:
 	return tex
 
 func _icon_rect(cid: String, px: float = 26.0) -> TextureRect:
+	return _icon_rect_path("res://art/icons/commodity/%s.png" % cid, px)
+
+## 1.6.18：装备图标
+func _gear_icon_rect(gid: String, px: float = 26.0) -> TextureRect:
+	return _icon_rect_path("res://art/icons/gear/%s.png" % gid, px)
+
+func _icon_rect_path(path: String, px: float) -> TextureRect:
 	var tr := TextureRect.new()
-	tr.texture = _com_icon(cid)
+	if _com_icon_cache.has(path):
+		tr.texture = _com_icon_cache[path]
+	else:
+		var tex: Texture2D = null
+		if ResourceLoader.exists(path):
+			tex = load(path)
+		else:
+			var im := Image.new()
+			if im.load(path) == OK:
+				tex = ImageTexture.create_from_image(im)
+		_com_icon_cache[path] = tex
+		tr.texture = tex
 	tr.custom_minimum_size = Vector2(px, px)
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.visible = tr.texture != null
@@ -3624,6 +3642,7 @@ func _rebuild_yard() -> void:
 			var hb := HBoxContainer.new()
 			hb.add_theme_constant_override("separation", 8)
 			yard_list.add_child(hb)
+			hb.add_child(_gear_icon_rect(String(g.id), 28))
 			hb.add_child(_lbl("[%s] %s" % [slot_names.get(String(slot), ""), g.display_name], 200, Rarity.color(int(g.rarity))))
 			hb.add_child(_lbl(g.bonus_text(), 190, Color(0.75, 0.8, 0.8)))
 			hb.add_child(_lbl("稀有度 %s" % Rarity.name_of(int(g.rarity)), 90, Color(0.6, 0.65, 0.65)))
